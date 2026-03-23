@@ -1,0 +1,167 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Ngăn 2 deploy chạy song song — queue thay vì cancel (cancel giữa chừng nguy hiểm hơn chờ)
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/${{ github.event.repository.name }}
+  APP_DIR: /opt/tekspace
+
+jobs:
+  build-and-push:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_name: ${{ steps.image.outputs.name }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set lowercase image name
+        id: image
+        run: echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+            VITE_APP_URL=${{ secrets.VITE_APP_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE }}
+          IMAGE_NAME: ${{ needs.build-and-push.outputs.image_name }}
+        run: |
+          # Dùng printf '%s' thay vì printf '%s\n' hoặc echo để tránh vấn đề với ký tự đặc biệt
+          printf '%s' "$ENV_CONTENT" > .env.production
+          echo "" >> .env.production
+          echo "GITHUB_REPOSITORY=${IMAGE_NAME}" >> .env.production
+          chmod 600 .env.production
+
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          source: ".env.production,docker-compose.prod.yml,nginx/"
+          target: ${{ env.APP_DIR }}
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          # Truyền secrets qua env vars thay vì inline trong script (tránh shell injection)
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+          IMAGE_NAME: ${{ needs.build-and-push.outputs.image_name }}
+          APP_DIR: ${{ env.APP_DIR }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          envs: GHCR_TOKEN,GH_ACTOR,IMAGE_NAME,APP_DIR
+          script: |
+            cd "$APP_DIR"
+
+            # Rename env file và set permissions chặt
+            mv .env.production .env
+            chmod 600 .env
+
+            # Login to GitHub Container Registry (dùng env var, không inline secret)
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
+
+            # Pull latest image
+            docker pull "ghcr.io/${IMAGE_NAME}:latest"
+
+            # Stop and remove old container
+            docker compose -f docker-compose.prod.yml down || true
+
+            # Start new container
+            docker compose -f docker-compose.prod.yml up -d
+
+            # Health check (sleep cho container khởi động)
+            sleep 10
+            curl -f http://localhost:3003/health || exit 1
+
+            # Cleanup old images SAU KHI health check pass (để có thể rollback nếu fail)
+            docker image prune -f
+
+            echo "Deployment completed successfully!"
+
+      - name: Setup Nginx and SSL
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DOMAIN: ${{ secrets.DOMAIN }}
+          SSL_EMAIL: ${{ secrets.SSL_EMAIL }}
+          APP_DIR: ${{ env.APP_DIR }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          envs: DOMAIN,SSL_EMAIL,APP_DIR
+          script: |
+            cd "$APP_DIR"
+
+            chmod +x nginx/setup-nginx.sh
+            # Dùng quoted vars để tránh word splitting / shell injection
+            ./nginx/setup-nginx.sh "$DOMAIN" "$SSL_EMAIL" "$APP_DIR"
+
+            sleep 5
+            curl -f "https://${DOMAIN}/" || echo "Warning: HTTPS health check failed, but deployment continued"
+
+            echo "Nginx and SSL setup completed!"

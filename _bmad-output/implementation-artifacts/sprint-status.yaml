@@ -1,0 +1,112 @@
+# generated: 2026-03-23
+# last_updated: 2026-03-23
+# project: TekSpace
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-03-23
+last_updated: 2026-03-23 (story 1-1 → done)
+project: TekSpace
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # ─────────────────────────────────────────────
+  # Epic 1: Foundation & Team Onboarding
+  # ─────────────────────────────────────────────
+  epic-1: in-progress
+  1-1-project-setup-supabase-foundation: done
+  1-2-user-registration-login: backlog
+  1-3-password-management: backlog
+  1-4-tenant-creation-team-settings: backlog
+  1-5-member-invitation-onboarding: backlog
+  1-6-team-role-membership-management: backlog
+  1-7-tenant-switcher-personal-profile: backlog
+  epic-1-retrospective: optional
+
+  # ─────────────────────────────────────────────
+  # Epic 2: Schedule Registration
+  # ─────────────────────────────────────────────
+  epic-2: backlog
+  2-1-weekly-schedule-registration: backlog
+  2-2-schedule-template-from-previous-week: backlog
+  2-3-schedule-change-deadline-lock: backlog
+  2-4-missed-deadline-auto-handling: backlog
+  epic-2-retrospective: optional
+
+  # ─────────────────────────────────────────────
+  # Epic 3: Team Visibility & Self-Dashboard
+  # ─────────────────────────────────────────────
+  epic-3: backlog
+  3-1-team-overview-dashboard: backlog
+  3-2-realtime-who-is-online-timezone-view: backlog
+  3-3-member-self-dashboard: backlog
+  epic-3-retrospective: optional
+
+  # ─────────────────────────────────────────────
+  # Epic 4: Daily Report
+  # ─────────────────────────────────────────────
+  epic-4: backlog
+  4-1-submit-daily-report: backlog
+  4-2-cross-validation-discrepancy-detection: backlog
+  4-3-manager-report-view: backlog
+  epic-4-retrospective: optional
+
+  # ─────────────────────────────────────────────
+  # Epic 5: Hours Analytics
+  # ─────────────────────────────────────────────
+  epic-5: backlog
+  5-1-committed-hours-configuration: backlog
+  5-2-team-hours-analytics-dashboard: backlog
+  5-3-member-self-analytics-history: backlog
+  epic-5-retrospective: optional
+
+  # ─────────────────────────────────────────────
+  # Epic 6: Smart Notifications
+  # ─────────────────────────────────────────────
+  epic-6: backlog
+  6-1-in-app-notification-center: backlog
+  6-2-schedule-deadline-notifications: backlog
+  6-3-daily-report-reminder: backlog
+  6-4-event-based-notifications: backlog
+  epic-6-retrospective: optional
+
+  # ─────────────────────────────────────────────
+  # Epic 7: Incident Management
+  # ─────────────────────────────────────────────
+  epic-7: backlog
+  7-1-log-incident: backlog
+  7-2-member-incident-view-appeal: backlog
+  7-3-incident-history-audit-trail: backlog
+  epic-7-retrospective: optional

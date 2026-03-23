@@ -1,0 +1,16 @@
+services:
+  admin:
+    image: ghcr.io/${GITHUB_REPOSITORY:-your-org/tekspace}:latest
+    container_name: tekspace
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      # Bind to loopback only — TLS termination bởi VPS nginx
+      - "127.0.0.1:3003:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
