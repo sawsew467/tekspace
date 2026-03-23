@@ -1,14 +1,12 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { useAuthStore } from '@/stores/auth-store'
+import { useTenantStore } from '@/stores/tenant-store'
+import { ROUTES } from '@/lib/routes'
 
-// Layout placeholder + auth guard stub
-// Story 1.2 sẽ implement sign-in form đầy đủ
-// Story 1.7 sẽ implement tenant switcher logic
+// Session timeout: dùng Supabase JWT Expiry = 86400s (24h) trên Dashboard
+// TODO: implement true 24h-inactive tracking (per-event) in post-MVP
 
 export const Route = createFileRoute('/_app')({
-  // Dùng context.supabase.auth.getSession() thay vì đọc Zustand snapshot
-  // vì onAuthStateChange là async — snapshot có thể là null trên cold load
-  // dù user có valid session được lưu trong storage
   beforeLoad: async ({ context }) => {
     const {
       data: { session },
@@ -16,17 +14,20 @@ export const Route = createFileRoute('/_app')({
     } = await context.supabase.auth.getSession()
 
     if (error || !session) {
-      throw redirect({ to: '/sign-in' })
+      throw redirect({ to: ROUTES.signIn })
     }
 
-    // Sync session vào store để components có thể đọc synchronously
+    // Sync session vào auth-store để components có thể đọc synchronously
     useAuthStore.getState().setSession(session)
+
+    // Khởi tạo tenant context từ JWT claims (không cần DB query thêm)
+    useTenantStore.getState().initFromSession(session.access_token)
   },
   component: AppLayout,
 })
 
 function AppLayout() {
-  // Layout stub — Header + Sidebar + Outlet sẽ implement đầy đủ trong Story 1.2+
+  // Layout stub — Header + Sidebar + Outlet sẽ implement đầy đủ trong Story 1.4+
   return (
     <div className='flex min-h-svh'>
       {/* Sidebar placeholder */}
