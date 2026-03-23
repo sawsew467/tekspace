@@ -42,3 +42,46 @@ export const initTenantAndGetRoute = (session: Session): string => {
 
   return ROUTES.app.createTenant
 }
+
+export const requestPasswordReset = async (email: string) => {
+  // Fallback về origin hiện tại nếu VITE_APP_URL không được set
+  const appUrl = import.meta.env.VITE_APP_URL ?? window.location.origin
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${appUrl}${ROUTES.resetPassword}`,
+  })
+  if (error) throw error
+}
+
+export const updatePassword = async (newPassword: string) => {
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+}
+
+/**
+ * Xác minh mật khẩu hiện tại bằng cách re-authenticate, sau đó cập nhật mật khẩu mới.
+ *
+ * ⚠️ Side effect: signInWithPassword tạo session mới (rotate refresh token).
+ * Điều này là bình thường — user vẫn là chính họ, không có navigation side effect.
+ * Nếu updateUser fail sau khi signIn thành công, session đã được refresh nhưng
+ * password chưa đổi — caller sẽ nhận updateError và nên thông báo user thử lại.
+ *
+ * @throws {{ code: 'INVALID_CURRENT_PASSWORD' }} khi currentPassword sai
+ * @throws {AuthError} khi updateUser thất bại (network, policy, v.v.)
+ */
+export const verifyAndChangePassword = async (
+  email: string,
+  currentPassword: string,
+  newPassword: string,
+) => {
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+  })
+  if (signInError) {
+    throw Object.assign(new Error('invalid_current_password'), {
+      code: 'INVALID_CURRENT_PASSWORD',
+    })
+  }
+  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+  if (updateError) throw updateError
+}
