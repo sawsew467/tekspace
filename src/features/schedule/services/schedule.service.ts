@@ -111,6 +111,42 @@ export const ScheduleService = {
     return data ?? []
   },
 
+  // Cập nhật một slot riêng lẻ với lý do bắt buộc (Story 2.3)
+  // RPC atomic: update slot + audit trail + notify managers
+  // isEmergencyOverride = true cho phép bypass deadline lock
+  updateSlotWithReason: async (
+    slotId: string,
+    newStartTimeUTC: Date,
+    newDurationMinutes: number,
+    reason: string,
+    isEmergencyOverride: boolean = false
+  ): Promise<void> => {
+    const { error } = await supabase.rpc('update_slot_with_reason', {
+      p_slot_id:               slotId,
+      p_new_start_time:        newStartTimeUTC.toISOString(),
+      p_new_duration_minutes:  newDurationMinutes,
+      p_reason:                reason,
+      p_is_emergency_override: isEmergencyOverride,
+    })
+    if (error) throw error
+  },
+
+  // Xóa một slot riêng lẻ với lý do bắt buộc (Story 2.3)
+  // RPC atomic: notify managers + delete slot
+  // isEmergencyOverride = true cho phép bypass deadline lock
+  deleteSlotWithReason: async (
+    slotId: string,
+    reason: string,
+    isEmergencyOverride: boolean = false
+  ): Promise<void> => {
+    const { error } = await supabase.rpc('delete_slot_with_reason', {
+      p_slot_id:               slotId,
+      p_reason:                reason,
+      p_is_emergency_override: isEmergencyOverride,
+    })
+    if (error) throw error
+  },
+
   // Upsert toàn bộ slots cho một week — atomic via RPC upsert_week_slots
   // RPC wrap delete + insert + audit trong 1 plpgsql transaction.
   // tenantId không cần truyền — RPC lấy từ JWT (current_tenant_id()).

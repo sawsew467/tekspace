@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { slotFormSchema, calcDurationMinutes, formatDuration } from '../schemas/schedule.schema'
-import { hasOverlapWithExisting, shiftSlotsToCurrentWeek } from '../utils/schedule.utils'
+import { hasOverlapWithExisting, shiftSlotsToCurrentWeek, isSlotLocked } from '../utils/schedule.utils'
 import type { ScheduleSlot } from '../services/schedule.service'
 
 // ── slotFormSchema tests ─────────────────────────────────────────────────────
@@ -286,5 +286,39 @@ describe('shiftSlotsToCurrentWeek', () => {
       duration_minutes: 120,
     })]
     expect(() => shiftSlotsToCurrentWeek(slots, 'UTC')).toThrow('thiếu start_time')
+  })
+})
+
+// ── isSlotLocked tests ────────────────────────────────────────────────────────
+
+describe('isSlotLocked', () => {
+  it('returns true when start_time is in the past (slot đã bắt đầu)', () => {
+    // Slot bắt đầu 1 giờ trước → locked
+    const pastTime = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    expect(isSlotLocked(pastTime)).toBe(true)
+  })
+
+  it('returns true when start_time is 1ms before now (just past boundary)', () => {
+    // Dùng Date.now()-1 thay vì Date.now() chính xác để tránh flakiness trong test runner
+    const justNow = new Date(Date.now() - 1).toISOString()
+    expect(isSlotLocked(justNow)).toBe(true)
+  })
+
+  it('returns false when start_time is in the future (slot chưa bắt đầu)', () => {
+    // Slot bắt đầu 1 giờ sau → unlocked
+    const futureTime = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    expect(isSlotLocked(futureTime)).toBe(false)
+  })
+
+  it('returns false for slot starting far in the future', () => {
+    // Slot tuần sau → unlocked
+    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    expect(isSlotLocked(nextWeek)).toBe(false)
+  })
+
+  it('returns true for slot starting far in the past', () => {
+    // Slot tháng trước → locked
+    const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    expect(isSlotLocked(lastMonth)).toBe(true)
   })
 })

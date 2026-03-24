@@ -1,0 +1,201 @@
+-- P-3: Thêm rowcount check sau DELETE trong delete_slot_with_reason
+--      → Tránh silent no-op khi slot đã bị xóa bởi concurrent operation
+-- P-6: Đổi NULL timezone fallback từ silent → RAISE WARNING
+--      → Phát hiện tenant chưa cấu hình timezone thay vì corrupt slot_date ngầm
+
+-- ================================================================
+-- update_slot_with_reason (P-6: RAISE WARNING khi tenant timezone NULL)
+-- ================================================================
+CREATE OR REPLACE FUNCTION public.update_slot_with_reason(
+  p_slot_id              uuid,
+  p_new_start_time       timestamptz,
+  p_new_duration_minutes smallint,
+  p_reason               text,
+  p_is_emergency_override boolean DEFAULT false
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  v_user_id       uuid;
+  v_tenant_id     uuid;
+  v_tenant_tz     text;
+  v_new_slot_date date;
+  v_slot          public.schedule_slots%ROWTYPE;
+  v_changer_name  text;
+BEGIN
+  v_user_id   := auth.uid();
+  v_tenant_id := public.current_tenant_id();
+
+  IF v_user_id IS NULL OR v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'Chưa xác thực — uid hoặc tenant_id bị null';
+  END IF;
+
+  -- Validate reason không rỗng
+  IF p_reason IS NULL OR trim(p_reason) = '' THEN
+    RAISE EXCEPTION 'Lý do thay đổi là bắt buộc';
+  END IF;
+
+  -- Validate duration range (30–720 phút) trước khi fetch slot
+  IF p_new_duration_minutes < 30 OR p_new_duration_minutes > 720 THEN
+    RAISE EXCEPTION 'Thời lượng ca phải từ 30 đến 720 phút';
+  END IF;
+
+  -- Lấy slot — verify ownership + tenant
+  SELECT * INTO v_slot
+  FROM public.schedule_slots
+  WHERE id        = p_slot_id
+    AND user_id   = v_user_id
+    AND tenant_id = v_tenant_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Slot không tồn tại hoặc bạn không có quyền chỉnh sửa';
+  END IF;
+
+  -- Deadline lock check (server-side enforcement)
+  IF NOT p_is_emergency_override AND now() >= v_slot.start_time THEN
+    RAISE EXCEPTION 'Slot này đã bị khóa. Dùng Emergency Override để thay đổi.';
+  END IF;
+
+  -- Tính slot_date mới từ new start_time theo tenant timezone
+  SELECT t.timezone INTO v_tenant_tz
+  FROM public.tenants t
+  WHERE t.id = v_tenant_id;
+
+  -- P-6: RAISE WARNING thay vì silent fallback — tenant cần cấu hình timezone để slot_date đúng
+  IF v_tenant_tz IS NULL THEN
+    RAISE WARNING 'Tenant % chưa cấu hình timezone — sử dụng UTC làm fallback. Slot_date có thể bị sai với tenants UTC+.', v_tenant_id;
+    v_tenant_tz := 'UTC';
+  END IF;
+
+  v_new_slot_date := (p_new_start_time AT TIME ZONE v_tenant_tz)::date;
+
+  -- Update slot
+  UPDATE public.schedule_slots
+  SET
+    start_time       = p_new_start_time,
+    duration_minutes = p_new_duration_minutes,
+    slot_date        = v_new_slot_date,
+    updated_at       = now()
+  WHERE id = p_slot_id;
+
+  -- Audit trail
+  INSERT INTO public.schedule_slot_changes (tenant_id, slot_id, changed_by, change_type, reason)
+  VALUES (
+    v_tenant_id,
+    p_slot_id,
+    v_user_id,
+    CASE WHEN p_is_emergency_override THEN 'emergency_override'::public.slot_change_type
+         ELSE 'updated'::public.slot_change_type END,
+    p_reason
+  );
+
+  SELECT full_name INTO v_changer_name
+  FROM public.users
+  WHERE id = v_user_id;
+
+  -- Notify managers/owners (không self-notify)
+  INSERT INTO public.notifications (tenant_id, user_id, type, message, link_to)
+  SELECT
+    v_tenant_id,
+    tm.user_id,
+    'schedule_changed',
+    CASE
+      WHEN p_is_emergency_override
+        THEN coalesce(v_changer_name, 'Thành viên') || ' đã dùng Emergency Override để thay đổi lịch. Lý do: ' || p_reason
+      ELSE
+        coalesce(v_changer_name, 'Thành viên') || ' đã thay đổi lịch làm việc. Lý do: ' || p_reason
+    END,
+    '/schedule'
+  FROM public.tenant_members tm
+  WHERE tm.tenant_id = v_tenant_id
+    AND tm.role   IN ('owner', 'manager')
+    AND tm.status  = 'active'
+    AND tm.user_id <> v_user_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_slot_with_reason(uuid, timestamptz, smallint, text, boolean) TO authenticated;
+
+-- ================================================================
+-- delete_slot_with_reason (P-3: rowcount check sau DELETE)
+-- ================================================================
+CREATE OR REPLACE FUNCTION public.delete_slot_with_reason(
+  p_slot_id              uuid,
+  p_reason               text,
+  p_is_emergency_override boolean DEFAULT false
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  v_user_id      uuid;
+  v_tenant_id    uuid;
+  v_slot         public.schedule_slots%ROWTYPE;
+  v_changer_name text;
+BEGIN
+  v_user_id   := auth.uid();
+  v_tenant_id := public.current_tenant_id();
+
+  IF v_user_id IS NULL OR v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'Chưa xác thực — uid hoặc tenant_id bị null';
+  END IF;
+
+  IF p_reason IS NULL OR trim(p_reason) = '' THEN
+    RAISE EXCEPTION 'Lý do xóa là bắt buộc';
+  END IF;
+
+  -- Verify ownership + tenant
+  SELECT * INTO v_slot
+  FROM public.schedule_slots
+  WHERE id        = p_slot_id
+    AND user_id   = v_user_id
+    AND tenant_id = v_tenant_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Slot không tồn tại hoặc bạn không có quyền xóa';
+  END IF;
+
+  -- Deadline lock check
+  IF NOT p_is_emergency_override AND now() >= v_slot.start_time THEN
+    RAISE EXCEPTION 'Slot này đã bị khóa. Dùng Emergency Override để xóa.';
+  END IF;
+
+  SELECT full_name INTO v_changer_name
+  FROM public.users
+  WHERE id = v_user_id;
+
+  -- Notify managers TRƯỚC khi xóa slot
+  -- (Sau khi slot bị xóa, CASCADE sẽ xóa schedule_slot_changes — nên phải notify trước)
+  INSERT INTO public.notifications (tenant_id, user_id, type, message, link_to)
+  SELECT
+    v_tenant_id,
+    tm.user_id,
+    'schedule_changed',
+    CASE
+      WHEN p_is_emergency_override
+        THEN coalesce(v_changer_name, 'Thành viên') || ' đã xóa ca làm việc (Emergency Override). Lý do: ' || p_reason
+      ELSE
+        coalesce(v_changer_name, 'Thành viên') || ' đã xóa ca làm việc. Lý do: ' || p_reason
+    END,
+    '/schedule'
+  FROM public.tenant_members tm
+  WHERE tm.tenant_id = v_tenant_id
+    AND tm.role   IN ('owner', 'manager')
+    AND tm.status  = 'active'
+    AND tm.user_id <> v_user_id;
+
+  -- P-3: DELETE + kiểm tra rowcount
+  -- Nếu slot đã bị xóa bởi concurrent operation, raise exception thay vì silent no-op
+  DELETE FROM public.schedule_slots
+  WHERE id = p_slot_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Slot không còn tồn tại — có thể đã bị xóa trước đó';
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.delete_slot_with_reason(uuid, text, boolean) TO authenticated;

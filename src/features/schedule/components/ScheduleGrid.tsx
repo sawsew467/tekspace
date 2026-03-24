@@ -1,13 +1,14 @@
 import { addDays, format, parseISO } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import { toZonedTime, format as formatTz } from 'date-fns-tz'
-import { Plus, Trash2, Clock } from 'lucide-react'
+import { Plus, Trash2, Clock, Pencil, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { type ScheduleSlot } from '../services/schedule.service'
+import { isSlotLocked } from '../utils/schedule.utils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,11 +36,24 @@ function totalWeekHours(slots: ScheduleSlot[]): number {
 interface SlotCardProps {
   slot: ScheduleSlot
   userTimezone: string
-  onDelete: (slotId: string) => void
+  isLocked: boolean                               // true = slot đã bắt đầu (deadline lock)
+  onEdit: (slotId: string) => void                // mở EditSlotDialog
+  onDelete: (slotId: string) => void              // mở DeleteSlotDialog
+  onEmergencyOverride: (slotId: string) => void   // mở EditSlotDialog trong emergency mode
+  onEmergencyDelete: (slotId: string) => void     // mở DeleteSlotDialog trong emergency mode
   isDeleting?: boolean
 }
 
-function SlotCard({ slot, userTimezone, onDelete, isDeleting }: SlotCardProps) {
+function SlotCard({
+  slot,
+  userTimezone,
+  isLocked,
+  onEdit,
+  onDelete,
+  onEmergencyOverride,
+  onEmergencyDelete,
+  isDeleting,
+}: SlotCardProps) {
   return (
     <div className="group flex items-start justify-between rounded-md border bg-card p-2 text-sm shadow-sm hover:border-primary/50 transition-colors">
       <div className="flex items-center gap-2 min-w-0">
@@ -53,16 +67,60 @@ function SlotCard({ slot, userTimezone, onDelete, isDeleting }: SlotCardProps) {
           </p>
         </div>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-        onClick={() => onDelete(slot.id)}
-        disabled={isDeleting}
-        aria-label="Xóa slot"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
+
+      {/* Actions: locked vs unlocked */}
+      <div className="flex items-center gap-1 shrink-0">
+        {isLocked ? (
+          // Locked state: lock icon + Override (edit) + Override (delete)
+          <>
+            <Lock className="h-3 w-3 text-muted-foreground shrink-0" aria-label="Đã khóa" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => onEmergencyOverride(slot.id)}
+              disabled={isDeleting}
+              aria-label="Emergency Override (chỉnh sửa)"
+            >
+              Override
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+              onClick={() => onEmergencyDelete(slot.id)}
+              disabled={isDeleting}
+              aria-label="Xóa (Emergency Override)"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        ) : (
+          // Unlocked state: Edit + Delete buttons
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => onEdit(slot.id)}
+              disabled={isDeleting}
+              aria-label="Chỉnh sửa slot"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+              onClick={() => onDelete(slot.id)}
+              disabled={isDeleting}
+              aria-label="Xóa slot"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -71,11 +129,14 @@ function SlotCard({ slot, userTimezone, onDelete, isDeleting }: SlotCardProps) {
 
 interface DayColumnProps {
   date: string          // "YYYY-MM-DD"
-  dayLabel: string      // "Thứ Hai 23/03"
+  dayLabel: string      // "Thứ Hai\n23/03"
   slots: ScheduleSlot[]
   userTimezone: string
   onAddSlot: (date: string) => void
+  onEditSlot: (slotId: string) => void
   onDeleteSlot: (slotId: string) => void
+  onEmergencyOverride: (slotId: string) => void
+  onEmergencyDelete: (slotId: string) => void     // Story 2.3: emergency delete cho locked slot
   isDeletingSlotId?: string
 }
 
@@ -85,7 +146,10 @@ function DayColumn({
   slots,
   userTimezone,
   onAddSlot,
+  onEditSlot,
   onDeleteSlot,
+  onEmergencyOverride,
+  onEmergencyDelete,
   isDeletingSlotId,
 }: DayColumnProps) {
   return (
@@ -101,7 +165,11 @@ function DayColumn({
             key={slot.id}
             slot={slot}
             userTimezone={userTimezone}
+            isLocked={isSlotLocked(slot.start_time)}
+            onEdit={onEditSlot}
             onDelete={onDeleteSlot}
+            onEmergencyOverride={onEmergencyOverride}
+            onEmergencyDelete={onEmergencyDelete}
             isDeleting={isDeletingSlotId === slot.id}
           />
         ))}
@@ -120,9 +188,8 @@ function DayColumn({
 
 // ── DayRow (mobile) ───────────────────────────────────────────────────────────
 
-interface DayRowProps extends Omit<DayColumnProps, 'isDeletingSlotId'> {
-  isDeletingSlotId?: string
-}
+// DayRow props = DayColumn props (mobile variant có cùng interface)
+type DayRowProps = DayColumnProps
 
 function DayRow({
   date,
@@ -130,7 +197,10 @@ function DayRow({
   slots,
   userTimezone,
   onAddSlot,
+  onEditSlot,
   onDeleteSlot,
+  onEmergencyOverride,
+  onEmergencyDelete,
   isDeletingSlotId,
 }: DayRowProps) {
   return (
@@ -154,7 +224,11 @@ function DayRow({
               key={slot.id}
               slot={slot}
               userTimezone={userTimezone}
+              isLocked={isSlotLocked(slot.start_time)}
+              onEdit={onEditSlot}
               onDelete={onDeleteSlot}
+              onEmergencyOverride={onEmergencyOverride}
+              onEmergencyDelete={onEmergencyDelete}
               isDeleting={isDeletingSlotId === slot.id}
             />
           ))}
@@ -172,8 +246,11 @@ interface ScheduleGridProps {
   slots: ScheduleSlot[]
   weekOf: string           // Monday "YYYY-MM-DD"
   userTimezone: string
-  onAddSlot: (date: string) => void   // truyền ngày để pre-fill form
-  onDeleteSlot: (slotId: string) => void
+  onAddSlot: (date: string) => void
+  onEditSlot: (slotId: string) => void           // Story 2.3: mở EditSlotDialog
+  onDeleteSlot: (slotId: string) => void         // Story 2.3: mở DeleteSlotDialog (không direct delete)
+  onEmergencyOverride: (slotId: string) => void  // Story 2.3: mở EditSlotDialog emergency mode
+  onEmergencyDelete: (slotId: string) => void    // Story 2.3: mở DeleteSlotDialog emergency mode
   isDeletingSlotId?: string
   className?: string
 }
@@ -183,13 +260,18 @@ interface ScheduleGridProps {
  *
  * Desktop (>= 768px): 7 cột Mon–Sun
  * Mobile (< 768px):   list theo ngày
+ *
+ * Story 2.3: Mỗi SlotCard hiển thị lock state và có Edit/Delete/Override actions.
  */
 export function ScheduleGrid({
   slots,
   weekOf,
   userTimezone,
   onAddSlot,
+  onEditSlot,
   onDeleteSlot,
+  onEmergencyOverride,
+  onEmergencyDelete,
   isDeletingSlotId,
   className,
 }: ScheduleGridProps) {
@@ -240,7 +322,10 @@ export function ScheduleGrid({
                 slots={slotsByDate[date] ?? []}
                 userTimezone={userTimezone}
                 onAddSlot={onAddSlot}
+                onEditSlot={onEditSlot}
                 onDeleteSlot={onDeleteSlot}
+                onEmergencyOverride={onEmergencyOverride}
+                onEmergencyDelete={onEmergencyDelete}
                 isDeletingSlotId={isDeletingSlotId}
               />
             ))}
@@ -256,7 +341,10 @@ export function ScheduleGrid({
                 slots={slotsByDate[date] ?? []}
                 userTimezone={userTimezone}
                 onAddSlot={onAddSlot}
+                onEditSlot={onEditSlot}
                 onDeleteSlot={onDeleteSlot}
+                onEmergencyOverride={onEmergencyOverride}
+                onEmergencyDelete={onEmergencyDelete}
                 isDeletingSlotId={isDeletingSlotId}
               />
             ))}

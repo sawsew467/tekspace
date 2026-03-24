@@ -3,6 +3,18 @@ import { format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
 
 /**
+ * isSlotLocked — deadline lock: slot bị lock khi current UTC >= slot start_time UTC
+ *
+ * Client-side check CHỈ dùng cho UX (disable buttons, show lock icon).
+ * Security boundary thực sự nằm ở server: RPC update_slot_with_reason /
+ * delete_slot_with_reason sẽ RAISE EXCEPTION nếu slot bị lock và
+ * p_is_emergency_override = false.
+ */
+export function isSlotLocked(slotStartTime: string): boolean {
+  return Date.now() >= new Date(slotStartTime).getTime()
+}
+
+/**
  * shiftSlotsToCurrentWeek — shift toàn bộ slots từ tuần trước sang tuần hiện tại
  *
  * Logic:
