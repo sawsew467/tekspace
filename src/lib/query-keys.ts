@@ -11,4 +11,5 @@ export const QUERY_KEYS = {
   analytics: 'analytics',
   userProfile: 'user-profile',    // Story 1.7: user profile (timezone, avatar, etc.)
   tenantNames: 'tenant-names',    // Story 1.7: tenant display names for TeamSwitcher
+  teamSchedule: 'team-schedule',  // Story 3.1: team overview dashboard
 } as const

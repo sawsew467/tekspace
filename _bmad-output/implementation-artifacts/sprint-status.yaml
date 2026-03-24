@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-23
-last_updated: 2026-03-25 (story-2-5 → done)
+last_updated: 2026-03-25 (story-6-2 → review)
 project: TekSpace
 project_key: NOKEY
 tracking_system: file-system
@@ -69,8 +69,8 @@ development_status:
   # ─────────────────────────────────────────────
   # Epic 3: Team Visibility & Self-Dashboard
   # ─────────────────────────────────────────────
-  epic-3: backlog
-  3-1-team-overview-dashboard: backlog
+  epic-3: in-progress
+  3-1-team-overview-dashboard: done
   3-2-realtime-who-is-online-timezone-view: backlog
   3-3-member-self-dashboard: backlog
   epic-3-retrospective: optional
@@ -84,7 +84,7 @@ development_status:
   4-3-manager-report-view: done
   4-4-ux-restructure-tabs-history-form-polish: done
   4-5-per-task-hours: done
-  4-6-edit-report-window: backlog
+  4-6-edit-report-window: review
   epic-4-retrospective: done
 
   # ─────────────────────────────────────────────
@@ -101,7 +101,7 @@ development_status:
   # ─────────────────────────────────────────────
   epic-6: in-progress
   6-1-in-app-notification-center: done
-  6-2-schedule-deadline-notifications: backlog
+  6-2-schedule-deadline-notifications: review
   6-3-daily-report-reminder: backlog
   6-4-event-based-notifications: backlog
   epic-6-retrospective: optional
