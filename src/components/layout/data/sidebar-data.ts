@@ -6,9 +6,8 @@ import {
   Bell,
   AlertTriangle,
   Settings,
-  UserCog,
   Users,
-  Building2,
+  Mail,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -23,7 +22,7 @@ export const sidebarData: SidebarData = {
   teams: [
     {
       name: 'TekSpace',
-      logo: Building2,
+      logo: Bell,
       plan: 'Team Workspace',
     },
   ],
@@ -69,24 +68,25 @@ export const sidebarData: SidebarData = {
       ],
     },
     {
-      title: 'Settings',
+      title: 'Team',
       items: [
         {
-          title: 'Profile',
-          url: '/settings/profile',
-          icon: UserCog,
-        },
-        {
-          title: 'Team',
-          url: '/settings/team',
+          title: 'Thành viên',
+          url: '/team/members',
           icon: Users,
         },
         {
-          title: 'App Settings',
-          url: '/settings/app',
+          title: 'Lời mời',
+          url: '/team/invites',
+          icon: Mail,
+        },
+        {
+          title: 'Cài đặt nhóm',
+          url: '/team/settings',
           icon: Settings,
         },
       ],
     },
   ],
 }
+

@@ -35,6 +35,9 @@ const inviteSearchSchema = z.object({
 })
 
 export const Route = createFileRoute('/accept-invite')({
+  head: () => ({
+    meta: [{ title: 'Tham gia team — TekSpace' }],
+  }),
   validateSearch: inviteSearchSchema,
   component: AcceptInvitePage,
 })
@@ -180,7 +183,7 @@ function AcceptInvitePage() {
       const ok = await finalizeAccept(result.tenantId)
       if (ok) {
         // AC3: người mới đăng ký → /settings/profile để setup timezone
-        await navigate({ to: ROUTES.app.settings.profile })
+        await navigate({ to: ROUTES.app.account.profile })
       }
     } catch (err) {
       toast.error((err as Error).message || 'Đăng ký không thành công. Vui lòng thử lại.')
@@ -202,13 +205,19 @@ function AcceptInvitePage() {
   if (inviteState.status === 'expired' || inviteState.status === 'error') {
     return (
       <div className='flex min-h-svh items-center justify-center bg-muted/40 p-4'>
-        <Card className='w-full max-w-sm'>
-          <CardHeader className='text-center'>
-            <AlertCircle className='mx-auto mb-2 h-10 w-10 text-destructive' />
-            <CardTitle>Lời mời không khả dụng</CardTitle>
-            <CardDescription>{inviteState.message}</CardDescription>
-          </CardHeader>
-        </Card>
+        <div className='w-full max-w-sm'>
+          <div className='mb-8 text-center'>
+            <h1 className='text-3xl font-bold tracking-tight'>TekSpace</h1>
+            <p className='text-muted-foreground mt-2 text-sm'>Team workspace management</p>
+          </div>
+          <Card className='w-full'>
+            <CardHeader className='text-center'>
+              <AlertCircle className='mx-auto mb-2 h-10 w-10 text-destructive' />
+              <CardTitle>Lời mời không khả dụng</CardTitle>
+              <CardDescription>{inviteState.message}</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
       </div>
     )
   }
@@ -217,37 +226,43 @@ function AcceptInvitePage() {
   if (inviteState.isAuthenticated) {
     return (
       <div className='flex min-h-svh items-center justify-center bg-muted/40 p-4'>
-        <Card className='w-full max-w-sm'>
-          <CardHeader className='text-center'>
-            <CheckCircle className='mx-auto mb-2 h-10 w-10 text-primary' />
-            <CardTitle>Chấp nhận lời mời</CardTitle>
-            <CardDescription>
-              Bạn được mời tham gia team{' '}
-              <strong>{inviteState.tenantName}</strong> trên TekSpace.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className='text-center text-sm text-muted-foreground'>
-              Sau khi chấp nhận, bạn sẽ có quyền truy cập vào lịch, báo cáo và dashboard của team.
-            </p>
-          </CardContent>
-          <CardFooter>
-            <Button
-              className='w-full'
-              onClick={handleConfirm}
-              disabled={acceptMutation.isPending}
-            >
-              {acceptMutation.isPending ? (
-                <>
-                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  Đang xử lý...
-                </>
-              ) : (
-                'Xác nhận tham gia'
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
+        <div className='w-full max-w-sm'>
+          <div className='mb-8 text-center'>
+            <h1 className='text-3xl font-bold tracking-tight'>TekSpace</h1>
+            <p className='text-muted-foreground mt-2 text-sm'>Team workspace management</p>
+          </div>
+          <Card className='w-full'>
+            <CardHeader className='text-center'>
+              <CheckCircle className='mx-auto mb-2 h-10 w-10 text-primary' />
+              <CardTitle>Chấp nhận lời mời</CardTitle>
+              <CardDescription>
+                Bạn được mời tham gia team{' '}
+                <strong>{inviteState.tenantName}</strong> trên TekSpace.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className='text-center text-sm text-muted-foreground'>
+                Sau khi chấp nhận, bạn sẽ có quyền truy cập vào lịch, báo cáo và dashboard của team.
+              </p>
+            </CardContent>
+            <CardFooter>
+              <Button
+                className='w-full'
+                onClick={handleConfirm}
+                disabled={acceptMutation.isPending}
+              >
+                {acceptMutation.isPending ? (
+                  <>
+                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  'Xác nhận tham gia'
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     )
   }
@@ -255,9 +270,14 @@ function AcceptInvitePage() {
   // ── Ready: AC3 — Unauthenticated user — Register form ──
   return (
     <div className='flex min-h-svh items-center justify-center bg-muted/40 p-4'>
-      <Card className='w-full max-w-sm'>
-        <CardHeader className='text-center'>
-          <CheckCircle className='mx-auto mb-2 h-10 w-10 text-primary' />
+      <div className='w-full max-w-sm'>
+        <div className='mb-8 text-center'>
+          <h1 className='text-3xl font-bold tracking-tight'>TekSpace</h1>
+          <p className='text-muted-foreground mt-2 text-sm'>Team workspace management</p>
+        </div>
+        <Card className='w-full'>
+          <CardHeader className='text-center'>
+            <CheckCircle className='mx-auto mb-2 h-10 w-10 text-primary' />
           <CardTitle>Tạo tài khoản để tham gia</CardTitle>
           <CardDescription>
             Bạn được mời tham gia <strong>{inviteState.tenantName}</strong> trên TekSpace.
@@ -328,6 +348,7 @@ function AcceptInvitePage() {
           </Form>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,5 @@
 import { useTenantStore } from '@/stores/tenant-store'
-import { hasPermission } from '@/lib/permissions'
-import type { Permission } from '@/lib/permissions'
+import { hasPermission, type Permission } from '@/lib/permissions'
 
 export function usePermissions() {
   const { activeRole } = useTenantStore()

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { usePermissions } from '@/hooks/use-permissions'
 import { RemoveMemberDialog } from '@/features/tenant/components/RemoveMemberDialog'
 import { PromoteMemberDialog } from '@/features/tenant/components/PromoteMemberDialog'
+import { DemoteMemberDialog } from '@/features/tenant/components/DemoteMemberDialog'
 import { TransferOwnershipDialog } from '@/features/tenant/components/TransferOwnershipDialog'
 
 interface RoleActionDropdownProps {
@@ -29,6 +30,7 @@ export function RoleActionDropdown({
 }: RoleActionDropdownProps) {
   const [removeOpen, setRemoveOpen] = useState(false)
   const [promoteOpen, setPromoteOpen] = useState(false)
+  const [demoteOpen, setDemoteOpen] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
   // P5: canPromoteMembers = Owner only (promote + transfer ownership)
   const { canPromoteMembers } = usePermissions()
@@ -37,8 +39,9 @@ export function RoleActionDropdown({
   if (userId === currentUserId) return null
 
   const hasPromoteActions = canPromoteMembers && currentRole === 'member'
+  const hasDemoteAction = canPromoteMembers && currentRole === 'manager'
   const hasTransferAction = canPromoteMembers && currentRole !== 'owner'
-  const hasSeparator = hasPromoteActions || hasTransferAction
+  const hasSeparator = hasPromoteActions || hasDemoteAction || hasTransferAction
 
   return (
     <>
@@ -54,6 +57,12 @@ export function RoleActionDropdown({
           {hasPromoteActions && (
             <DropdownMenuItem onClick={() => setPromoteOpen(true)}>
               Nâng lên Manager
+            </DropdownMenuItem>
+          )}
+          {/* "Hạ xuống Member" — chỉ Owner, chỉ khi target là manager */}
+          {hasDemoteAction && (
+            <DropdownMenuItem onClick={() => setDemoteOpen(true)}>
+              Hạ xuống Member
             </DropdownMenuItem>
           )}
           {/* "Chuyển quyền Owner" — chỉ Owner, target là manager hoặc member — AC#3 */}
@@ -82,6 +91,12 @@ export function RoleActionDropdown({
       <PromoteMemberDialog
         open={promoteOpen}
         onOpenChange={setPromoteOpen}
+        userId={userId}
+        memberName={memberName}
+      />
+      <DemoteMemberDialog
+        open={demoteOpen}
+        onOpenChange={setDemoteOpen}
         userId={userId}
         memberName={memberName}
       />

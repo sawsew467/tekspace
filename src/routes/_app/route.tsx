@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { useAuthStore, isManualSignOut } from '@/stores/auth-store'
 import { useTenantStore } from '@/stores/tenant-store'
@@ -43,6 +43,10 @@ export const Route = createFileRoute('/_app')({
 
 function AppLayout() {
   const navigate = useNavigate()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+
+  // FIX 1: create-tenant là onboarding fullscreen, không có sidebar
+  const isOnboarding = pathname === ROUTES.app.createTenant
 
   // Story 1.7: Detect server-side session invalidation real-time
   // Khi user bị remove khỏi tenant (Story 1.6), admin.signOut() được gọi server-side
@@ -61,5 +65,9 @@ function AppLayout() {
     return () => subscription.unsubscribe()
   }, [navigate])
 
+  // Onboarding: fullscreen, không sidebar
+  if (isOnboarding) return <Outlet />
+
   return <AuthenticatedLayout />
 }
+

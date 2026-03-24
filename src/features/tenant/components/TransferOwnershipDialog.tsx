@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { useTransferOwnership } from '@/features/tenant/hooks/use-transfer-ownership'

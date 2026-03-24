@@ -8,6 +8,7 @@ export const signInSchema = z.object({
 
 export const registerSchema = z
   .object({
+    fullName: z.string().trim().min(2, 'Họ và tên tối thiểu 2 ký tự').max(100, 'Họ và tên tối đa 100 ký tự'),
     email: z.string().email('Email không hợp lệ'),
     password: z
       .string()

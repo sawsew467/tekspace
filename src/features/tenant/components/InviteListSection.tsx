@@ -8,23 +8,18 @@ import { useTenantInvites } from '@/features/tenant/hooks/use-tenant-invites'
 import { useResendInvite } from '@/features/tenant/hooks/use-resend-invite'
 import type { TenantInvite } from '@/features/tenant/services/tenant.service'
 
-const STATUS_LABEL: Record<TenantInvite['status'], string> = {
-  pending: 'Đang chờ',
-  accepted: 'Đã chấp nhận',
-  expired: 'Hết hạn',
-  revoked: 'Đã thu hồi',
-  declined: 'Đã từ chối',
+type BadgeConfig = {
+  label: string
+  variant?: 'default' | 'secondary' | 'outline' | 'destructive'
+  className?: string
 }
 
-const STATUS_VARIANT: Record<
-  TenantInvite['status'],
-  'default' | 'secondary' | 'outline' | 'destructive'
-> = {
-  pending: 'default',
-  accepted: 'secondary',
-  expired: 'destructive',
-  revoked: 'outline',
-  declined: 'outline',
+const STATUS_CONFIG: Record<TenantInvite['status'], BadgeConfig> = {
+  pending: { label: 'Đang chờ', className: 'bg-orange-100 text-orange-800 hover:bg-orange-100 border-transparent' },
+  accepted: { label: 'Đã chấp nhận', className: 'bg-green-100 text-green-800 hover:bg-green-100 border-transparent' },
+  expired: { label: 'Đã hết hạn', variant: 'secondary' },
+  revoked: { label: 'Đã thu hồi', variant: 'secondary' },
+  declined: { label: 'Đã từ chối', variant: 'secondary' },
 }
 
 interface InviteListSectionProps {
@@ -99,8 +94,8 @@ export function InviteListSection({ canManage }: InviteListSectionProps) {
                   </p>
                 </div>
                 <div className='ml-4 flex items-center gap-3'>
-                  <Badge variant={STATUS_VARIANT[invite.status]}>
-                    {STATUS_LABEL[invite.status]}
+                  <Badge variant={STATUS_CONFIG[invite.status].variant} className={STATUS_CONFIG[invite.status].className}>
+                    {STATUS_CONFIG[invite.status].label}
                   </Badge>
                   {canResend && (
                     <Button

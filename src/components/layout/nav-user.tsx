@@ -1,9 +1,9 @@
 import {
   BadgeCheck,
-  Bell,
   ChevronsUpDown,
   LogOut,
 } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
 import useDialogState from '@/hooks/use-dialog-state'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -22,6 +22,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { SignOutDialog } from '@/components/sign-out-dialog'
+import { ROUTES } from '@/lib/routes'
 
 type NavUserProps = {
   user: {
@@ -34,6 +35,7 @@ type NavUserProps = {
 export function NavUser({ user }: NavUserProps) {
   const { isMobile } = useSidebar()
   const [open, setOpen] = useDialogState()
+  const navigate = useNavigate()
 
   return (
     <>
@@ -80,13 +82,9 @@ export function NavUser({ user }: NavUserProps) {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuItem onClick={() => (window.location.href = '/settings/profile')}>
+                <DropdownMenuItem onClick={() => void navigate({ to: ROUTES.app.account.profile as string })}>
                   <BadgeCheck />
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => (window.location.href = '/notifications')}>
-                  <Bell />
-                  Notifications
+                  Hồ sơ cá nhân
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
@@ -95,7 +93,7 @@ export function NavUser({ user }: NavUserProps) {
                 onClick={() => setOpen(true)}
               >
                 <LogOut />
-                Sign out
+                Đăng xuất
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

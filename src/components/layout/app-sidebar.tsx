@@ -7,11 +7,13 @@ import { useLayout } from '@/context/layout-provider'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarRail,
 } from '@/components/ui/sidebar'
 import { sidebarData } from './data/sidebar-data'
 import { NavGroup } from './nav-group'
+import { NavUser } from './nav-user'
 import { TeamSwitcher } from './team-switcher'
 import { useTenantStore } from '@/stores/tenant-store'
 import { useAuthStore } from '@/stores/auth-store'
@@ -53,6 +55,13 @@ export function AppSidebar() {
     plan: t.role,    // Hiển thị role dưới team name
   }))
 
+  // Build navUser object cho NavUser footer
+  const navUser = {
+    name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User',
+    email: user?.email || '',
+    avatar: '',
+  }
+
   const handleSwitch = async (newTenantId: string) => {
     if (!user || newTenantId === activeTenantId) return
     if (!tenants.some((t) => t.tenantId === newTenantId)) return  // [P-4] validate tenant membership
@@ -80,10 +89,12 @@ export function AppSidebar() {
       // 5. Navigate về dashboard để reload data với tenant context mới
       await navigate({ to: ROUTES.app.dashboard })
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('[AppSidebar] tenant switch failed:', err)
       // [P-2] Rollback DB write nếu refreshSession fail
       if (dbWritten) {
         await updateActiveTenant(user.id, activeTenantId ?? '').catch((rollbackErr) => {
+          // eslint-disable-next-line no-console
           console.error('[AppSidebar] rollback failed:', rollbackErr)
         })
       }
@@ -97,13 +108,20 @@ export function AppSidebar() {
     <Sidebar collapsible={collapsible} variant={variant}>
       <SidebarHeader>
         {/* Story 1.7: TeamSwitcher thực thay thế AppTitle — disabled khi đang switch */}
-        <TeamSwitcher teams={teams} onSwitch={isSwitching ? undefined : handleSwitch} />
+        <TeamSwitcher
+          teams={teams}
+          onSwitch={isSwitching ? undefined : handleSwitch}
+          onCreateTeam={() => void navigate({ to: ROUTES.app.createTenant })}
+        />
       </SidebarHeader>
       <SidebarContent>
         {sidebarData.navGroups.map((props) => (
           <NavGroup key={props.title} {...props} />
         ))}
       </SidebarContent>
+      <SidebarFooter>
+        <NavUser user={navUser} />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )

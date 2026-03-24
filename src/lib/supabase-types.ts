@@ -186,6 +186,58 @@ export type Database = {
           },
         ]
       }
+      member_audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          details: Json | null
+          id: string
+          target_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_audit_logs_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_audit_logs_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_audit_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -249,7 +301,7 @@ export type Database = {
           changed_by: string
           created_at?: string
           id?: string
-          reason: string
+          reason?: string
           slot_id: string
           tenant_id: string
         }
@@ -385,7 +437,7 @@ export type Database = {
           email: string
           expires_at: string
           id: string
-          invited_by: string
+          invited_by: string | null
           status: Database["public"]["Enums"]["invite_status"]
           tenant_id: string
           token: string
@@ -395,7 +447,7 @@ export type Database = {
           email: string
           expires_at: string
           id?: string
-          invited_by: string
+          invited_by?: string | null
           status?: Database["public"]["Enums"]["invite_status"]
           tenant_id: string
           token: string
@@ -405,7 +457,7 @@ export type Database = {
           email?: string
           expires_at?: string
           id?: string
-          invited_by?: string
+          invited_by?: string | null
           status?: Database["public"]["Enums"]["invite_status"]
           tenant_id?: string
           token?: string
@@ -513,30 +565,44 @@ export type Database = {
       }
       users: {
         Row: {
+          active_tenant_id: string | null
           avatar_url: string | null
           created_at: string
+          email: string
           full_name: string
           id: string
           timezone: string
           updated_at: string
         }
         Insert: {
+          active_tenant_id?: string | null
           avatar_url?: string | null
           created_at?: string
+          email?: string
           full_name?: string
           id: string
           timezone?: string
           updated_at?: string
         }
         Update: {
+          active_tenant_id?: string | null
           avatar_url?: string | null
           created_at?: string
+          email?: string
           full_name?: string
           id?: string
           timezone?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_active_tenant_id_fkey"
+            columns: ["active_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -545,6 +611,12 @@ export type Database = {
     Functions: {
       current_tenant_id: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      is_member_of_current_tenant: {
+        Args: { check_user_id: string }
+        Returns: boolean
+      }
+      is_tenant_manager: { Args: never; Returns: boolean }
+      is_valid_timezone: { Args: { tz: string }; Returns: boolean }
     }
     Enums: {
       incident_category:
@@ -552,7 +624,7 @@ export type Database = {
         | "missed_report"
         | "low_commitment"
         | "policy_violation"
-      invite_status: "pending" | "accepted" | "expired"
+      invite_status: "pending" | "accepted" | "expired" | "declined" | "revoked"
       member_role: "owner" | "manager" | "member"
       member_status: "active" | "inactive"
       notification_type:
@@ -562,8 +634,11 @@ export type Database = {
         | "daily_report_reminder"
         | "member_removed"
         | "invite_sent"
+        | "invite_accepted"
+        | "invite_expired"
         | "incident_logged"
         | "appeal_submitted"
+        | "appeal_reviewed"
       slot_change_type: "created" | "updated" | "deleted" | "emergency_override"
     }
     CompositeTypes: {
@@ -701,7 +776,7 @@ export const Constants = {
         "low_commitment",
         "policy_violation",
       ],
-      invite_status: ["pending", "accepted", "expired"],
+      invite_status: ["pending", "accepted", "expired", "declined", "revoked"],
       member_role: ["owner", "manager", "member"],
       member_status: ["active", "inactive"],
       notification_type: [
@@ -711,8 +786,11 @@ export const Constants = {
         "daily_report_reminder",
         "member_removed",
         "invite_sent",
+        "invite_accepted",
+        "invite_expired",
         "incident_logged",
         "appeal_submitted",
+        "appeal_reviewed",
       ],
       slot_change_type: ["created", "updated", "deleted", "emergency_override"],
     },

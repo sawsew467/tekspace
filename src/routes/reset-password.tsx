@@ -4,6 +4,9 @@ import { ResetPasswordForm } from '@/features/auth/components/ResetPasswordForm'
 import { ROUTES } from '@/lib/routes'
 
 export const Route = createFileRoute('/reset-password')({
+  head: () => ({
+    meta: [{ title: 'Đặt lại mật khẩu — TekSpace' }],
+  }),
   // Chỉ parse `error` param từ Supabase redirect lỗi (e.g. ?error=access_denied)
   validateSearch: (search: Record<string, unknown>) => ({
     error: typeof search['error'] === 'string' ? search['error'] : '',

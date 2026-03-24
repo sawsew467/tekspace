@@ -27,9 +27,10 @@ type Team = {
 type TeamSwitcherProps = {
   teams: Team[]
   onSwitch?: (teamId: string) => void
+  onCreateTeam?: () => void
 }
 
-export function TeamSwitcher({ teams, onSwitch }: TeamSwitcherProps) {
+export function TeamSwitcher({ teams, onSwitch, onCreateTeam }: TeamSwitcherProps) {
   const { isMobile } = useSidebar()
   const { activeTenantId } = useTenantStore()
 
@@ -77,7 +78,7 @@ export function TeamSwitcher({ teams, onSwitch }: TeamSwitcherProps) {
             sideOffset={4}
           >
             <DropdownMenuLabel className='text-xs text-muted-foreground'>
-              Teams
+              Danh sách team
             </DropdownMenuLabel>
             {teams.map((team, index) => (
               // Dùng team.id (UUID) làm key, không dùng name vì name không unique
@@ -94,11 +95,11 @@ export function TeamSwitcher({ teams, onSwitch }: TeamSwitcherProps) {
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className='gap-2 p-2'>
+            <DropdownMenuItem className='gap-2 p-2' onClick={onCreateTeam}>
               <div className='flex size-6 items-center justify-center rounded-md border bg-background'>
                 <Plus className='size-4' />
               </div>
-              <div className='font-medium text-muted-foreground'>Add team</div>
+              <div className='font-medium text-muted-foreground'>Tạo team mới</div>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

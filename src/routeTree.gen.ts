@@ -16,9 +16,13 @@ import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppCreateTenantRouteImport } from './routes/_app/create-tenant'
-import { Route as AppSettingsRouteRouteImport } from './routes/_app/settings/route'
-import { Route as AppSettingsTeamRouteImport } from './routes/_app/settings/team'
-import { Route as AppSettingsProfileRouteImport } from './routes/_app/settings/profile'
+import { Route as AppTeamRouteRouteImport } from './routes/_app/team/route'
+import { Route as AppAccountRouteRouteImport } from './routes/_app/account/route'
+import { Route as AppTeamSettingsRouteImport } from './routes/_app/team/settings'
+import { Route as AppTeamMembersRouteImport } from './routes/_app/team/members'
+import { Route as AppTeamInvitesRouteImport } from './routes/_app/team/invites'
+import { Route as AppAccountSecurityRouteImport } from './routes/_app/account/security'
+import { Route as AppAccountProfileRouteImport } from './routes/_app/account/profile'
 
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
@@ -54,20 +58,40 @@ const AppCreateTenantRoute = AppCreateTenantRouteImport.update({
   path: '/create-tenant',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppSettingsRouteRoute = AppSettingsRouteRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppSettingsTeamRoute = AppSettingsTeamRouteImport.update({
+const AppTeamRouteRoute = AppTeamRouteRouteImport.update({
   id: '/team',
   path: '/team',
-  getParentRoute: () => AppSettingsRouteRoute,
+  getParentRoute: () => AppRouteRoute,
 } as any)
-const AppSettingsProfileRoute = AppSettingsProfileRouteImport.update({
+const AppAccountRouteRoute = AppAccountRouteRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppTeamSettingsRoute = AppTeamSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppTeamRouteRoute,
+} as any)
+const AppTeamMembersRoute = AppTeamMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AppTeamRouteRoute,
+} as any)
+const AppTeamInvitesRoute = AppTeamInvitesRouteImport.update({
+  id: '/invites',
+  path: '/invites',
+  getParentRoute: () => AppTeamRouteRoute,
+} as any)
+const AppAccountSecurityRoute = AppAccountSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => AppAccountRouteRoute,
+} as any)
+const AppAccountProfileRoute = AppAccountProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
-  getParentRoute: () => AppSettingsRouteRoute,
+  getParentRoute: () => AppAccountRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -76,11 +100,15 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
-  '/settings': typeof AppSettingsRouteRouteWithChildren
+  '/account': typeof AppAccountRouteRouteWithChildren
+  '/team': typeof AppTeamRouteRouteWithChildren
   '/create-tenant': typeof AppCreateTenantRoute
   '/dashboard': typeof AppDashboardRoute
-  '/settings/profile': typeof AppSettingsProfileRoute
-  '/settings/team': typeof AppSettingsTeamRoute
+  '/account/profile': typeof AppAccountProfileRoute
+  '/account/security': typeof AppAccountSecurityRoute
+  '/team/invites': typeof AppTeamInvitesRoute
+  '/team/members': typeof AppTeamMembersRoute
+  '/team/settings': typeof AppTeamSettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppRouteRouteWithChildren
@@ -88,11 +116,15 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
-  '/settings': typeof AppSettingsRouteRouteWithChildren
+  '/account': typeof AppAccountRouteRouteWithChildren
+  '/team': typeof AppTeamRouteRouteWithChildren
   '/create-tenant': typeof AppCreateTenantRoute
   '/dashboard': typeof AppDashboardRoute
-  '/settings/profile': typeof AppSettingsProfileRoute
-  '/settings/team': typeof AppSettingsTeamRoute
+  '/account/profile': typeof AppAccountProfileRoute
+  '/account/security': typeof AppAccountSecurityRoute
+  '/team/invites': typeof AppTeamInvitesRoute
+  '/team/members': typeof AppTeamMembersRoute
+  '/team/settings': typeof AppTeamSettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -101,11 +133,15 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
-  '/_app/settings': typeof AppSettingsRouteRouteWithChildren
+  '/_app/account': typeof AppAccountRouteRouteWithChildren
+  '/_app/team': typeof AppTeamRouteRouteWithChildren
   '/_app/create-tenant': typeof AppCreateTenantRoute
   '/_app/dashboard': typeof AppDashboardRoute
-  '/_app/settings/profile': typeof AppSettingsProfileRoute
-  '/_app/settings/team': typeof AppSettingsTeamRoute
+  '/_app/account/profile': typeof AppAccountProfileRoute
+  '/_app/account/security': typeof AppAccountSecurityRoute
+  '/_app/team/invites': typeof AppTeamInvitesRoute
+  '/_app/team/members': typeof AppTeamMembersRoute
+  '/_app/team/settings': typeof AppTeamSettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -115,11 +151,15 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
-    | '/settings'
+    | '/account'
+    | '/team'
     | '/create-tenant'
     | '/dashboard'
-    | '/settings/profile'
-    | '/settings/team'
+    | '/account/profile'
+    | '/account/security'
+    | '/team/invites'
+    | '/team/members'
+    | '/team/settings'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -127,11 +167,15 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
-    | '/settings'
+    | '/account'
+    | '/team'
     | '/create-tenant'
     | '/dashboard'
-    | '/settings/profile'
-    | '/settings/team'
+    | '/account/profile'
+    | '/account/security'
+    | '/team/invites'
+    | '/team/members'
+    | '/team/settings'
   id:
     | '__root__'
     | '/_app'
@@ -139,11 +183,15 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
-    | '/_app/settings'
+    | '/_app/account'
+    | '/_app/team'
     | '/_app/create-tenant'
     | '/_app/dashboard'
-    | '/_app/settings/profile'
-    | '/_app/settings/team'
+    | '/_app/account/profile'
+    | '/_app/account/security'
+    | '/_app/team/invites'
+    | '/_app/team/members'
+    | '/_app/team/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -205,51 +253,98 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCreateTenantRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/settings': {
-      id: '/_app/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AppSettingsRouteRouteImport
+    '/_app/team': {
+      id: '/_app/team'
+      path: '/team'
+      fullPath: '/team'
+      preLoaderRoute: typeof AppTeamRouteRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/settings/team': {
-      id: '/_app/settings/team'
-      path: '/team'
-      fullPath: '/settings/team'
-      preLoaderRoute: typeof AppSettingsTeamRouteImport
-      parentRoute: typeof AppSettingsRouteRoute
+    '/_app/account': {
+      id: '/_app/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AppAccountRouteRouteImport
+      parentRoute: typeof AppRouteRoute
     }
-    '/_app/settings/profile': {
-      id: '/_app/settings/profile'
+    '/_app/team/settings': {
+      id: '/_app/team/settings'
+      path: '/settings'
+      fullPath: '/team/settings'
+      preLoaderRoute: typeof AppTeamSettingsRouteImport
+      parentRoute: typeof AppTeamRouteRoute
+    }
+    '/_app/team/members': {
+      id: '/_app/team/members'
+      path: '/members'
+      fullPath: '/team/members'
+      preLoaderRoute: typeof AppTeamMembersRouteImport
+      parentRoute: typeof AppTeamRouteRoute
+    }
+    '/_app/team/invites': {
+      id: '/_app/team/invites'
+      path: '/invites'
+      fullPath: '/team/invites'
+      preLoaderRoute: typeof AppTeamInvitesRouteImport
+      parentRoute: typeof AppTeamRouteRoute
+    }
+    '/_app/account/security': {
+      id: '/_app/account/security'
+      path: '/security'
+      fullPath: '/account/security'
+      preLoaderRoute: typeof AppAccountSecurityRouteImport
+      parentRoute: typeof AppAccountRouteRoute
+    }
+    '/_app/account/profile': {
+      id: '/_app/account/profile'
       path: '/profile'
-      fullPath: '/settings/profile'
-      preLoaderRoute: typeof AppSettingsProfileRouteImport
-      parentRoute: typeof AppSettingsRouteRoute
+      fullPath: '/account/profile'
+      preLoaderRoute: typeof AppAccountProfileRouteImport
+      parentRoute: typeof AppAccountRouteRoute
     }
   }
 }
 
-interface AppSettingsRouteRouteChildren {
-  AppSettingsProfileRoute: typeof AppSettingsProfileRoute
-  AppSettingsTeamRoute: typeof AppSettingsTeamRoute
+interface AppAccountRouteRouteChildren {
+  AppAccountProfileRoute: typeof AppAccountProfileRoute
+  AppAccountSecurityRoute: typeof AppAccountSecurityRoute
 }
 
-const AppSettingsRouteRouteChildren: AppSettingsRouteRouteChildren = {
-  AppSettingsProfileRoute: AppSettingsProfileRoute,
-  AppSettingsTeamRoute: AppSettingsTeamRoute,
+const AppAccountRouteRouteChildren: AppAccountRouteRouteChildren = {
+  AppAccountProfileRoute: AppAccountProfileRoute,
+  AppAccountSecurityRoute: AppAccountSecurityRoute,
 }
 
-const AppSettingsRouteRouteWithChildren =
-  AppSettingsRouteRoute._addFileChildren(AppSettingsRouteRouteChildren)
+const AppAccountRouteRouteWithChildren = AppAccountRouteRoute._addFileChildren(
+  AppAccountRouteRouteChildren,
+)
+
+interface AppTeamRouteRouteChildren {
+  AppTeamInvitesRoute: typeof AppTeamInvitesRoute
+  AppTeamMembersRoute: typeof AppTeamMembersRoute
+  AppTeamSettingsRoute: typeof AppTeamSettingsRoute
+}
+
+const AppTeamRouteRouteChildren: AppTeamRouteRouteChildren = {
+  AppTeamInvitesRoute: AppTeamInvitesRoute,
+  AppTeamMembersRoute: AppTeamMembersRoute,
+  AppTeamSettingsRoute: AppTeamSettingsRoute,
+}
+
+const AppTeamRouteRouteWithChildren = AppTeamRouteRoute._addFileChildren(
+  AppTeamRouteRouteChildren,
+)
 
 interface AppRouteRouteChildren {
-  AppSettingsRouteRoute: typeof AppSettingsRouteRouteWithChildren
+  AppAccountRouteRoute: typeof AppAccountRouteRouteWithChildren
+  AppTeamRouteRoute: typeof AppTeamRouteRouteWithChildren
   AppCreateTenantRoute: typeof AppCreateTenantRoute
   AppDashboardRoute: typeof AppDashboardRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
-  AppSettingsRouteRoute: AppSettingsRouteRouteWithChildren,
+  AppAccountRouteRoute: AppAccountRouteRouteWithChildren,
+  AppTeamRouteRoute: AppTeamRouteRouteWithChildren,
   AppCreateTenantRoute: AppCreateTenantRoute,
   AppDashboardRoute: AppDashboardRoute,
 }

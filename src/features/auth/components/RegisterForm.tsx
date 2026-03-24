@@ -24,13 +24,13 @@ export function RegisterForm() {
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { email: '', password: '', confirmPassword: '' },
+    defaultValues: { fullName: '', email: '', password: '', confirmPassword: '' },
   })
 
   const onSubmit = async (data: RegisterInput) => {
     setIsPending(true)
     try {
-      const { session } = await signUp(data.email, data.password)
+      const { session } = await signUp(data.email, data.password, data.fullName)
       if (!session) throw new Error('Không thể tạo session')
 
       const redirectTo = initTenantAndGetRoute(session)
@@ -51,6 +51,25 @@ export function RegisterForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
+        <FormField
+          control={form.control}
+          name='fullName'
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Họ và tên</FormLabel>
+              <FormControl>
+                <Input
+                  type='text'
+                  placeholder='Nguyễn Văn A'
+                  autoComplete='name'
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name='email'

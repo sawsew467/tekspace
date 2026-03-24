@@ -6,6 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 // Story 3.1 sẽ implement team dashboard đầy đủ
 
 export const Route = createFileRoute('/_app/dashboard')({
+  head: () => ({
+    meta: [{ title: 'Dashboard — TekSpace' }],
+  }),
   component: DashboardPage,
 })
 

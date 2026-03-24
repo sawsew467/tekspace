@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Building2 } from 'lucide-react'
 import { createTenantSchema, type CreateTenantInput } from '@/features/tenant/schemas/tenant.schema'
 import { createTenant } from '@/features/tenant/services/tenant.service'
 import { useTenantStore } from '@/stores/tenant-store'
@@ -21,6 +20,9 @@ import {
 import { Input } from '@/components/ui/input'
 
 export const Route = createFileRoute('/_app/create-tenant')({
+  head: () => ({
+    meta: [{ title: 'Tạo team — TekSpace' }],
+  }),
   component: CreateTenantPage,
 })
 
@@ -39,20 +41,15 @@ function CreateTenantPage() {
     setIsPending(true)
     try {
       // F2: Snapshot tenant IDs TRƯỚC khi insert để identify tenant mới sau refresh
-      // Tránh giả định tenants[0] (sai nếu user đã có tenant khác từ trước)
       const existingTenantIds = new Set(
         useTenantStore.getState().tenants.map((t) => t.tenantId)
       )
 
-      // createTenant không trả về tenant.id (bỏ .select() trên INSERT để tránh RLS)
-      // Tenant ID được lấy từ JWT sau refreshSession (custom_access_token_hook embeds tenant_roles)
       const { session } = await createTenant(data.name)
 
       const tenantStore = useTenantStore.getState()
       tenantStore.initFromSession(session.access_token)
 
-      // F2: Tìm tenant mới = tenant xuất hiện trong JWT sau refresh nhưng chưa có trước đó
-      // Cách này đúng bất kể user có bao nhiêu tenant trước đó
       const { tenants } = useTenantStore.getState()
       const newTenant = tenants.find((t) => !existingTenantIds.has(t.tenantId))
       if (!newTenant) {
@@ -60,9 +57,8 @@ function CreateTenantPage() {
       }
       tenantStore.setActiveTenant(newTenant.tenantId)
 
-      await navigate({ to: ROUTES.app.settings.team })
+      await navigate({ to: ROUTES.app.team.members })
     } catch (err) {
-      // F3: Log lỗi để debug thay vì silent swallow
       // eslint-disable-next-line no-console
       console.error('[CreateTenantPage] onSubmit error:', err)
       toast.error('Không thể tạo team. Vui lòng thử lại.')
@@ -72,40 +68,42 @@ function CreateTenantPage() {
   }
 
   return (
-    <div className='flex min-h-svh items-center justify-center p-4'>
-      <Card className='w-full max-w-md'>
-        <CardHeader className='text-center'>
-          <div className='mb-4 flex justify-center'>
-            <Building2 className='text-muted-foreground h-12 w-12' />
-          </div>
-          <CardTitle>Tạo team của bạn</CardTitle>
-          <CardDescription>
-            Đặt tên cho workspace của team bạn để bắt đầu sử dụng TekSpace.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
-              <FormField
-                control={form.control}
-                name='name'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tên team</FormLabel>
-                    <FormControl>
-                      <Input placeholder='VD: Acme Corp, My Startup...' {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type='submit' className='w-full' disabled={isPending}>
-                {isPending ? 'Đang tạo...' : 'Tạo team'}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+    <div className='flex min-h-svh items-center justify-center bg-muted/40 p-4'>
+      <div className='w-full max-w-sm'>
+        <div className='mb-8 text-center'>
+          <h1 className='text-3xl font-bold tracking-tight'>TekSpace</h1>
+          <p className='text-muted-foreground mt-2 text-sm'>Tạo workspace cho team của bạn</p>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Tạo team</CardTitle>
+            <CardDescription>Đặt tên cho team workspace của bạn</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
+                <FormField
+                  control={form.control}
+                  name='name'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tên team</FormLabel>
+                      <FormControl>
+                        <Input placeholder='VD: Acme Corp, My Startup...' {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type='submit' className='w-full' disabled={isPending}>
+                  {isPending ? 'Đang tạo...' : 'Tạo team'}
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
+

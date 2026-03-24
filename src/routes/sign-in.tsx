@@ -7,6 +7,9 @@ import { SignInForm } from '@/features/auth/components/SignInForm'
 import { RegisterForm } from '@/features/auth/components/RegisterForm'
 
 export const Route = createFileRoute('/sign-in')({
+  head: () => ({
+    meta: [{ title: 'Đăng nhập — TekSpace' }],
+  }),
   beforeLoad: async ({ context }) => {
     const {
       data: { session },

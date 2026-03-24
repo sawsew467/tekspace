@@ -12,9 +12,14 @@ export const ROUTES = {
     analytics: '/analytics',
     notifications: '/notifications',
     incidents: '/incidents',
-    settings: {
-      profile: '/settings/profile',
-      team: '/settings/team',
+    account: {
+      profile: '/account/profile',
+      security: '/account/security',
+    },
+    team: {
+      members: '/team/members',
+      invites: '/team/invites',
+      settings: '/team/settings',
     },
   },
 } as const

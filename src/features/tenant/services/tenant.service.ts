@@ -220,6 +220,15 @@ export const promoteToManager = async (userId: string, tenantId: string): Promis
   }
 }
 
+export const demoteToMember = async (userId: string, tenantId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('tenant_members')
+    .update({ role: 'member' })
+    .eq('user_id', userId)
+    .eq('tenant_id', tenantId)
+  if (error) throw new Error(error.message ?? 'Không thể hạ quyền thành viên. Vui lòng thử lại.')
+}
+
 export const transferOwnership = async (
   newOwnerId: string,
   tenantId: string,

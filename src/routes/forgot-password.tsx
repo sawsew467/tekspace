@@ -3,6 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ForgotPasswordForm } from '@/features/auth/components/ForgotPasswordForm'
 
 export const Route = createFileRoute('/forgot-password')({
+  head: () => ({
+    meta: [{ title: 'Quên mật khẩu — TekSpace' }],
+  }),
   component: ForgotPasswordPage,
 })
 

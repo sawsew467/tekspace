@@ -14,26 +14,24 @@ export const teamSettingsSchema = z.object({
   timezone: z.string().min(1, 'Vui lòng chọn timezone'),
   // P-05: thêm custom error messages cho numeric fields
   schedule_deadline_day: z
-    .number({ invalid_type_error: 'Vui lòng chọn ngày' })
+    .number({ error: 'Vui lòng chọn ngày' })
     .int()
     .min(0, 'Ngày không hợp lệ')
     .max(6, 'Ngày không hợp lệ'),
   schedule_deadline_hour: z
-    .number({ invalid_type_error: 'Vui lòng chọn giờ' })
+    .number({ error: 'Vui lòng chọn giờ' })
     .int()
     .min(0, 'Giờ không hợp lệ')
     .max(23, 'Giờ không hợp lệ'),
   daily_report_deadline_hour: z
-    .number({ invalid_type_error: 'Vui lòng chọn giờ' })
+    .number({ error: 'Vui lòng chọn giờ' })
     .int()
     .min(0, 'Giờ không hợp lệ')
     .max(23, 'Giờ không hợp lệ'),
-  // F10: z.coerce chỉ dùng cho default_committed_hours (<input type="number">)
-  // vì browser có thể trả về '' (string) khi field trống.
-  // Select fields (deadline_day, deadline_hour) dùng z.number() vì onValueChange
-  // luôn gọi Number(val) trước khi set, nên luôn nhận được number đúng type.
-  default_committed_hours: z.coerce
-    .number({ invalid_type_error: 'Vui lòng nhập số giờ' })
+  // F10: onChange handler trong settings/team.tsx đã gọi Number() trước khi set,
+  // nên dùng z.number() bình thường — không cần z.coerce
+  default_committed_hours: z
+    .number({ error: 'Vui lòng nhập số giờ' })
     .int('Số giờ phải là số nguyên')
     .min(1, 'Tối thiểu 1 giờ')
     .max(168, 'Tối đa 168 giờ'),

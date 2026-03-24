@@ -9,9 +9,23 @@ export const signIn = async (email: string, password: string) => {
   return data
 }
 
-export const signUp = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signUp({ email, password })
+export const signUp = async (email: string, password: string, fullName: string) => {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { full_name: fullName },  // Supabase raw_user_meta_data — handle_new_user trigger copies this
+    },
+  })
   if (error) throw error
+
+  // Backup update: đề phòng trigger chưa copy full_name sang users table
+  if (data.user) {
+    await supabase
+      .from('users')
+      .update({ full_name: fullName })
+      .eq('id', data.user.id)
+  }
   return data
 }
 

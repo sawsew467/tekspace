@@ -5,7 +5,7 @@ const validTimezoneValues = COMMON_TIMEZONES.map((tz) => tz.value) as [string, .
 
 export const timezoneSchema = z.object({
   timezone: z.enum(validTimezoneValues, {
-    errorMap: () => ({ message: 'Vui lòng chọn timezone hợp lệ' }),
+    error: 'Vui lòng chọn timezone hợp lệ',
   }),
 })
 

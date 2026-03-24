@@ -2,7 +2,14 @@ import { AlertCircle, Users } from 'lucide-react'
 import { useTenantMembers } from '@/features/tenant/hooks/use-tenant-members'
 import { InviteMemberDialog } from '@/features/tenant/components/InviteMemberDialog'
 import { RoleActionDropdown } from '@/features/tenant/components/RoleActionDropdown'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(' ')
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  return name.slice(0, 2).toUpperCase()
+}
 
 const ROLE_LABEL: Record<string, string> = {
   owner: 'Owner',
@@ -58,12 +65,19 @@ export function MemberList({ canManage, currentUserId }: MemberListProps) {
         <div className='divide-y rounded-md border'>
           {members.map((member) => (
             <div key={member.id} className='flex items-center justify-between px-4 py-3'>
-              <div>
-                <p className='font-medium'>{member.users.full_name}</p>
-                {/* P5: Hiển thị email (AC2) thay vì timezone */}
-                <p className='text-muted-foreground text-sm'>
-                  {member.users.email ?? member.users.timezone}
-                </p>
+              <div className='flex items-center gap-3'>
+                <Avatar className='h-8 w-8'>
+                  <AvatarFallback className='text-xs'>
+                    {getInitials(member.users.full_name || member.users.email?.split('@')[0] || 'U')}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className='font-medium'>{member.users.full_name || member.users.email?.split('@')[0]}</p>
+                  {/* P5: Hiển thị email (AC2) */}
+                  <p className='text-muted-foreground text-xs'>
+                    {member.users.email ?? member.users.timezone}
+                  </p>
+                </div>
               </div>
               <div className='flex items-center gap-2'>
                 <Badge variant={ROLE_VARIANT[member.role] ?? 'outline'}>

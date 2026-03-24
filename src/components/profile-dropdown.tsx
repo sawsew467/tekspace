@@ -55,12 +55,12 @@ export function ProfileDropdown() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem onClick={() => (window.location.href = ROUTES.app.settings.profile)}>
-              Profile
+            <DropdownMenuItem onClick={() => (window.location.href = ROUTES.app.account.profile)}>
+              Hồ sơ cá nhân
               <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => (window.location.href = ROUTES.app.settings.team)}>
-              Team Settings
+            <DropdownMenuItem onClick={() => (window.location.href = ROUTES.app.team.settings)}>
+              Cài đặt nhóm
               <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
             </DropdownMenuItem>
           </DropdownMenuGroup>
