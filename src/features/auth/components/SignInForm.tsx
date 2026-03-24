@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import type { AuthError } from '@supabase/supabase-js'
 
@@ -17,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { signIn, initTenantAndGetRoute } from '../services/auth.service'
 import { signInSchema, type SignInInput } from '../schemas/auth.schema'
+import { ROUTES } from '@/lib/routes'
 
 export function SignInForm() {
   const [isPending, setIsPending] = useState(false)
@@ -74,7 +75,15 @@ export function SignInForm() {
           name='password'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Mật khẩu</FormLabel>
+              <div className='flex items-center justify-between'>
+                <FormLabel>Mật khẩu</FormLabel>
+                <Link
+                  to={ROUTES.forgotPassword}
+                  className='text-xs text-muted-foreground underline-offset-4 hover:underline'
+                >
+                  Quên mật khẩu?
+                </Link>
+              </div>
               <FormControl>
                 <Input
                   type='password'

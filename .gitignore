@@ -26,3 +26,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code local settings (chứa secrets)
+.claude/settings.local.json
+.claude/skills/supabase-sentinel/

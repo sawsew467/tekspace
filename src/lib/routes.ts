@@ -1,7 +1,10 @@
 export const ROUTES = {
   signIn: '/sign-in',
+  forgotPassword: '/forgot-password',
+  resetPassword: '/reset-password',
   acceptInvite: '/accept-invite',
   app: {
+    createTenant: '/create-tenant',
     dashboard: '/dashboard',
     schedule: '/schedule',
     scheduleManage: '/schedule/manage',

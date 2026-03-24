@@ -39,5 +39,10 @@ export const teamSettingsSchema = z.object({
     .max(168, 'Tối đa 168 giờ'),
 })
 
+export const inviteMemberSchema = z.object({
+  email: z.string().email('Email không hợp lệ'),
+})
+
 export type CreateTenantInput = z.infer<typeof createTenantSchema>
 export type TeamSettingsInput = z.infer<typeof teamSettingsSchema>
+export type InviteMemberInput = z.infer<typeof inviteMemberSchema>

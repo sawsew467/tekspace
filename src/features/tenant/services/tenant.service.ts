@@ -12,6 +12,29 @@ export type TenantSettings = {
   default_committed_hours: number
 }
 
+export type TenantMemberWithUser = {
+  id: string
+  user_id: string
+  role: 'owner' | 'manager' | 'member'
+  status: 'active' | 'inactive'
+  committed_hours: number | null
+  users: {
+    id: string
+    full_name: string
+    avatar_url: string | null
+    timezone: string
+    email: string | null
+  }
+}
+
+export type InviteTokenInfo = {
+  tenantId: string
+  tenantName: string
+  email: string
+  status: string
+  expiresAt: string
+}
+
 export const createTenant = async (name: string) => {
   // 1. Insert tenant WITHOUT .select() để tránh INSERT+RETURNING RLS issue:
   //    Khi chain .select() trên INSERT, PostgREST dùng "INSERT ... RETURNING"
@@ -79,4 +102,82 @@ export const updateTenantSettings = async (
     .single()
   if (error) throw error
   if (!data) throw new Error('Update returned no rows — check RLS policies')
+}
+
+export const getMembers = async (tenantId: string): Promise<TenantMemberWithUser[]> => {
+  const { data, error } = await supabase
+    .from('tenant_members')
+    .select('id, user_id, role, status, committed_hours, users(id, full_name, avatar_url, timezone, email)')
+    .eq('tenant_id', tenantId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data as TenantMemberWithUser[]
+}
+
+export const inviteMember = async (
+  tenantId: string,
+  email: string
+): Promise<{ inviteLink: string }> => {
+  // Gọi Edge Function send-invite — xác thực + INSERT tenant_invites + gửi email
+  const { data, error } = await supabase.functions.invoke('send-invite', {
+    body: { tenantId, email },
+  })
+  if (error) {
+    // P12: Extract user-facing error message từ response body thay vì dùng SDK generic message
+    let serverMessage: string | undefined
+    try {
+      const body = await (error as unknown as { context: Response }).context.json()
+      serverMessage = body?.error
+    } catch {
+      /* ignore — network error hoặc non-JSON response */
+    }
+    throw new Error(serverMessage ?? 'Không thể gửi lời mời.')
+  }
+  const appUrl = window.location.origin
+  return { inviteLink: `${appUrl}/accept-invite?token=${data.token}` }
+}
+
+export const validateInviteToken = async (token: string): Promise<InviteTokenInfo> => {
+  // Gọi accept-invite Edge Function với validateOnly=true để không cần JWT tenant context
+  // RLS trên tenant_invites check current_tenant_id() → block nếu user chưa có tenant
+  // Bypass: dùng Edge Function với supabaseAdmin
+  const { data, error } = await supabase.functions.invoke('accept-invite', {
+    body: { token, validateOnly: true },
+  })
+  if (error) {
+    let serverMessage: string | undefined
+    try {
+      const body = await (error as unknown as { context: Response }).context.json()
+      serverMessage = body?.error
+    } catch {
+      /* ignore */
+    }
+    throw new Error(serverMessage ?? 'Lời mời không hợp lệ.')
+  }
+  // P10: Guard shape trước khi cast
+  if (!data?.tenantId) throw new Error('Lời mời không hợp lệ.')
+  return data as InviteTokenInfo
+}
+
+export const acceptInvite = async (token: string): Promise<{ tenantId: string }> => {
+  // Gọi accept-invite Edge Function — bypass RLS với service role
+  // P1: userId không truyền qua body — Edge Function extract từ JWT đã xác thực
+  // INSERT tenant_members + UPDATE tenant_invites status='accepted'
+  const { data, error } = await supabase.functions.invoke('accept-invite', {
+    body: { token },
+  })
+  if (error) {
+    let serverMessage: string | undefined
+    try {
+      const body = await (error as unknown as { context: Response }).context.json()
+      serverMessage = body?.error
+    } catch {
+      /* ignore */
+    }
+    throw new Error(serverMessage ?? 'Không thể chấp nhận lời mời.')
+  }
+  // P10: Guard shape trước khi cast
+  if (!data?.tenantId) throw new Error('Phản hồi không hợp lệ từ server.')
+  return data as { tenantId: string }
 }
