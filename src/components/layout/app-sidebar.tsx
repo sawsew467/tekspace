@@ -21,6 +21,8 @@ import { supabase } from '@/lib/supabase-browser'
 import { updateActiveTenant } from '@/features/settings/services/settings.service'
 import { QUERY_KEYS } from '@/lib/query-keys'
 import { ROUTES } from '@/lib/routes'
+import { useUnreadCount } from '@/features/notifications/hooks/use-unread-count'
+import { useNotificationsRealtime } from '@/features/notifications/hooks/use-notifications-realtime'
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
@@ -28,6 +30,21 @@ export function AppSidebar() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+
+  // Notifications: unread count badge + realtime subscription
+  // AppSidebar luôn mount → subscription active toàn bộ session
+  const { data: unreadCount = 0 } = useUnreadCount(activeTenantId, user?.id ?? null)
+  useNotificationsRealtime(activeTenantId, user?.id ?? null)
+
+  // Inject unread badge vào nav item "Notifications"
+  const navGroupsWithBadge = sidebarData.navGroups.map((group) => ({
+    ...group,
+    items: group.items.map((item) =>
+      item.url === ROUTES.app.notifications
+        ? { ...item, badge: unreadCount > 0 ? String(unreadCount > 99 ? '99+' : unreadCount) : undefined }
+        : item
+    ),
+  }))
   const [isSwitching, setIsSwitching] = useState(false)
 
   // Query tenant names từ DB dựa trên tenant IDs trong store
@@ -115,7 +132,7 @@ export function AppSidebar() {
         />
       </SidebarHeader>
       <SidebarContent>
-        {sidebarData.navGroups.map((props) => (
+        {navGroupsWithBadge.map((props) => (
           <NavGroup key={props.title} {...props} />
         ))}
       </SidebarContent>

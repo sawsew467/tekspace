@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-23
-last_updated: 2026-03-24 (epic-2 → done, retro-2 → done)
+last_updated: 2026-03-25 (story-6-1 → done)
 project: TekSpace
 project_key: NOKEY
 tracking_system: file-system
@@ -63,7 +63,7 @@ development_status:
   2-2-schedule-template-from-previous-week: done
   2-3-schedule-change-deadline-lock: done
   2-4-missed-deadline-auto-handling: done
-  2-5-ux-polish-behavior-corrections: backlog
+  2-5-ux-polish-behavior-corrections: review
   epic-2-retrospective: done
 
   # ─────────────────────────────────────────────
@@ -83,7 +83,7 @@ development_status:
   4-2-cross-validation-discrepancy-detection: done
   4-3-manager-report-view: done
   4-4-ux-restructure-tabs-history-form-polish: done
-  4-5-per-task-hours: backlog
+  4-5-per-task-hours: review
   4-6-edit-report-window: backlog
   epic-4-retrospective: done
 
@@ -100,7 +100,7 @@ development_status:
   # Epic 6: Smart Notifications
   # ─────────────────────────────────────────────
   epic-6: in-progress
-  6-1-in-app-notification-center: review
+  6-1-in-app-notification-center: done
   6-2-schedule-deadline-notifications: backlog
   6-3-daily-report-reminder: backlog
   6-4-event-based-notifications: backlog

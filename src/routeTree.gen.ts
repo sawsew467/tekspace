@@ -15,6 +15,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AppScheduleRouteImport } from './routes/_app/schedule'
+import { Route as AppNotificationsRouteImport } from './routes/_app/notifications'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppDailyReportRouteImport } from './routes/_app/daily-report'
 import { Route as AppCreateTenantRouteImport } from './routes/_app/create-tenant'
@@ -53,6 +54,11 @@ const AppRouteRoute = AppRouteRouteImport.update({
 const AppScheduleRoute = AppScheduleRouteImport.update({
   id: '/schedule',
   path: '/schedule',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppNotificationsRoute = AppNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/create-tenant': typeof AppCreateTenantRoute
   '/daily-report': typeof AppDailyReportRoute
   '/dashboard': typeof AppDashboardRoute
+  '/notifications': typeof AppNotificationsRoute
   '/schedule': typeof AppScheduleRoute
   '/account/profile': typeof AppAccountProfileRoute
   '/account/security': typeof AppAccountSecurityRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/create-tenant': typeof AppCreateTenantRoute
   '/daily-report': typeof AppDailyReportRoute
   '/dashboard': typeof AppDashboardRoute
+  '/notifications': typeof AppNotificationsRoute
   '/schedule': typeof AppScheduleRoute
   '/account/profile': typeof AppAccountProfileRoute
   '/account/security': typeof AppAccountSecurityRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/_app/create-tenant': typeof AppCreateTenantRoute
   '/_app/daily-report': typeof AppDailyReportRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/notifications': typeof AppNotificationsRoute
   '/_app/schedule': typeof AppScheduleRoute
   '/_app/account/profile': typeof AppAccountProfileRoute
   '/_app/account/security': typeof AppAccountSecurityRoute
@@ -174,6 +183,7 @@ export interface FileRouteTypes {
     | '/create-tenant'
     | '/daily-report'
     | '/dashboard'
+    | '/notifications'
     | '/schedule'
     | '/account/profile'
     | '/account/security'
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | '/create-tenant'
     | '/daily-report'
     | '/dashboard'
+    | '/notifications'
     | '/schedule'
     | '/account/profile'
     | '/account/security'
@@ -210,6 +221,7 @@ export interface FileRouteTypes {
     | '/_app/create-tenant'
     | '/_app/daily-report'
     | '/_app/dashboard'
+    | '/_app/notifications'
     | '/_app/schedule'
     | '/_app/account/profile'
     | '/_app/account/security'
@@ -268,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/schedule'
       fullPath: '/schedule'
       preLoaderRoute: typeof AppScheduleRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/notifications': {
+      id: '/_app/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AppNotificationsRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/dashboard': {
@@ -379,6 +398,7 @@ interface AppRouteRouteChildren {
   AppCreateTenantRoute: typeof AppCreateTenantRoute
   AppDailyReportRoute: typeof AppDailyReportRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppNotificationsRoute: typeof AppNotificationsRoute
   AppScheduleRoute: typeof AppScheduleRoute
 }
 
@@ -388,6 +408,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppCreateTenantRoute: AppCreateTenantRoute,
   AppDailyReportRoute: AppDailyReportRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppNotificationsRoute: AppNotificationsRoute,
   AppScheduleRoute: AppScheduleRoute,
 }
 
