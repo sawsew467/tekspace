@@ -1,4 +1,4 @@
-import { toZonedTime, format } from 'date-fns-tz'
+import { format } from 'date-fns-tz'
 import { formatDistanceToNow, isPast } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import { Clock, AlertTriangle, CheckCircle2 } from 'lucide-react'
@@ -30,8 +30,8 @@ export function ScheduleDeadlineBadge({
   const isUrgent = !isPastDeadline && hoursLeft < 24
 
   // Hiển thị deadline theo user timezone
-  const deadlineLocal = toZonedTime(deadlineDate, userTimezone)
-  const deadlineFormatted = format(deadlineLocal, 'EEE dd/MM HH:mm', {
+  // Dùng format trực tiếp với timeZone option (không qua toZonedTime — tránh double conversion)
+  const deadlineFormatted = format(deadlineDate, 'EEE dd/MM HH:mm', {
     timeZone: userTimezone,
     locale: vi,
   })

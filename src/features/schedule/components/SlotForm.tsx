@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { addDays, format, parseISO } from 'date-fns'
@@ -39,12 +40,19 @@ for (let h = 0; h < 24; h++) {
   }
 }
 
+// Overnight end time options: chỉ 00:00 → 06:00 (AC9), không bao gồm 06:30+
+const OVERNIGHT_END_OPTIONS = TIME_OPTIONS.filter((t) => {
+  const [h, m] = t.split(':').map(Number)
+  return h < 6 || (h === 6 && m === 0) // 00:00, 00:30, ..., 06:00
+})
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface SlotFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   weekOf: string                 // Monday ISO date "YYYY-MM-DD"
+  defaultDate?: string           // AC3: "YYYY-MM-DD" — pre-fill dropdown Ngày khi click "+"
   existingSlots: ScheduleSlot[]
   onSubmit: (values: SlotFormValues) => void
   isLoading?: boolean
@@ -58,17 +66,20 @@ interface SlotFormProps {
  * SlotForm — dialog để thêm một time slot mới vào lịch tuần
  *
  * Features:
- * - Chọn ngày trong tuần (Mon–Sun) của week_of
- * - Chọn start time và end time (30-min steps, bao gồm 23:30)
+ * - Chọn ngày trong tuần (Mon–Sun) của week_of, pre-fill từ defaultDate (AC3)
+ * - Chọn start time và end time (30-min steps)
  * - Overnight support: auto-detect khi endTime <= startTime
- * - Hiển thị duration preview ("2 giờ 30 phút")
- * - Client-side overlap detection dùng UTC epoch (chính xác với mọi timezone)
- * - Validate slotDate nằm trong tuần hiện tại
+ *   - Overnight end time được cap tại 06:00 (AC9)
+ * - Hint text khi start sáng sớm + overnight (AC10)
+ * - Duration preview với "→" và "+1 ngày" badge (AC8)
+ * - Disabled submit khi có lỗi (AC8)
+ * - Client-side overlap detection dùng UTC epoch
  */
 export function SlotForm({
   open,
   onOpenChange,
   weekOf,
+  defaultDate,
   existingSlots,
   onSubmit,
   isLoading = false,
@@ -76,7 +87,6 @@ export function SlotForm({
   tenantTimezone,
 }: SlotFormProps) {
   // Generate days Mon–Sun cho tuần này
-  // Dùng parseISO() thay vì new Date() để tránh UTC-midnight timezone issue
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(parseISO(weekOf), i)
     return {
@@ -88,14 +98,26 @@ export function SlotForm({
   const form = useForm<SlotFormValues>({
     resolver: zodResolver(slotFormSchema),
     defaultValues: {
-      slotDate: weekOf,    // Default: thứ Hai của tuần
+      slotDate: defaultDate ?? weekOf,
       startTime: '09:00',
       endTime: '17:00',
       isOvernight: false,
     },
   })
 
-  // eslint-disable-next-line react-hooks/incompatible-library
+  // Reset form khi open thay đổi hoặc defaultDate thay đổi (AC3)
+  // form từ react-hook-form là stable ref — thêm vào deps để lint không complain
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        slotDate: defaultDate ?? weekOf,
+        startTime: '09:00',
+        endTime: '17:00',
+        isOvernight: false,
+      })
+    }
+  }, [open, defaultDate, weekOf, form])
+
   const watchedValues = form.watch()
   const { startTime, endTime, isOvernight } = watchedValues
 
@@ -111,14 +133,27 @@ export function SlotForm({
     }
   })()
 
-  // End time options: nếu không overnight → chỉ hiện times > startTime
-  const endTimeOptions = TIME_OPTIONS.filter((t) => {
-    if (isOvernight) return true
-    return t > startTime
-  })
+  // End time options (AC9):
+  // - Overnight mode: chỉ sáng sớm hôm sau (00:00–06:00)
+  // - Normal mode: chỉ times > startTime
+  const endTimeOptions = (() => {
+    if (isOvernight) {
+      return OVERNIGHT_END_OPTIONS
+    }
+    return TIME_OPTIONS.filter((t) => t > startTime)
+  })()
+
+  // AC10: Hint text khi isOvernight=true và start time ở sáng sớm (00:00–06:00)
+  // Dùng string compare thay vì integer để tránh nhầm 06:30 (hour=6 nhưng ngoài range)
+  const showNextDayHint = isOvernight &&
+    endTime !== '' &&
+    startTime <= '06:00'  // "06:00" <= "06:00" = true; "06:30" <= "06:00" = false ✓
+
+  // Disabled submit khi có validation error (AC8)
+  const hasAnyError = Object.keys(form.formState.errors).length > 0
 
   function handleSubmit(values: SlotFormValues) {
-    // Validate slotDate nằm trong tuần hiện tại (NFR11)
+    // Validate slotDate nằm trong tuần hiện tại
     const weekStart = parseISO(weekOf)
     const weekEnd = addDays(weekStart, 6)
     const slotDate = parseISO(values.slotDate)
@@ -131,8 +166,7 @@ export function SlotForm({
     const overnight = values.isOvernight || values.endTime <= values.startTime
     const finalValues: SlotFormValues = { ...values, isOvernight: overnight }
 
-    // Client-side overlap check dùng UTC epoch (P1+P2 fix)
-    // Không filter theo slot_date → bắt được cả overnight cross-midnight overlaps
+    // Client-side overlap check
     const { startTimeUTC, durationMinutes } = convertSlotToUTC(finalValues, userTimezone, tenantTimezone)
     if (hasOverlapWithExisting(startTimeUTC, durationMinutes, existingSlots)) {
       form.setError('startTime', { message: 'Thời gian này bị trùng với slot khác.' })
@@ -146,12 +180,6 @@ export function SlotForm({
   function handleClose(open: boolean) {
     if (!open) form.reset()
     onOpenChange(open)
-  }
-
-  function cancelOvernight() {
-    form.setValue('isOvernight', false)
-    const nextTime = TIME_OPTIONS.find((t) => t > form.getValues('startTime')) ?? '23:30'
-    form.setValue('endTime', nextTime)
   }
 
   return (
@@ -192,13 +220,14 @@ export function SlotForm({
               )}
             />
 
-            <div className="grid grid-cols-2 gap-3">
-              {/* Start time — bao gồm 23:30 (bỏ slice(0,-1) cũ) */}
+            {/* Thời gian: Start → End với "+1 ngày" badge (AC8) */}
+            <div className="flex items-end gap-2">
+              {/* Start time */}
               <FormField
                 control={form.control}
                 name="startTime"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex-1">
                     <FormLabel>Bắt đầu</FormLabel>
                     <Select
                       onValueChange={(val) => {
@@ -225,78 +254,88 @@ export function SlotForm({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* End time */}
+              {/* Dấu → ở giữa (AC8) */}
+              <span className="text-muted-foreground pb-2">→</span>
+
+              {/* End time với "+1 ngày" badge (AC8) */}
               <FormField
                 control={form.control}
                 name="endTime"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex-1">
                     <FormLabel>Kết thúc</FormLabel>
-                    <Select
-                      onValueChange={(val) => {
-                        field.onChange(val)
-                        // Auto-detect overnight: nếu endTime <= startTime → overnight
-                        // Dùng onValueChange thay vì onSelect (Radix-safe)
-                        form.setValue('isOvernight', val <= form.getValues('startTime'))
-                      }}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {endTimeOptions.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
-                          </SelectItem>
-                        ))}
-                        {/* Overnight section: hiển thị khi chưa chọn overnight */}
-                        {!isOvernight && (
-                          <SelectItem value="__overnight_separator__" disabled>
-                            ── Ngày hôm sau ──
-                          </SelectItem>
-                        )}
-                        {!isOvernight &&
-                          TIME_OPTIONS.filter((t) => t <= startTime).map((t) => (
-                            <SelectItem key={`overnight-${t}`} value={t}>
-                              {t} (hôm sau)
+                    <div className="flex items-center gap-1.5">
+                      <Select
+                        onValueChange={(val) => {
+                          field.onChange(val)
+                          // Auto-detect overnight: nếu endTime <= startTime → overnight
+                          form.setValue('isOvernight', val <= form.getValues('startTime'))
+                        }}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {endTimeOptions.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
                             </SelectItem>
                           ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                          {/* Non-overnight mode: hiển thị ngăn cách và các giờ overnight */}
+                          {!isOvernight && (
+                            <SelectItem value="__overnight_separator__" disabled>
+                              ── Ngày hôm sau ──
+                            </SelectItem>
+                          )}
+                          {!isOvernight &&
+                            OVERNIGHT_END_OPTIONS.filter((t) => t <= startTime).map((t) => (
+                              <SelectItem key={`overnight-${t}`} value={t}>
+                                {t} (hôm sau)
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      {/* "+1 ngày" badge thay cho "Hủy qua đêm" link (AC8) */}
+                      {isOvernight && (
+                        <span className="text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 px-1.5 py-0.5 rounded font-medium whitespace-nowrap">
+                          +1 ngày
+                        </span>
+                      )}
+                    </div>
                   </FormItem>
                 )}
               />
             </div>
 
-            {/* Duration preview + overnight badge + cancel */}
+            {/* Error message dưới cả time row (AC8) — không dưới từng field riêng */}
+            {(form.formState.errors.startTime || form.formState.errors.endTime) && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.startTime?.message ??
+                  form.formState.errors.endTime?.message}
+              </p>
+            )}
+
+            {/* Duration preview với (qua đêm) label */}
             {durationPreview && (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Thời lượng:{' '}
-                  <span className="font-medium text-foreground">{durationPreview}</span>
-                  {(isOvernight || endTime <= startTime) && (
-                    <span className="ml-2 text-xs text-yellow-600">(qua đêm)</span>
-                  )}
-                </p>
-                {/* Cho phép hủy overnight mode (P8) */}
+              <p className="text-sm text-muted-foreground">
+                ⏱ {durationPreview}
                 {isOvernight && (
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground underline hover:text-foreground"
-                    onClick={cancelOvernight}
-                  >
-                    Hủy qua đêm
-                  </button>
+                  <span className="ml-1.5 text-xs text-yellow-600">(qua đêm)</span>
                 )}
+              </p>
+            )}
+
+            {/* AC10: Hint text khi start sáng sớm + overnight */}
+            {showNextDayHint && (
+              <div className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 rounded p-2">
+                💡 Ca hoàn toàn trong sáng ngày hôm sau? Hãy chọn ngày tiếp theo trong dropdown bên trên.
               </div>
             )}
 
@@ -304,8 +343,9 @@ export function SlotForm({
               <Button type="button" variant="outline" onClick={() => handleClose(false)}>
                 Hủy
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Đang lưu...' : 'Thêm slot'}
+              {/* AC8: disabled khi có bất kỳ lỗi nào */}
+              <Button type="submit" disabled={isLoading || hasAnyError}>
+                {isLoading ? 'Đang lưu...' : 'Thêm slot →'}
               </Button>
             </DialogFooter>
           </form>

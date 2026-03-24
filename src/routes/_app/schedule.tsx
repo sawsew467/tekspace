@@ -16,6 +16,8 @@ import { useUpsertSlots } from '@/features/schedule/hooks/use-upsert-slots'
 import { usePreviousWeekSlots } from '@/features/schedule/hooks/use-previous-week-slots'
 import { useUpdateSlot } from '@/features/schedule/hooks/use-update-slot'
 import { useDeleteSlotWithReason } from '@/features/schedule/hooks/use-delete-slot-with-reason'
+import { useUpdateSlotDirect } from '@/features/schedule/hooks/use-update-slot-direct'
+import { useDeleteSlotDirect } from '@/features/schedule/hooks/use-delete-slot-direct'
 import { ScheduleGrid, ScheduleGridSkeleton } from '@/features/schedule/components/ScheduleGrid'
 import { ScheduleDeadlineBadge } from '@/features/schedule/components/ScheduleDeadlineBadge'
 import { SlotForm } from '@/features/schedule/components/SlotForm'
@@ -26,7 +28,7 @@ import {
   convertSlotToUTC,
   type ScheduleSlot,
 } from '@/features/schedule/services/schedule.service'
-import { shiftSlotsToCurrentWeek } from '@/features/schedule/utils/schedule.utils'
+import { shiftSlotsToCurrentWeek, getSlotEditMode, type SlotEditMode } from '@/features/schedule/utils/schedule.utils'
 import type { SlotFormValues } from '@/features/schedule/schemas/schedule.schema'
 
 export const Route = createFileRoute('/_app/schedule')({
@@ -69,15 +71,15 @@ function SchedulePage() {
   // ── UI state ───────────────────────────────────────────────────────────────
 
   const [slotFormOpen, setSlotFormOpen] = useState(false)
+  // AC3: pre-fill date khi click "+" trên một ngày cụ thể
+  const [slotFormDefaultDate, setSlotFormDefaultDate] = useState<string | undefined>(undefined)
 
-  // Story 2.3: Edit/Delete dialog state
+  // Edit/Delete dialog state
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
+  const [editingSlotMode, setEditingSlotMode] = useState<SlotEditMode>('free') // P-6: capture mode lúc open
   const [deletingSlot, setDeletingSlot] = useState<ScheduleSlot | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  // P-2: tách riêng emergency flag cho edit và delete để tránh bleed giữa 2 dialogs
-  const [editIsEmergency, setEditIsEmergency] = useState(false)
-  const [deleteIsEmergency, setDeleteIsEmergency] = useState(false)
 
   // ── Data queries ───────────────────────────────────────────────────────────
 
@@ -118,11 +120,13 @@ function SchedulePage() {
   const upsertSlots = useUpsertSlots()
   const { mutate: upsertMutate, isPending: isUpsertPending } = upsertSlots
 
-  // Story 2.3: Update slot với reason (edit + emergency override)
+  // Tier 2: Update/Delete slot với reason (hôm nay → Chủ nhật tuần này)
   const updateSlot = useUpdateSlot(scheduleWeek?.id)
-
-  // Story 2.3: Delete slot với reason (thay thế direct delete)
   const deleteSlotWithReason = useDeleteSlotWithReason(scheduleWeek?.id)
+
+  // Tier 3: Direct update/delete không cần reason (tuần sau trở đi)
+  const updateSlotDirect = useUpdateSlotDirect(scheduleWeek?.id)
+  const deleteSlotDirect = useDeleteSlotDirect(scheduleWeek?.id)
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -130,22 +134,24 @@ function SchedulePage() {
     return slots.find((s) => s.id === slotId) ?? null
   }
 
-  // ── Handlers: Add slot (giữ nguyên từ Story 2.1) ──────────────────────────
+  // ── Handlers: Add slot ──────────────────────────────────────────────────────
 
-  function handleAddSlot(_date: string) {
+  // AC3: pre-fill date khi click "+" trên column của ngày cụ thể
+  function handleAddSlot(date: string) {
+    setSlotFormDefaultDate(date)
     setSlotFormOpen(true)
   }
 
   function handleAddSlotSubmit(values: SlotFormValues) {
     if (!scheduleWeek || !activeTenantId) return
 
-    // Guard: không submit khi profile đang loading (userTimezone có thể là 'UTC' fallback sai) (P13)
+    // Guard: không submit khi profile đang loading (userTimezone có thể là 'UTC' fallback sai)
     if (isProfileLoading) {
       toast.error('Đang tải thông tin người dùng, vui lòng đợi...')
       return
     }
 
-    // Guard: không submit khi đang có mutation khác in-flight (P12: stale snapshot race)
+    // Guard: không submit khi đang có mutation khác in-flight
     if (upsertSlots.isPending) return
 
     const newSlotInput = convertSlotToUTC(values, userTimezone, tenantTimezone)
@@ -168,7 +174,7 @@ function SchedulePage() {
     )
   }
 
-  // ── Handlers: Apply template (giữ nguyên từ Story 2.2) ───────────────────
+  // ── Handlers: Apply template ───────────────────────────────────────────────
 
   function handleApplyTemplate() {
     if (!scheduleWeek || isUpsertPending) return
@@ -179,38 +185,41 @@ function SchedulePage() {
     )
   }
 
-  // ── Handlers: Story 2.3 — Edit/Delete/Emergency ───────────────────────────
+  // ── Handlers: 3-tier Edit/Delete (AC5, AC6) ────────────────────────────────
 
   function handleEditSlot(slotId: string) {
     const slot = findSlot(slotId)
     if (!slot) return
-    setEditingSlot(slot)
-    setEditIsEmergency(false)
-    setEditDialogOpen(true)
+    const mode = getSlotEditMode(slot.slot_date, userTimezone)
+
+    if (mode === 'reason-required') {
+      // Tier 2: mở EditSlotDialog (cần reason, gọi RPC, manager notified)
+      setEditingSlot(slot)
+      setEditingSlotMode(mode) // P-6: capture mode lúc mở, tránh race condition midnight
+      setEditDialogOpen(true)
+    } else if (mode === 'free') {
+      // Tier 3: mở EditSlotDialog (reuse dialog, route sang direct update)
+      setEditingSlot(slot)
+      setEditingSlotMode(mode) // P-6: capture mode lúc mở
+      setEditDialogOpen(true)
+    }
+    // Tier 1 (locked): không làm gì — UI đã không hiển thị button
   }
 
   function handleDeleteSlot(slotId: string) {
     const slot = findSlot(slotId)
     if (!slot) return
-    setDeletingSlot(slot)
-    setDeleteIsEmergency(false)
-    setDeleteDialogOpen(true)
-  }
+    const mode = getSlotEditMode(slot.slot_date, userTimezone)
 
-  function handleEmergencyOverride(slotId: string) {
-    const slot = findSlot(slotId)
-    if (!slot) return
-    setEditingSlot(slot)
-    setEditIsEmergency(true)
-    setEditDialogOpen(true)
-  }
-
-  function handleEmergencyDelete(slotId: string) {
-    const slot = findSlot(slotId)
-    if (!slot) return
-    setDeletingSlot(slot)
-    setDeleteIsEmergency(true)
-    setDeleteDialogOpen(true)
+    if (mode === 'reason-required') {
+      // Tier 2: mở DeleteSlotDialog (cần reason, gọi RPC, manager notified)
+      setDeletingSlot(slot)
+      setDeleteDialogOpen(true)
+    } else if (mode === 'free') {
+      // Tier 3: direct delete — không cần dialog, không notify manager (AC6)
+      deleteSlotDirect.mutate({ slotId })
+    }
+    // Tier 1 (locked): không làm gì — UI đã không hiển thị button
   }
 
   function handleEditSubmit(data: {
@@ -220,21 +229,43 @@ function SchedulePage() {
     isEmergency: boolean
   }) {
     if (!editingSlot) return
-    updateSlot.mutate(
-      {
-        slotId: editingSlot.id,
-        newStartTimeUTC: data.newStartTimeUTC,
-        newDurationMinutes: data.newDurationMinutes,
-        reason: data.reason,
-        isEmergencyOverride: data.isEmergency,
-      },
-      {
-        onSuccess: () => {
-          setEditDialogOpen(false)
-          setEditingSlot(null) // P-4: clear stale reference để tránh form pre-fill cũ khi mở lại
+    // P-6: dùng editingSlotMode đã capture lúc mở dialog, không re-evaluate
+    // → tránh race condition khi user submit sau midnight (mode đổi từ free → reason-required)
+
+    if (editingSlotMode === 'free') {
+      // Tier 3: direct update — không cần reason, không notify manager (AC6)
+      updateSlotDirect.mutate(
+        {
+          slotId: editingSlot.id,
+          newStartTimeUTC: data.newStartTimeUTC,
+          newDurationMinutes: data.newDurationMinutes,
+          tenantTimezone,
         },
-      }
-    )
+        {
+          onSuccess: () => {
+            setEditDialogOpen(false)
+            setEditingSlot(null)
+          },
+        }
+      )
+    } else {
+      // Tier 2: RPC với reason bắt buộc, manager được notify
+      updateSlot.mutate(
+        {
+          slotId: editingSlot.id,
+          newStartTimeUTC: data.newStartTimeUTC,
+          newDurationMinutes: data.newDurationMinutes,
+          reason: data.reason,
+          isEmergencyOverride: false,
+        },
+        {
+          onSuccess: () => {
+            setEditDialogOpen(false)
+            setEditingSlot(null)
+          },
+        }
+      )
+    }
   }
 
   function handleDeleteConfirm(data: { reason: string; isEmergency: boolean }) {
@@ -253,8 +284,6 @@ function SchedulePage() {
 
   // ── Template banner visibility ────────────────────────────────────────────
 
-  // Banner template: hiện khi tuần đang xem trống và tuần trước có data.
-  // User chủ động quyết định có tải template hay không (không auto-apply).
   const showTemplateBanner =
     !isLoading &&
     !!scheduleWeek &&
@@ -264,53 +293,52 @@ function SchedulePage() {
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        {/* Title + week navigation */}
-        <div className="flex items-center gap-3">
-          <CalendarDays className="h-6 w-6 text-muted-foreground" />
-          <div>
-            <h1 className="text-xl font-semibold">Lịch làm việc</h1>
-            <div className="flex items-center gap-0.5 mt-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={handlePrevWeek}
-                title="Tuần trước"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <span className="text-sm text-muted-foreground tabular-nums px-1">
-                {format(parseISO(currentWeekOf), 'dd/MM')}
-                {' – '}
-                {format(addDays(parseISO(currentWeekOf), 6), 'dd/MM/yyyy')}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={handleNextWeek}
-                title="Tuần sau"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-              {!isViewingCurrentWeek && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-xs px-2 text-blue-600 hover:text-blue-700"
-                  onClick={handleGoToCurrentWeek}
-                >
-                  Tuần này
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+      {/* Title row */}
+      <div className="flex items-center gap-2">
+        <CalendarDays className="h-6 w-6 text-muted-foreground" />
+        <h1 className="text-xl font-semibold">Lịch làm việc</h1>
+      </div>
 
-        {/* Right side: deadline badge + add button */}
-        <div className="flex items-center gap-3 flex-wrap">
+      {/* Week navigation — centered (AC4) */}
+      <div className="flex items-center justify-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={handlePrevWeek}
+          title="Tuần trước"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-sm text-muted-foreground tabular-nums px-2">
+          {format(parseISO(currentWeekOf), 'dd/MM')}
+          {' – '}
+          {format(addDays(parseISO(currentWeekOf), 6), 'dd/MM/yyyy')}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={handleNextWeek}
+          title="Tuần sau"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        {!isViewingCurrentWeek && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs px-2 text-blue-600 hover:text-blue-700"
+            onClick={handleGoToCurrentWeek}
+          >
+            Tuần này
+          </Button>
+        )}
+      </div>
+
+      {/* Right side: deadline badge + add button */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
           {scheduleWeek && !isWeekLoading ? (
             <ScheduleDeadlineBadge
               deadline={scheduleWeek.deadline}
@@ -319,16 +347,16 @@ function SchedulePage() {
           ) : (
             <Skeleton className="h-6 w-48" />
           )}
-
-          {/* Add slot button — disabled khi upsert in-flight (P12: prevent stale snapshot race) */}
-          <Button
-            onClick={() => handleAddSlot(currentWeekOf)}
-            disabled={isLoading || scheduleWeek?.is_locked || upsertSlots.isPending}
-            size="sm"
-          >
-            + Thêm ca làm việc
-          </Button>
         </div>
+
+        {/* Add slot button — disabled khi upsert in-flight */}
+        <Button
+          onClick={() => handleAddSlot(currentWeekOf)}
+          disabled={isLoading || scheduleWeek?.is_locked || upsertSlots.isPending}
+          size="sm"
+        >
+          + Thêm ca làm việc
+        </Button>
       </div>
 
       {/* Locked warning */}
@@ -366,21 +394,22 @@ function SchedulePage() {
           onAddSlot={handleAddSlot}
           onEditSlot={handleEditSlot}
           onDeleteSlot={handleDeleteSlot}
-          onEmergencyOverride={handleEmergencyOverride}
-          onEmergencyDelete={handleEmergencyDelete}
           isDeletingSlotId={
             deleteSlotWithReason.isPending
               ? deletingSlot?.id
-              : undefined
+              : deleteSlotDirect.isPending
+                ? deleteSlotDirect.variables?.slotId  // P-7: track per-slot spinner cho Tier 3
+                : undefined
           }
         />
       )}
 
-      {/* Slot form dialog — Add slot (Story 2.1) */}
+      {/* Slot form dialog — Add slot (AC3: defaultDate pre-fill) */}
       <SlotForm
         open={slotFormOpen}
         onOpenChange={setSlotFormOpen}
         weekOf={currentWeekOf}
+        defaultDate={slotFormDefaultDate}
         existingSlots={slots}
         onSubmit={handleAddSlotSubmit}
         isLoading={upsertSlots.isPending}
@@ -388,7 +417,7 @@ function SchedulePage() {
         tenantTimezone={tenantTimezone}
       />
 
-      {/* Story 2.3: Edit slot dialog (unlocked edit + emergency override) */}
+      {/* Edit slot dialog — Tier 2 (reason required) + Tier 3 (direct via handleEditSubmit routing) */}
       {/* key={editingSlot.id} — force remount khi slot thay đổi để useForm reset defaultValues đúng */}
       {editingSlot && (
         <EditSlotDialog
@@ -400,21 +429,21 @@ function SchedulePage() {
           weekOf={currentWeekOf}
           userTimezone={userTimezone}
           tenantTimezone={tenantTimezone}
-          isEmergency={editIsEmergency}
-          isLoading={updateSlot.isPending}
+          isEmergency={false}
+          requireReason={editingSlotMode === 'reason-required'} // P-6: dùng captured mode
+          isLoading={updateSlot.isPending || updateSlotDirect.isPending}
           onSubmit={handleEditSubmit}
         />
       )}
 
-      {/* Story 2.3: Delete slot dialog (unlocked + emergency delete) */}
-      {/* P-5: null guard — chỉ render khi deletingSlot đã được set */}
+      {/* Delete slot dialog — Tier 2 only (Tier 3 direct delete không dùng dialog) */}
       {deletingSlot && (
         <DeleteSlotDialog
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
           slot={deletingSlot}
           userTimezone={userTimezone}
-          isEmergency={deleteIsEmergency}
+          isEmergency={false}
           isLoading={deleteSlotWithReason.isPending}
           onConfirm={handleDeleteConfirm}
         />

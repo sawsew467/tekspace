@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-23
-last_updated: 2026-03-25 (story-4-5 → done)
+last_updated: 2026-03-25 (story-2-5 → done)
 project: TekSpace
 project_key: NOKEY
 tracking_system: file-system

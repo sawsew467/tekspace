@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { slotFormSchema, calcDurationMinutes, formatDuration } from '../schemas/schedule.schema'
-import { hasOverlapWithExisting, shiftSlotsToCurrentWeek, isSlotLocked } from '../utils/schedule.utils'
+import { hasOverlapWithExisting, shiftSlotsToCurrentWeek, getSlotEditMode } from '../utils/schedule.utils'
 import type { ScheduleSlot } from '../services/schedule.service'
 
 // ── slotFormSchema tests ─────────────────────────────────────────────────────
@@ -289,36 +289,48 @@ describe('shiftSlotsToCurrentWeek', () => {
   })
 })
 
-// ── isSlotLocked tests ────────────────────────────────────────────────────────
+// ── getSlotEditMode tests ─────────────────────────────────────────────────────
 
-describe('isSlotLocked', () => {
-  it('returns true when start_time is in the past (slot đã bắt đầu)', () => {
-    // Slot bắt đầu 1 giờ trước → locked
-    const pastTime = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-    expect(isSlotLocked(pastTime)).toBe(true)
+describe('getSlotEditMode', () => {
+  const TZ = 'Asia/Ho_Chi_Minh'
+
+  // Test deterministic: fake today = Thứ Tư 2026-03-25 12:00 ICT = 2026-03-25T05:00:00Z
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-25T05:00:00Z'))
   })
 
-  it('returns true when start_time is 1ms before now (just past boundary)', () => {
-    // Dùng Date.now()-1 thay vì Date.now() chính xác để tránh flakiness trong test runner
-    const justNow = new Date(Date.now() - 1).toISOString()
-    expect(isSlotLocked(justNow)).toBe(true)
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
-  it('returns false when start_time is in the future (slot chưa bắt đầu)', () => {
-    // Slot bắt đầu 1 giờ sau → unlocked
-    const futureTime = new Date(Date.now() + 60 * 60 * 1000).toISOString()
-    expect(isSlotLocked(futureTime)).toBe(false)
+  it('slot_date trước today → locked', () => {
+    expect(getSlotEditMode('2026-03-24', TZ)).toBe('locked')
   })
 
-  it('returns false for slot starting far in the future', () => {
-    // Slot tuần sau → unlocked
-    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-    expect(isSlotLocked(nextWeek)).toBe(false)
+  it('slot_date = today → reason-required', () => {
+    expect(getSlotEditMode('2026-03-25', TZ)).toBe('reason-required')
   })
 
-  it('returns true for slot starting far in the past', () => {
-    // Slot tháng trước → locked
-    const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-    expect(isSlotLocked(lastMonth)).toBe(true)
+  it('slot_date = Sunday (cuối tuần này) → reason-required', () => {
+    // Thứ Tư 25/03, Sunday = 29/03
+    expect(getSlotEditMode('2026-03-29', TZ)).toBe('reason-required')
+  })
+
+  it('slot_date = next Monday → free', () => {
+    // Thứ Tư 25/03, next Monday = 30/03
+    expect(getSlotEditMode('2026-03-30', TZ)).toBe('free')
+  })
+
+  it('slot_date 2 tuần sau → free', () => {
+    expect(getSlotEditMode('2026-04-06', TZ)).toBe('free')
+  })
+
+  it('khi today là Sunday, next_monday = tomorrow', () => {
+    vi.setSystemTime(new Date('2026-03-29T05:00:00Z')) // Sunday 29/03 ICT
+    // Sunday 29/03 = reason-required (còn trong current week)
+    expect(getSlotEditMode('2026-03-29', TZ)).toBe('reason-required')
+    // Monday 30/03 = free
+    expect(getSlotEditMode('2026-03-30', TZ)).toBe('free')
   })
 })

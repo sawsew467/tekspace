@@ -1,17 +1,47 @@
 import type { ScheduleSlot, SlotInput } from '../services/schedule.service'
-import { format } from 'date-fns'
+import { addDays, format, parseISO } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
 
 /**
- * isSlotLocked — deadline lock: slot bị lock khi current UTC >= slot start_time UTC
+ * SlotEditMode — 3-tier lock model (Story 2.5)
  *
- * Client-side check CHỈ dùng cho UX (disable buttons, show lock icon).
- * Security boundary thực sự nằm ở server: RPC update_slot_with_reason /
- * delete_slot_with_reason sẽ RAISE EXCEPTION nếu slot bị lock và
- * p_is_emergency_override = false.
+ * | Tầng           | Điều kiện                              | Hành vi                           |
+ * |----------------|----------------------------------------|-----------------------------------|
+ * | locked         | slot_date < today                      | Card grayed out, no edit/delete   |
+ * | reason-required| today <= slot_date <= end_of_week (Sun)| Edit/delete → reason dialog + RPC |
+ * | free           | slot_date >= next_monday               | Edit/delete → direct call, no notify|
  */
-export function isSlotLocked(slotStartTime: string): boolean {
-  return Date.now() >= new Date(slotStartTime).getTime()
+export type SlotEditMode = 'locked' | 'reason-required' | 'free'
+
+/**
+ * getSlotEditMode — xác định edit mode của slot dựa theo slot_date so với ngày hôm nay
+ *
+ * @param slotDate     "YYYY-MM-DD" — slot_date từ DB
+ * @param userTimezone IANA timezone của user (e.g. "Asia/Ho_Chi_Minh")
+ */
+export function getSlotEditMode(
+  slotDate: string,
+  userTimezone: string,
+): SlotEditMode {
+  const todayInUserTz = format(
+    toZonedTime(new Date(), userTimezone),
+    'yyyy-MM-dd',
+  )
+  // parseISO parses "YYYY-MM-DD" as local midnight — getDay() trả đúng weekday
+  // trong mọi browser timezone (new Date("YYYY-MM-DD") lại parse UTC → getDay() sai)
+  const todayDate = parseISO(todayInUserTz)
+
+  // Next Monday = start of next week
+  const dayOfWeek = todayDate.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek
+  const nextMondayISO = format(
+    addDays(todayDate, daysUntilMonday),
+    'yyyy-MM-dd',
+  )
+
+  if (slotDate < todayInUserTz) return 'locked'          // Tầng 1: quá khứ
+  if (slotDate < nextMondayISO) return 'reason-required' // Tầng 2: tuần này
+  return 'free'                                          // Tầng 3: tuần sau+
 }
 
 /**

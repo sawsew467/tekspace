@@ -66,7 +66,7 @@ const editSlotDialogSchema = z
         { message: 'Giờ kết thúc phải là bội số 30 phút' }
       ),
     isOvernight: z.boolean(),
-    reason: z.string().trim().min(1, 'Lý do không được để trống'),
+    reason: z.string(),  // validation tùy theo requireReason prop (xử lý ở handleSubmit)
   })
   .refine(
     (data) => {
@@ -96,6 +96,7 @@ interface EditSlotDialogProps {
   userTimezone: string
   tenantTimezone: string
   isEmergency?: boolean              // true = emergency override mode (slot đã lock)
+  requireReason?: boolean            // false = Tier 3, ẩn reason field (default: true)
   isLoading?: boolean
   onSubmit: (data: {
     newStartTimeUTC: Date
@@ -153,6 +154,7 @@ export function EditSlotDialog({
   userTimezone,
   tenantTimezone,
   isEmergency = false,
+  requireReason = true,
   isLoading = false,
   onSubmit,
 }: EditSlotDialogProps) {
@@ -207,6 +209,12 @@ export function EditSlotDialog({
       return
     }
 
+    // Validate reason khi bắt buộc (Tier 2)
+    if (requireReason && !values.reason.trim()) {
+      form.setError('reason', { message: 'Lý do không được để trống' })
+      return
+    }
+
     const overnight = values.isOvernight || values.endTime <= values.startTime
     const finalValues = { ...values, isOvernight: overnight }
 
@@ -254,7 +262,9 @@ export function EditSlotDialog({
           <DialogDescription>
             {isEmergency
               ? 'Ca này đã bắt đầu. Nhập lý do để tiếp tục.'
-              : 'Cập nhật thời gian và nhập lý do thay đổi.'}
+              : requireReason
+                ? 'Cập nhật thời gian và nhập lý do thay đổi.'
+                : 'Cập nhật thời gian ca làm việc.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -399,7 +409,8 @@ export function EditSlotDialog({
               </div>
             )}
 
-            {/* Lý do thay đổi — bắt buộc */}
+            {/* Lý do thay đổi — chỉ hiển thị khi requireReason=true (Tier 2) */}
+            {requireReason && (
             <FormField
               control={form.control}
               name="reason"
@@ -421,6 +432,7 @@ export function EditSlotDialog({
                 </FormItem>
               )}
             />
+            )}
 
             <DialogFooter>
               <Button
