@@ -1,6 +1,6 @@
 # Story 1.5: Member Invitation & Onboarding
 
-Status: review
+Status: done
 
 ## Story
 

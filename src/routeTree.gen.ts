@@ -14,6 +14,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
+import { Route as AppScheduleRouteImport } from './routes/_app/schedule'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppCreateTenantRouteImport } from './routes/_app/create-tenant'
 import { Route as AppTeamRouteRouteImport } from './routes/_app/team/route'
@@ -47,6 +48,11 @@ const AcceptInviteRoute = AcceptInviteRouteImport.update({
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppScheduleRoute = AppScheduleRouteImport.update({
+  id: '/schedule',
+  path: '/schedule',
+  getParentRoute: () => AppRouteRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/team': typeof AppTeamRouteRouteWithChildren
   '/create-tenant': typeof AppCreateTenantRoute
   '/dashboard': typeof AppDashboardRoute
+  '/schedule': typeof AppScheduleRoute
   '/account/profile': typeof AppAccountProfileRoute
   '/account/security': typeof AppAccountSecurityRoute
   '/team/invites': typeof AppTeamInvitesRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByTo {
   '/team': typeof AppTeamRouteRouteWithChildren
   '/create-tenant': typeof AppCreateTenantRoute
   '/dashboard': typeof AppDashboardRoute
+  '/schedule': typeof AppScheduleRoute
   '/account/profile': typeof AppAccountProfileRoute
   '/account/security': typeof AppAccountSecurityRoute
   '/team/invites': typeof AppTeamInvitesRoute
@@ -137,6 +145,7 @@ export interface FileRoutesById {
   '/_app/team': typeof AppTeamRouteRouteWithChildren
   '/_app/create-tenant': typeof AppCreateTenantRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/schedule': typeof AppScheduleRoute
   '/_app/account/profile': typeof AppAccountProfileRoute
   '/_app/account/security': typeof AppAccountSecurityRoute
   '/_app/team/invites': typeof AppTeamInvitesRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/team'
     | '/create-tenant'
     | '/dashboard'
+    | '/schedule'
     | '/account/profile'
     | '/account/security'
     | '/team/invites'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/team'
     | '/create-tenant'
     | '/dashboard'
+    | '/schedule'
     | '/account/profile'
     | '/account/security'
     | '/team/invites'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/_app/team'
     | '/_app/create-tenant'
     | '/_app/dashboard'
+    | '/_app/schedule'
     | '/_app/account/profile'
     | '/_app/account/security'
     | '/_app/team/invites'
@@ -238,6 +250,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AppRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/schedule': {
+      id: '/_app/schedule'
+      path: '/schedule'
+      fullPath: '/schedule'
+      preLoaderRoute: typeof AppScheduleRouteImport
+      parentRoute: typeof AppRouteRoute
     }
     '/_app/dashboard': {
       id: '/_app/dashboard'
@@ -340,6 +359,7 @@ interface AppRouteRouteChildren {
   AppTeamRouteRoute: typeof AppTeamRouteRouteWithChildren
   AppCreateTenantRoute: typeof AppCreateTenantRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppScheduleRoute: typeof AppScheduleRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
@@ -347,6 +367,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppTeamRouteRoute: AppTeamRouteRouteWithChildren,
   AppCreateTenantRoute: AppCreateTenantRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppScheduleRoute: AppScheduleRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(

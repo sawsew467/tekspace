@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-23
-last_updated: 2026-03-24 (story 1-7 → done)
+last_updated: 2026-03-24 (story 2-1 → done after code review fixes)
 project: TekSpace
 project_key: NOKEY
 tracking_system: file-system
@@ -58,8 +58,8 @@ development_status:
   # ─────────────────────────────────────────────
   # Epic 2: Schedule Registration
   # ─────────────────────────────────────────────
-  epic-2: backlog
-  2-1-weekly-schedule-registration: backlog
+  epic-2: in-progress
+  2-1-weekly-schedule-registration: done
   2-2-schedule-template-from-previous-week: backlog
   2-3-schedule-change-deadline-lock: backlog
   2-4-missed-deadline-auto-handling: backlog

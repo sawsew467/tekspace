@@ -1,6 +1,6 @@
 # Story 1.4: Tenant Creation & Team Settings
 
-Status: review
+Status: done
 
 ## Story
 

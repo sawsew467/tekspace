@@ -46,12 +46,12 @@ export const sidebarData: SidebarData = {
       title: 'Work',
       items: [
         {
-          title: 'Schedule',
+          title: 'Lịch làm việc',
           url: '/schedule',
           icon: CalendarDays,
         },
         {
-          title: 'Daily Report',
+          title: 'Báo cáo ngày',
           url: '/daily-report',
           icon: FileText,
         },

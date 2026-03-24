@@ -611,12 +611,20 @@ export type Database = {
     Functions: {
       current_tenant_id: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      get_or_create_schedule_week: {
+        Args: { p_week_of: string }
+        Returns: string
+      }
       is_member_of_current_tenant: {
         Args: { check_user_id: string }
         Returns: boolean
       }
       is_tenant_manager: { Args: never; Returns: boolean }
       is_valid_timezone: { Args: { tz: string }; Returns: boolean }
+      upsert_week_slots: {
+        Args: { p_week_id: string; p_slots: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       incident_category:

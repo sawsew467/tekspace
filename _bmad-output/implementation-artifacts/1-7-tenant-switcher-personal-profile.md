@@ -1,6 +1,6 @@
 # Story 1.7: Tenant Switcher & Personal Profile
 
-Status: review
+Status: done
 
 ## Story
 

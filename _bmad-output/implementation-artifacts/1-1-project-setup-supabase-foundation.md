@@ -1,6 +1,6 @@
 # Story 1.1: Project Setup & Supabase Foundation
 
-Status: review
+Status: done
 
 ## Story
 
