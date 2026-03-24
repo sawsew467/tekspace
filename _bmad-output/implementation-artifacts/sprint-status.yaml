@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-23
-last_updated: 2026-03-24 (story 2-4 → review)
+last_updated: 2026-03-24 (epic-2 → done, retro-2 → done)
 project: TekSpace
 project_key: NOKEY
 tracking_system: file-system
@@ -58,12 +58,13 @@ development_status:
   # ─────────────────────────────────────────────
   # Epic 2: Schedule Registration
   # ─────────────────────────────────────────────
-  epic-2: in-progress
+  epic-2: done
   2-1-weekly-schedule-registration: done
   2-2-schedule-template-from-previous-week: done
   2-3-schedule-change-deadline-lock: done
   2-4-missed-deadline-auto-handling: done
-  epic-2-retrospective: optional
+  2-5-ux-polish-behavior-corrections: backlog
+  epic-2-retrospective: done
 
   # ─────────────────────────────────────────────
   # Epic 3: Team Visibility & Self-Dashboard
@@ -77,10 +78,13 @@ development_status:
   # ─────────────────────────────────────────────
   # Epic 4: Daily Report
   # ─────────────────────────────────────────────
-  epic-4: done
+  epic-4: in-progress
   4-1-submit-daily-report: done
   4-2-cross-validation-discrepancy-detection: done
   4-3-manager-report-view: done
+  4-4-ux-restructure-tabs-history-form-polish: done
+  4-5-per-task-hours: backlog
+  4-6-edit-report-window: backlog
   epic-4-retrospective: done
 
   # ─────────────────────────────────────────────

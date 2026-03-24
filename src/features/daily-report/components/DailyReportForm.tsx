@@ -78,53 +78,59 @@ function TaskRow({ index, control, canRemove, onRemove }: TaskRowProps) {
         )}
       />
 
-      {/* Output type */}
-      <FormField
-        control={control}
-        name={`tasks.${index}.output_type`}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Loại output</FormLabel>
-            <Select onValueChange={field.onChange} defaultValue={field.value}>
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder='Chọn loại output' />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {Object.entries(OUTPUT_TYPE_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      {/* Output link */}
-      <FormField
-        control={control}
-        name={`tasks.${index}.output_link`}
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>
-              Output link{' '}
-              <span className='text-muted-foreground font-normal'>(optional)</span>
-            </FormLabel>
-            <FormControl>
-              <Input
-                {...field}
-                placeholder={OUTPUT_TYPE_PLACEHOLDERS[outputType]}
-                type={outputType === 'other' ? 'text' : 'url'}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+      {/* Output type + Output link — cùng 1 hàng */}
+      <div className='space-y-1.5'>
+        {/* Section label dùng <p> thay vì FormLabel (FormLabel cần context FormItem).
+            Đây là label chung cho cả 2 fields, không cần htmlFor. */}
+        <p className='text-sm font-medium leading-none'>
+          {outputType === 'other' ? 'Output / Ghi chú' : 'Output link'}
+          {' '}
+          <span className='text-muted-foreground font-normal'>(optional)</span>
+        </p>
+        <div className='flex gap-2'>
+          {/* Output type — fixed width */}
+          <FormField
+            control={control}
+            name={`tasks.${index}.output_type`}
+            render={({ field }) => (
+              <FormItem className='w-[150px] shrink-0'>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Loại output' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {Object.entries(OUTPUT_TYPE_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {/* Output link — fill remaining */}
+          <FormField
+            control={control}
+            name={`tasks.${index}.output_link`}
+            render={({ field }) => (
+              <FormItem className='flex-1'>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder={OUTPUT_TYPE_PLACEHOLDERS[outputType]}
+                    type={outputType === 'other' ? 'text' : 'url'}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </div>
     </div>
   )
 }

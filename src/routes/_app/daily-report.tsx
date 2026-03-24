@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '@/stores/auth-store'
 import { useTenantStore } from '@/stores/tenant-store'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -18,10 +19,13 @@ import { ScheduleService } from '@/features/schedule/services/schedule.service'
 import { useTodayReport } from '@/features/daily-report/hooks/use-today-report'
 import { useSubmitReport } from '@/features/daily-report/hooks/use-submit-report'
 import { useTeamReports, useActiveMembers } from '@/features/daily-report/hooks/use-team-reports'
+import { useAllReports } from '@/features/daily-report/hooks/use-all-reports'
+import { useReportDates } from '@/features/daily-report/hooks/use-report-dates'
 import { DailyReportForm } from '@/features/daily-report/components/DailyReportForm'
 import { DailyReportView } from '@/features/daily-report/components/DailyReportView'
 import { TeamReportList } from '@/features/daily-report/components/TeamReportList'
-import type { DailyReportFormValues } from '@/features/daily-report/schemas/daily-report.schema'
+import { ReportHistoryList } from '@/features/daily-report/components/ReportHistoryList'
+import { computeStreak, type DailyReportFormValues } from '@/features/daily-report/schemas/daily-report.schema'
 
 // Validate timezone string để tránh RangeError từ toZonedTime
 function isValidTimezone(tz: string | null | undefined): tz is string {
@@ -107,6 +111,28 @@ function DailyReportPage() {
     [timezone],
   )
 
+  // ── History tab — lazy load ───────────────────────────────────────────────────
+
+  // Chỉ fetch full history data khi user click tab "Lịch sử" lần đầu
+  const [historyEnabled, setHistoryEnabled] = useState(false)
+
+  const { data: allReports = [], isLoading: isHistoryLoading } = useAllReports(
+    historyEnabled ? activeTenantId ?? null : null,
+    historyEnabled ? (user?.id ?? null) : null,
+  )
+
+  // ── Streak — eager lightweight fetch (chỉ lấy dates, không cần click tab) ────
+
+  const { data: reportDates = [] } = useReportDates(
+    activeTenantId ?? null,
+    user?.id ?? null,
+  )
+
+  const streak = useMemo(
+    () => computeStreak(reportDates, reportDate),
+    [reportDates, reportDate],
+  )
+
   // ── Manager view: date navigation ────────────────────────────────────────────
 
   // viewDate: ngày đang xem trong Team Reports (mặc định = ngày hôm nay)
@@ -160,6 +186,13 @@ function DailyReportPage() {
   const isManagerDataLoading = isTeamLoading || isMembersLoading
   const isManagerDataError = isTeamError || isMembersError
 
+  // Badge: số member chưa nộp report hôm nay
+  const missingCount = useMemo(() => {
+    if (!isManager) return 0
+    const submittedUserIds = new Set(teamReports.map((r) => r.user_id))
+    return activeMembers.filter((m) => !submittedUserIds.has(m.user_id)).length
+  }, [isManager, teamReports, activeMembers])
+
   return (
     <div className='container max-w-2xl py-6 space-y-4'>
       {/* Header */}
@@ -171,145 +204,196 @@ function DailyReportPage() {
         </div>
       </div>
 
-      {/* My report card (tất cả roles đều thấy) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className='text-base'>
-            {isLoading
-              ? 'Đang tải...'
-              : todayReport
-                ? 'Report hôm nay'
-                : 'Nộp report hôm nay'}
-          </CardTitle>
-          {!isLoading && !todayReport && (
-            <CardDescription>
-              Điền thông tin tasks đã hoàn thành và số giờ làm việc.
-            </CardDescription>
-          )}
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className='space-y-3'>
-              <Skeleton className='h-4 w-full' />
-              <Skeleton className='h-4 w-3/4' />
-              <Skeleton className='h-10 w-full' />
-              <Skeleton className='h-10 w-full' />
-            </div>
-          ) : todayReport ? (
-            <DailyReportView report={todayReport} timezone={timezone} />
-          ) : (
-            <DailyReportForm onSubmit={handleSubmit} isPending={submitReport.isPending} />
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Team Reports panel — chỉ Manager/Owner thấy */}
-      {isManager && (
-        <Card>
-          <CardHeader>
-            <div className='flex items-center justify-between flex-wrap gap-2'>
-              <div className='flex items-center gap-2'>
-                <Users className='h-4 w-4 text-muted-foreground' />
-                <CardTitle className='text-base'>Team Reports</CardTitle>
-              </div>
-
-              {/* Date navigation — F1: date span là clickable Popover/Calendar */}
-              <div className='flex items-center gap-1'>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  className='h-7 w-7'
-                  onClick={handlePrevDay}
-                  aria-label='Ngày trước'
+      {/* Tabs layout */}
+      <Tabs
+        defaultValue='today'
+        onValueChange={(val) => {
+          if (val === 'history') setHistoryEnabled(true)
+        }}
+      >
+        <TabsList className={isManager ? 'grid w-full grid-cols-3' : 'grid w-full grid-cols-2'}>
+          <TabsTrigger value='today'>Hôm nay</TabsTrigger>
+          <TabsTrigger value='history'>
+            Lịch sử
+            {streak > 0 && (
+              <span className='ml-1.5 text-orange-500 text-xs font-semibold'>🔥{streak}</span>
+            )}
+          </TabsTrigger>
+          {isManager && (
+            <TabsTrigger value='team'>
+              Team
+              {missingCount > 0 && (
+                <span
+                  className='ml-1.5 text-xs font-semibold text-destructive'
+                  aria-label={`${missingCount} thành viên chưa nộp`}
                 >
-                  <ChevronLeft className='h-4 w-4' />
-                </Button>
+                  ● {missingCount}
+                </span>
+              )}
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-                {/* F1: date picker qua Popover + Calendar */}
-                <Popover>
-                  <PopoverTrigger asChild>
+        {/* Tab: Hôm nay */}
+        <TabsContent value='today'>
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-base'>
+                {isLoading
+                  ? 'Đang tải...'
+                  : todayReport
+                    ? 'Report hôm nay'
+                    : 'Nộp report hôm nay'}
+              </CardTitle>
+              {!isLoading && !todayReport && (
+                <CardDescription>
+                  Điền thông tin tasks đã hoàn thành và số giờ làm việc.
+                </CardDescription>
+              )}
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className='space-y-3'>
+                  <Skeleton className='h-4 w-full' />
+                  <Skeleton className='h-4 w-3/4' />
+                  <Skeleton className='h-10 w-full' />
+                  <Skeleton className='h-10 w-full' />
+                </div>
+              ) : todayReport ? (
+                <DailyReportView report={todayReport} timezone={timezone} />
+              ) : (
+                <DailyReportForm onSubmit={handleSubmit} isPending={submitReport.isPending} />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab: Lịch sử */}
+        <TabsContent value='history'>
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-base'>Lịch sử nộp report</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ReportHistoryList
+                reports={allReports}
+                timezone={timezone}
+                isLoading={isHistoryLoading}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab: Team — chỉ Manager/Owner */}
+        {isManager && (
+          <TabsContent value='team'>
+            <Card>
+              <CardHeader>
+                <div className='flex items-center justify-between flex-wrap gap-2'>
+                  <div className='flex items-center gap-2'>
+                    <Users className='h-4 w-4 text-muted-foreground' />
+                    <CardTitle className='text-base'>Team Reports</CardTitle>
+                  </div>
+
+                  {/* Date navigation — F1: date span là clickable Popover/Calendar */}
+                  <div className='flex items-center gap-1'>
                     <Button
                       variant='ghost'
-                      size='sm'
-                      className='h-7 min-w-[160px] text-sm text-muted-foreground capitalize'
-                      aria-label='Chọn ngày'
+                      size='icon'
+                      className='h-7 w-7'
+                      onClick={handlePrevDay}
+                      aria-label='Ngày trước'
                     >
-                      {viewDateDisplay}
+                      <ChevronLeft className='h-4 w-4' />
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className='w-auto p-0' align='center'>
-                    <Calendar
-                      mode='single'
-                      selected={parseISO(viewDate)}
-                      onSelect={date => {
-                        if (date) setViewDate(format(date, 'yyyy-MM-dd'))
-                      }}
-                      // Disable future dates (chỉ xem lịch sử)
-                      disabled={date => format(date, 'yyyy-MM-dd') > reportDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
 
-                {/* F4: disabled khi viewDate >= reportDate (không cho navigate vào tương lai) */}
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  className='h-7 w-7'
-                  onClick={handleNextDay}
-                  disabled={viewDate >= reportDate}
-                  aria-label='Ngày sau'
-                >
-                  <ChevronRight className='h-4 w-4' />
-                </Button>
-                {!isViewingToday && (
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    className='h-7 text-xs text-muted-foreground'
-                    onClick={() => setViewDate(reportDate)}
-                  >
-                    Hôm nay
-                  </Button>
+                    {/* F1: date picker qua Popover + Calendar */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          className='h-7 min-w-[160px] text-sm text-muted-foreground capitalize'
+                          aria-label='Chọn ngày'
+                        >
+                          {viewDateDisplay}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className='w-auto p-0' align='center'>
+                        <Calendar
+                          mode='single'
+                          selected={parseISO(viewDate)}
+                          onSelect={date => {
+                            if (date) setViewDate(format(date, 'yyyy-MM-dd'))
+                          }}
+                          // Disable future dates (chỉ xem lịch sử)
+                          disabled={date => format(date, 'yyyy-MM-dd') > reportDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* F4: disabled khi viewDate >= reportDate (không cho navigate vào tương lai) */}
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      className='h-7 w-7'
+                      onClick={handleNextDay}
+                      disabled={viewDate >= reportDate}
+                      aria-label='Ngày sau'
+                    >
+                      <ChevronRight className='h-4 w-4' />
+                    </Button>
+                    {!isViewingToday && (
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className='h-7 text-xs text-muted-foreground'
+                        onClick={() => setViewDate(reportDate)}
+                      >
+                        Hôm nay
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isManagerDataLoading ? (
+                  <div className='space-y-2'>
+                    {[1, 2, 3].map(i => (
+                      <Skeleton key={i} className='h-12 w-full rounded-lg' />
+                    ))}
+                  </div>
+                ) : isManagerDataError ? (
+                  // F5: error state — network error / RLS rejection
+                  <div className='flex flex-col items-center justify-center py-8 text-center gap-3'>
+                    <p className='text-sm text-muted-foreground'>
+                      Không thể tải dữ liệu team reports. Vui lòng thử lại.
+                    </p>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => {
+                        void refetchTeamReports()
+                        void refetchMembers()
+                      }}
+                    >
+                      Thử lại
+                    </Button>
+                  </div>
+                ) : (
+                  <TeamReportList
+                    members={activeMembers}
+                    reports={teamReports}
+                    timezone={timezone}
+                    currentUserId={user?.id ?? null}
+                  />
                 )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isManagerDataLoading ? (
-              <div className='space-y-2'>
-                {[1, 2, 3].map(i => (
-                  <Skeleton key={i} className='h-12 w-full rounded-lg' />
-                ))}
-              </div>
-            ) : isManagerDataError ? (
-              // F5: error state — network error / RLS rejection
-              <div className='flex flex-col items-center justify-center py-8 text-center gap-3'>
-                <p className='text-sm text-muted-foreground'>
-                  Không thể tải dữ liệu team reports. Vui lòng thử lại.
-                </p>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => {
-                    void refetchTeamReports()
-                    void refetchMembers()
-                  }}
-                >
-                  Thử lại
-                </Button>
-              </div>
-            ) : (
-              <TeamReportList
-                members={activeMembers}
-                reports={teamReports}
-                timezone={timezone}
-                currentUserId={user?.id ?? null}
-              />
-            )}
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   )
 }

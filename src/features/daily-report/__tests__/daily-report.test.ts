@@ -6,6 +6,7 @@ import {
   OUTPUT_TYPE_LABELS,
   OUTPUT_TYPE_PLACEHOLDERS,
   hasDiscrepancy,
+  computeStreak,
   type TaskItem,
 } from '../schemas/daily-report.schema'
 
@@ -237,5 +238,89 @@ describe('hasDiscrepancy', () => {
 
   it('returns true: task without output_link field, hours > 4', () => {
     expect(hasDiscrepancy(8, [taskNoLinkField])).toBe(true)
+  })
+})
+
+// ── computeStreak ─────────────────────────────────────────────────────────────
+
+describe('computeStreak', () => {
+  // 2026-03-24 = Thứ 3 (Tuesday)
+  const today = '2026-03-24'
+
+  it('returns 0 khi reportDates array rỗng', () => {
+    expect(computeStreak([], today)).toBe(0)
+  })
+
+  it('returns 1 khi chỉ có hôm nay', () => {
+    expect(computeStreak([today], today)).toBe(1)
+  })
+
+  it('returns 3 khi có 3 ngày liên tiếp (T3, T2, CN)', () => {
+    // 2026-03-24 T3, 2026-03-23 T2, 2026-03-22 CN (weekend → tính)
+    const dates = ['2026-03-24', '2026-03-23', '2026-03-22']
+    expect(computeStreak(dates, today)).toBe(3)
+  })
+
+  it('returns 1 khi hôm nay T3 có nhưng T2 hôm qua bị đứt', () => {
+    // 2026-03-23 T2 bị thiếu — là ngày thường → break
+    const dates = ['2026-03-24', '2026-03-22'] // bỏ 23
+    expect(computeStreak(dates, today)).toBe(1)
+  })
+
+  it('returns 0 khi hôm nay chưa nộp (chỉ có các ngày trước)', () => {
+    const dates = ['2026-03-23', '2026-03-22', '2026-03-21']
+    expect(computeStreak(dates, today)).toBe(0)
+  })
+
+  it('boundary: today-1 nhưng không có today → streak = 0', () => {
+    const dates = ['2026-03-23']
+    expect(computeStreak(dates, today)).toBe(0)
+  })
+
+  it('trả về đúng streak khi dates không theo thứ tự', () => {
+    const dates = ['2026-03-22', '2026-03-24', '2026-03-23']
+    expect(computeStreak(dates, today)).toBe(3)
+  })
+
+  it('streak dài hơn — 5 ngày liên tiếp (T3 → T7)', () => {
+    // 2026-03-24 T3, 23 T2, 22 CN, 21 T7, 20 T6
+    const dates = ['2026-03-24', '2026-03-23', '2026-03-22', '2026-03-21', '2026-03-20']
+    expect(computeStreak(dates, today)).toBe(5)
+  })
+
+  // ── Weekend skipping ──────────────────────────────────────────────────────
+
+  it('T7/CN không nộp không phá streak — T2 kết nối với T6 qua weekend', () => {
+    // today = '2026-03-23' (Thứ 2), có T6 trước đó (20), skip T7(21)+CN(22)
+    const monday = '2026-03-23'
+    const dates = ['2026-03-23', '2026-03-20'] // T2 + T6, không có T7/CN
+    expect(computeStreak(dates, monday)).toBe(2)
+  })
+
+  it('T7/CN có nộp vẫn tính vào streak', () => {
+    // today = '2026-03-23' (T2), nộp cả T7/CN
+    const monday = '2026-03-23'
+    const dates = ['2026-03-23', '2026-03-22', '2026-03-21', '2026-03-20'] // T2+CN+T7+T6
+    expect(computeStreak(dates, monday)).toBe(4)
+  })
+
+  it('T7 không nộp nhưng CN nộp — CN vẫn tính, streak không đứt', () => {
+    // today = '2026-03-23' (T2), CN(22) nộp, T7(21) không nộp, T6(20) nộp
+    const monday = '2026-03-23'
+    const dates = ['2026-03-23', '2026-03-22', '2026-03-20'] // T2+CN+T6, thiếu T7
+    expect(computeStreak(dates, monday)).toBe(3)
+  })
+
+  it('hôm nay chưa nộp dù T7/CN trước đó đã nộp → streak = 0', () => {
+    // today = '2026-03-23' (T2), chưa nộp T2 nhưng có CN+T7
+    const monday = '2026-03-23'
+    const dates = ['2026-03-22', '2026-03-21']
+    expect(computeStreak(dates, monday)).toBe(0)
+  })
+
+  it('xử lý đúng với date string không hợp lệ trong array — không crash', () => {
+    const dates = ['2026-03-24', 'invalid-date', '2026-03-23']
+    // 'invalid-date' không làm crash, streak vẫn tính được từ valid dates
+    expect(() => computeStreak(dates, today)).not.toThrow()
   })
 })

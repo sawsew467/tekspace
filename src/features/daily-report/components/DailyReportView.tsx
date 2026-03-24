@@ -27,11 +27,13 @@ export function DailyReportView({ report, timezone }: Props) {
 
   return (
     <div className='space-y-5'>
-      {/* Header */}
+      {/* Header — compact: status + hours + submitted_at */}
       <div className='flex items-center gap-3'>
         <CheckCircle2 className='h-5 w-5 text-green-500 shrink-0' />
         <div className='flex-1'>
-          <p className='text-sm font-medium'>Đã nộp daily report</p>
+          <p className='text-sm font-medium'>
+            Đã nộp · <span className='font-semibold'>{report.hours_logged}h</span>
+          </p>
           <p className='text-xs text-muted-foreground flex items-center gap-1 mt-0.5'>
             <Clock className='h-3 w-3' />
             {submittedAtLocal}
@@ -42,14 +44,6 @@ export function DailyReportView({ report, timezone }: Props) {
             Nộp muộn
           </Badge>
         )}
-      </div>
-
-      <Separator />
-
-      {/* Hours logged */}
-      <div>
-        <p className='text-xs text-muted-foreground uppercase tracking-wider mb-1'>Số giờ làm việc</p>
-        <p className='text-2xl font-bold'>{report.hours_logged}h</p>
       </div>
 
       <Separator />
