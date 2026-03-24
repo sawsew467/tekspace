@@ -30,3 +30,18 @@ dist-ssr
 # Claude Code local settings (chứa secrets)
 .claude/settings.local.json
 .claude/skills/supabase-sentinel/
+
+# Tool runtime directories
+.agent/
+.agents/
+.trae/
+.playwright-mcp/
+
+# Test output
+test-results/
+playwright-report/
+
+# Generated reports & debug artifacts
+SECURITY_AUDIT_REPORT.md
+debug-*.png
+supabase/rls_manual_check.sql
