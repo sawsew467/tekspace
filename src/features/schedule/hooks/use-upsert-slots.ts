@@ -14,7 +14,8 @@ export function useUpsertSlots() {
       return ScheduleService.upsertWeekSlots(weekId, slots)
     },
     onSuccess: (_, { weekId }) => {
-      toast.success('Đã lưu lịch làm việc')
+      // Toast được handle tại call site — mỗi nơi gọi có message phù hợp context
+      // (template apply: "Đã tải lịch từ tuần trước", manual save: "Đã lưu lịch làm việc")
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.scheduleSlots, weekId] })
     },
     onError: (error: Error) => {

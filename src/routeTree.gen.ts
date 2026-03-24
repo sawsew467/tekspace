@@ -16,6 +16,7 @@ import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AppScheduleRouteImport } from './routes/_app/schedule'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppDailyReportRouteImport } from './routes/_app/daily-report'
 import { Route as AppCreateTenantRouteImport } from './routes/_app/create-tenant'
 import { Route as AppTeamRouteRouteImport } from './routes/_app/team/route'
 import { Route as AppAccountRouteRouteImport } from './routes/_app/account/route'
@@ -57,6 +58,11 @@ const AppScheduleRoute = AppScheduleRouteImport.update({
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppDailyReportRoute = AppDailyReportRouteImport.update({
+  id: '/daily-report',
+  path: '/daily-report',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppCreateTenantRoute = AppCreateTenantRouteImport.update({
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AppAccountRouteRouteWithChildren
   '/team': typeof AppTeamRouteRouteWithChildren
   '/create-tenant': typeof AppCreateTenantRoute
+  '/daily-report': typeof AppDailyReportRoute
   '/dashboard': typeof AppDashboardRoute
   '/schedule': typeof AppScheduleRoute
   '/account/profile': typeof AppAccountProfileRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/account': typeof AppAccountRouteRouteWithChildren
   '/team': typeof AppTeamRouteRouteWithChildren
   '/create-tenant': typeof AppCreateTenantRoute
+  '/daily-report': typeof AppDailyReportRoute
   '/dashboard': typeof AppDashboardRoute
   '/schedule': typeof AppScheduleRoute
   '/account/profile': typeof AppAccountProfileRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/_app/account': typeof AppAccountRouteRouteWithChildren
   '/_app/team': typeof AppTeamRouteRouteWithChildren
   '/_app/create-tenant': typeof AppCreateTenantRoute
+  '/_app/daily-report': typeof AppDailyReportRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/schedule': typeof AppScheduleRoute
   '/_app/account/profile': typeof AppAccountProfileRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/team'
     | '/create-tenant'
+    | '/daily-report'
     | '/dashboard'
     | '/schedule'
     | '/account/profile'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/team'
     | '/create-tenant'
+    | '/daily-report'
     | '/dashboard'
     | '/schedule'
     | '/account/profile'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/_app/account'
     | '/_app/team'
     | '/_app/create-tenant'
+    | '/_app/daily-report'
     | '/_app/dashboard'
     | '/_app/schedule'
     | '/_app/account/profile'
@@ -263,6 +275,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/daily-report': {
+      id: '/_app/daily-report'
+      path: '/daily-report'
+      fullPath: '/daily-report'
+      preLoaderRoute: typeof AppDailyReportRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/create-tenant': {
@@ -358,6 +377,7 @@ interface AppRouteRouteChildren {
   AppAccountRouteRoute: typeof AppAccountRouteRouteWithChildren
   AppTeamRouteRoute: typeof AppTeamRouteRouteWithChildren
   AppCreateTenantRoute: typeof AppCreateTenantRoute
+  AppDailyReportRoute: typeof AppDailyReportRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppScheduleRoute: typeof AppScheduleRoute
 }
@@ -366,6 +386,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAccountRouteRoute: AppAccountRouteRouteWithChildren,
   AppTeamRouteRoute: AppTeamRouteRouteWithChildren,
   AppCreateTenantRoute: AppCreateTenantRoute,
+  AppDailyReportRoute: AppDailyReportRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppScheduleRoute: AppScheduleRoute,
 }

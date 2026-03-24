@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { slotFormSchema, calcDurationMinutes, formatDuration } from '../schemas/schedule.schema'
-import { hasOverlapWithExisting } from '../utils/schedule.utils'
+import { hasOverlapWithExisting, shiftSlotsToCurrentWeek } from '../utils/schedule.utils'
 import type { ScheduleSlot } from '../services/schedule.service'
 
 // ── slotFormSchema tests ─────────────────────────────────────────────────────
@@ -151,23 +151,26 @@ describe('hasOverlapWithExisting', () => {
   })
 
   it('no overlap — disjoint slots (11:00–13:00 after 09:00–11:00)', () => {
-    expect(hasOverlapWithExisting('11:00', '13:00', monday, false, [existing09to11])).toBe(false)
+    // New: 11:00–13:00 UTC = 120 min. Existing ends at 11:00 → no overlap
+    expect(hasOverlapWithExisting(new Date(`${monday}T11:00:00Z`), 120, [existing09to11])).toBe(false)
   })
 
   it('overlap — new slot starts during existing (10:00–12:00)', () => {
-    expect(hasOverlapWithExisting('10:00', '12:00', monday, false, [existing09to11])).toBe(true)
+    // New: 10:00–12:00 UTC = 120 min. Overlaps existing 09:00–11:00
+    expect(hasOverlapWithExisting(new Date(`${monday}T10:00:00Z`), 120, [existing09to11])).toBe(true)
   })
 
   it('overlap — new slot contains existing (08:00–13:00)', () => {
-    expect(hasOverlapWithExisting('08:00', '13:00', monday, false, [existing09to11])).toBe(true)
+    // New: 08:00–13:00 UTC = 300 min. Contains existing 09:00–11:00
+    expect(hasOverlapWithExisting(new Date(`${monday}T08:00:00Z`), 300, [existing09to11])).toBe(true)
   })
 
   it('no overlap — adjacent slots (boundary = 09:00)', () => {
-    // New slot ends exactly when existing starts: 07:00–09:00
-    expect(hasOverlapWithExisting('07:00', '09:00', monday, false, [existing09to11])).toBe(false)
+    // New slot ends exactly when existing starts: 07:00–09:00 = 120 min
+    expect(hasOverlapWithExisting(new Date(`${monday}T07:00:00Z`), 120, [existing09to11])).toBe(false)
   })
 
-  it('no overlap — different slot_date', () => {
+  it('no overlap — different slot_date (Tuesday slot vs Monday new slot)', () => {
     const tuesday = '2026-03-24'
     const existingTuesday = makeSlot({
       id: 'slot-2',
@@ -175,16 +178,113 @@ describe('hasOverlapWithExisting', () => {
       start_time: `${tuesday}T09:00:00Z`,
       duration_minutes: 120,
     })
-    expect(hasOverlapWithExisting('09:30', '10:30', monday, false, [existingTuesday])).toBe(false)
+    // New: Monday 09:30–10:30 UTC = 60 min. Existing is Tuesday → no overlap (different UTC epoch range)
+    expect(hasOverlapWithExisting(new Date(`${monday}T09:30:00Z`), 60, [existingTuesday])).toBe(false)
   })
 
   it('skips slot with excludeSlotId', () => {
+    // Even though 09:00–11:00 would overlap, we exclude slot-1
     expect(
-      hasOverlapWithExisting('09:00', '11:00', monday, false, [existing09to11], 'slot-1')
+      hasOverlapWithExisting(new Date(`${monday}T09:00:00Z`), 120, [existing09to11], 'slot-1')
     ).toBe(false)
   })
 
   it('no overlap — empty existing slots', () => {
-    expect(hasOverlapWithExisting('09:00', '11:00', monday, false, [])).toBe(false)
+    expect(hasOverlapWithExisting(new Date(`${monday}T09:00:00Z`), 120, [])).toBe(false)
+  })
+})
+
+// ── shiftSlotsToCurrentWeek tests ────────────────────────────────────────────
+
+describe('shiftSlotsToCurrentWeek', () => {
+  it('shifts slot_date forward 7 days', () => {
+    const slots = [makeSlot({
+      id: 's1',
+      slot_date: '2026-03-23',
+      start_time: '2026-03-23T09:00:00Z',
+      duration_minutes: 120,
+    })]
+    const result = shiftSlotsToCurrentWeek(slots, 'UTC')
+    expect(result[0].slotDate).toBe('2026-03-30')
+  })
+
+  it('shifts start_time forward 7 days in UTC milliseconds', () => {
+    const originalTime = '2026-03-23T09:00:00Z'
+    const slots = [makeSlot({
+      id: 's1',
+      slot_date: '2026-03-23',
+      start_time: originalTime,
+      duration_minutes: 120,
+    })]
+    const result = shiftSlotsToCurrentWeek(slots, 'UTC')
+    const expectedMs = new Date(originalTime).getTime() + 7 * 24 * 60 * 60 * 1000
+    expect(result[0].startTimeUTC.getTime()).toBe(expectedMs)
+  })
+
+  it('preserves duration_minutes unchanged', () => {
+    const slots = [makeSlot({
+      id: 's1',
+      slot_date: '2026-03-23',
+      start_time: '2026-03-23T09:00:00Z',
+      duration_minutes: 240,
+    })]
+    const result = shiftSlotsToCurrentWeek(slots, 'UTC')
+    expect(result[0].durationMinutes).toBe(240)
+  })
+
+  it('returns empty array when no slots provided', () => {
+    expect(shiftSlotsToCurrentWeek([], 'UTC')).toEqual([])
+  })
+
+  it('shifts multiple slots correctly', () => {
+    const slots = [
+      makeSlot({ id: 's1', slot_date: '2026-03-23', start_time: '2026-03-23T09:00:00Z', duration_minutes: 120 }),
+      makeSlot({ id: 's2', slot_date: '2026-03-25', start_time: '2026-03-25T14:00:00Z', duration_minutes: 60 }),
+    ]
+    const result = shiftSlotsToCurrentWeek(slots, 'UTC')
+    expect(result).toHaveLength(2)
+    expect(result[0].slotDate).toBe('2026-03-30')
+    expect(result[1].slotDate).toBe('2026-04-01')
+  })
+
+  it('handles overnight slots — start_time shifted by exactly 7 days', () => {
+    // Overnight: 23:00 Monday → 01:00 Tuesday = 120 min
+    const slots = [makeSlot({
+      id: 's1',
+      slot_date: '2026-03-23',
+      start_time: '2026-03-23T23:00:00Z',
+      duration_minutes: 120,
+    })]
+    const result = shiftSlotsToCurrentWeek(slots, 'UTC')
+    expect(result[0].slotDate).toBe('2026-03-30')
+    // 2026-03-23T23:00:00Z + 7 days = 2026-03-30T23:00:00Z
+    expect(result[0].startTimeUTC.toISOString()).toBe('2026-03-30T23:00:00.000Z')
+  })
+
+  it('DST boundary: slot_date derived from tenant timezone, not calendar arithmetic', () => {
+    // Europe/Amsterdam DST spring-forward: last Sunday of March (2026-03-29 02:00 → 03:00)
+    // Slot: Sunday 2026-03-29 23:00 UTC = 00:00 CEST Monday 2026-03-30 → slot_date = '2026-03-30'
+    // After +7 days: 2026-04-05T23:00:00Z = 2026-04-06T01:00:00 CEST → slot_date must be '2026-04-06'
+    // Calendar arithmetic would give '2026-04-05' (wrong — DB trigger would reject)
+    const slots = [makeSlot({
+      id: 's1',
+      slot_date: '2026-03-30',
+      start_time: '2026-03-29T23:00:00Z',
+      duration_minutes: 120,
+    })]
+    const result = shiftSlotsToCurrentWeek(slots, 'Europe/Amsterdam')
+    expect(result[0].startTimeUTC.toISOString()).toBe('2026-04-05T23:00:00.000Z')
+    // slotDate tái tính từ UTC: 2026-04-05T23:00Z = 2026-04-06T01:00 CEST → '2026-04-06'
+    expect(result[0].slotDate).toBe('2026-04-06')
+  })
+
+  it('throws on slot with missing start_time', () => {
+    const slots = [makeSlot({
+      id: 's-bad',
+      slot_date: '2026-03-23',
+      start_time: '',   // empty = falsy → should throw
+      duration_minutes: 120,
+    })]
+    expect(() => shiftSlotsToCurrentWeek(slots, 'UTC')).toThrow('thiếu start_time')
   })
 })

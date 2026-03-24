@@ -84,6 +84,33 @@ export const ScheduleService = {
     return data.timezone
   },
 
+  // Lấy slots của user từ tuần trước (KHÔNG tạo record mới nếu chưa tồn tại)
+  // Dùng maybeSingle() — trả về null thay vì throw khi không tìm thấy
+  getPreviousWeekSlots: async (previousWeekOf: string): Promise<ScheduleSlot[]> => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) throw new Error('Chưa đăng nhập')
+
+    // Step 1: Tìm schedule_week của tuần trước (KHÔNG tạo mới)
+    const { data: prevWeek, error: weekError } = await supabase
+      .from('schedule_weeks')
+      .select('id')
+      .eq('week_of', previousWeekOf)
+      .maybeSingle()  // Trả null nếu không tìm thấy — không throw error
+    if (weekError) throw weekError
+    if (!prevWeek) return []  // Tuần trước chưa có record → return trống
+
+    // Step 2: Lấy slots của tuần trước theo user_id
+    const { data, error } = await supabase
+      .from('schedule_slots')
+      .select('*')
+      .eq('week_id', prevWeek.id)
+      .eq('user_id', session.user.id)
+      .order('slot_date', { ascending: true })
+      .order('start_time', { ascending: true })
+    if (error) throw error
+    return data ?? []
+  },
+
   // Upsert toàn bộ slots cho một week — atomic via RPC upsert_week_slots
   // RPC wrap delete + insert + audit trong 1 plpgsql transaction.
   // tenantId không cần truyền — RPC lấy từ JWT (current_tenant_id()).
