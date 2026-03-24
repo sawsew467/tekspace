@@ -9,4 +9,6 @@ export const QUERY_KEYS = {
   incidents: 'incidents',
   incidentAppeals: 'incident-appeals',
   analytics: 'analytics',
+  userProfile: 'user-profile',    // Story 1.7: user profile (timezone, avatar, etc.)
+  tenantNames: 'tenant-names',    // Story 1.7: tenant display names for TeamSwitcher
 } as const

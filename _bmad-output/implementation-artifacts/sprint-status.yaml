@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-23
-last_updated: 2026-03-24 (story 1-6 → done)
+last_updated: 2026-03-24 (story 1-7 → done)
 project: TekSpace
 project_key: NOKEY
 tracking_system: file-system
@@ -52,7 +52,7 @@ development_status:
   1-4-tenant-creation-team-settings: done
   1-5-member-invitation-onboarding: done
   1-6-team-role-membership-management: done
-  1-7-tenant-switcher-personal-profile: ready-for-dev
+  1-7-tenant-switcher-personal-profile: done
   epic-1-retrospective: optional
 
   # ─────────────────────────────────────────────

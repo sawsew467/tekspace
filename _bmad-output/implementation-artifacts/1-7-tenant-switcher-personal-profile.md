@@ -1,6 +1,6 @@
 # Story 1.7: Tenant Switcher & Personal Profile
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -31,47 +31,47 @@ So that I always work in the right team context and see accurate local times.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Tạo migration thêm users.active_tenant_id (AC: 2, 7)
-  - [ ] Tạo `supabase/migrations/20260323000015_add_active_tenant_id_to_users.sql`
-  - [ ] `ALTER TABLE public.users ADD COLUMN active_tenant_id uuid REFERENCES public.tenants(id) ON DELETE SET NULL;`
-  - [ ] Update `custom_access_token_hook` để ưu tiên `users.active_tenant_id` nếu không NULL
+- [x] Task 1: Tạo migration thêm users.active_tenant_id (AC: 2, 7)
+  - [x] Tạo `supabase/migrations/20260324000007_add_active_tenant_id_to_users.sql`
+  - [x] `ALTER TABLE public.users ADD COLUMN active_tenant_id uuid REFERENCES public.tenants(id) ON DELETE SET NULL;`
+  - [x] Update `custom_access_token_hook` để ưu tiên `users.active_tenant_id` nếu không NULL
 
-- [ ] Task 2: Tạo settings feature structure (AC: 3)
-  - [ ] Tạo `src/features/settings/services/settings.service.ts` — updateTimezone, updateActiveTenant
-  - [ ] Tạo `src/features/settings/schemas/settings.schema.ts` — timezoneSchema
-  - [ ] Tạo `src/features/settings/hooks/use-update-timezone.ts` — useMutation
+- [x] Task 2: Tạo settings feature structure (AC: 3)
+  - [x] Tạo `src/features/settings/services/settings.service.ts` — updateTimezone, updateActiveTenant
+  - [x] Tạo `src/features/settings/schemas/settings.schema.ts` — timezoneSchema
+  - [x] Tạo `src/features/settings/hooks/use-update-timezone.ts` — useMutation
 
-- [ ] Task 3: Update query-keys.ts (AC: 3)
-  - [ ] Thêm `userProfile: 'user-profile'` vào QUERY_KEYS (dùng cho useQuery profile data)
+- [x] Task 3: Update query-keys.ts (AC: 3)
+  - [x] Thêm `userProfile: 'user-profile'` vào QUERY_KEYS (dùng cho useQuery profile data)
 
-- [ ] Task 4: Tạo TimezoneSelector component (AC: 3)
-  - [ ] Tạo `src/features/settings/components/TimezoneSelector.tsx`
-  - [ ] Props: `value: string`, `onChange: (tz: string) => void`, `disabled?: boolean`
-  - [ ] Dùng shadcn `Select` với danh sách IANA timezones
-  - [ ] Tái sử dụng `COMMON_TIMEZONES` list từ `settings/team.tsx` (hoặc extract vào shared constant)
+- [x] Task 4: Tạo TimezoneSelector component (AC: 3)
+  - [x] Tạo `src/features/settings/components/TimezoneSelector.tsx`
+  - [x] Props: `value: string`, `onChange: (tz: string) => void`, `disabled?: boolean`
+  - [x] Dùng shadcn `Select` với danh sách IANA timezones
+  - [x] Tái sử dụng `COMMON_TIMEZONES` list từ `settings/team.tsx` (đã extract vào `src/lib/timezones.ts`)
 
-- [ ] Task 5: Cập nhật settings/profile.tsx (AC: 3, 4)
-  - [ ] Thêm section "Timezone cá nhân" với `TimezoneSelector` + save button
-  - [ ] Dùng `useQuery` để load `users.timezone` hiện tại
-  - [ ] Dùng `useUpdateTimezone` mutation để save
-  - [ ] Nếu timezone === 'UTC' → hiện hint "Bạn chưa set timezone cá nhân."
+- [x] Task 5: Cập nhật settings/profile.tsx (AC: 3, 4)
+  - [x] Thêm section "Timezone cá nhân" với `TimezoneSelector` + save button
+  - [x] Dùng `useQuery` để load `users.timezone` hiện tại
+  - [x] Dùng `useUpdateTimezone` mutation để save
+  - [x] Nếu timezone === 'UTC' → hiện hint "Bạn chưa set timezone cá nhân."
 
-- [ ] Task 6: Wire TeamSwitcher vào AppSidebar (AC: 1, 2)
-  - [ ] Sửa `src/components/layout/app-sidebar.tsx`:
-    - [ ] Thêm query lấy tenant names từ `tenants` table dựa trên `useTenantStore().tenants`
-    - [ ] Uncomment `<TeamSwitcher>` (hiện tại bị comment), xóa `<AppTitle />`
-    - [ ] Pass teams data thực từ tenant store + tenants query
-    - [ ] Implement `onSwitch` handler: updateActiveTenant() + refreshSession() + navigate
-  - [ ] Sửa `src/components/layout/team-switcher.tsx`:
-    - [ ] Wire `onSwitch` prop để trigger real tenant switching
-    - [ ] Xóa internal `setActiveTeam` state (dùng tenant store làm source of truth)
+- [x] Task 6: Wire TeamSwitcher vào AppSidebar (AC: 1, 2)
+  - [x] Sửa `src/components/layout/app-sidebar.tsx`:
+    - [x] Thêm query lấy tenant names từ `tenants` table dựa trên `useTenantStore().tenants`
+    - [x] Uncomment `<TeamSwitcher>` (hiện tại bị comment), xóa `<AppTitle />`
+    - [x] Pass teams data thực từ tenant store + tenants query
+    - [x] Implement `onSwitch` handler: updateActiveTenant() + refreshSession() + navigate
+  - [x] Sửa `src/components/layout/team-switcher.tsx`:
+    - [x] Wire `onSwitch` prop để trigger real tenant switching
+    - [x] Xóa internal `setActiveTeam` state (dùng tenant store làm source of truth)
 
-- [ ] Task 7: Cải thiện session invalidation handler (AC: 5)
-  - [ ] Sửa `src/lib/query-client.ts` — global `QueryCache.onError`
-  - [ ] Detect error code 401, "Session not found", "JWT expired", "User not found"
-  - [ ] Show toast.error("Phiên đăng nhập của bạn đã bị thu hồi. Vui lòng đăng nhập lại.")
-  - [ ] Redirect đến ROUTES.signIn
-  - [ ] Xem xét: cần `supabase.auth.onAuthStateChange()` listener trong `_app/route.tsx` hoặc `__root.tsx` để catch session invalidation real-time (không chỉ khi có API call)
+- [x] Task 7: Cải thiện session invalidation handler (AC: 5)
+  - [x] Sửa `src/lib/query-client.ts` — global `QueryCache.onError`
+  - [x] Detect error code 401, "Session not found", "JWT expired", "User not found"
+  - [x] Show toast.error("Phiên đăng nhập của bạn đã bị thu hồi. Vui lòng đăng nhập lại.")
+  - [x] Redirect đến ROUTES.signIn
+  - [x] Thêm `supabase.auth.onAuthStateChange()` listener trong `_app/route.tsx` để catch session invalidation real-time
 
 ## Dev Notes
 
@@ -507,13 +507,15 @@ src/
 │   ├── app-sidebar.tsx                           ← SỬA (uncomment TeamSwitcher, wire data + onSwitch)
 │   └── team-switcher.tsx                         ← SỬA (bỏ internal state, derive từ store)
 └── routes/
-    ├── __root.tsx                                ← SỬA (thêm onAuthStateChange listener)
-    └── _app/settings/
-        ├── profile.tsx                           ← SỬA (thêm TimezoneSection)
-        └── team.tsx                              ← SỬA nhỏ (import COMMON_TIMEZONES từ lib/timezones.ts)
+    ├── __root.tsx                                ← KHÔNG SỬA (onAuthStateChange đã có trong auth-store)
+    └── _app/
+        ├── route.tsx                             ← SỬA (thêm onAuthStateChange listener trong AppLayout)
+        └── settings/
+            ├── profile.tsx                       ← SỬA (thêm TimezoneSection)
+            └── team.tsx                          ← SỬA nhỏ (import COMMON_TIMEZONES từ lib/timezones.ts)
 supabase/
 └── migrations/
-    └── 20260323000015_add_active_tenant_id_to_users.sql  ← TẠO MỚI
+    └── 20260324000007_add_active_tenant_id_to_users.sql  ← TẠO MỚI
 ```
 
 ### Thứ tự Implementation được khuyến nghị
@@ -575,20 +577,55 @@ await navigate({ to: ROUTES.app.dashboard })
 ## Dev Agent Record
 
 ### Agent Model Used
-_[To be filled by dev agent]_
+Claude Sonnet 4.5
 
 ### Debug Log References
-_[To be filled by dev agent]_
+- Migration: `20260324000007_add_active_tenant_id_to_users.sql` — applied thành công
+- TypeScript: `npx tsc --noEmit` — 0 errors
+- ESLint: 0 warnings, 0 errors trên toàn bộ files thay đổi
+- DB Tests: 17/17 PASS (`npx supabase test db`)
+- Vite Build: Thành công (6.67s, 2151 modules)
 
 ### Completion Notes List
-_[To be filled by dev agent]_
+- ✅ Task 1: Migration `20260324000007` tạo column `active_tenant_id` trên `users` table + update `custom_access_token_hook` để ưu tiên column này. Index được tạo. Migration applied và verified qua MCP.
+- ✅ Task 2: Settings feature structure tạo đủ — `settings.service.ts` (updateTimezone, updateActiveTenant, getUserProfile), `settings.schema.ts` (timezoneSchema với zod enum validation), `use-update-timezone.ts` hook
+- ✅ Task 3: `query-keys.ts` thêm `userProfile` và `tenantNames` keys
+- ✅ Task 4: `TimezoneSelector.tsx` component + `src/lib/timezones.ts` shared constant (extract từ `settings/team.tsx`)
+- ✅ Task 5: `settings/profile.tsx` — thêm `TimezoneSection` component với useQuery + useUpdateTimezone + inline alert khi timezone === 'UTC'
+- ✅ Task 6: `app-sidebar.tsx` — wire TeamSwitcher với tenant query, handleSwitch (updateActiveTenant → refreshSession → initFromSession → setActiveTenant → queryClient.clear() → navigate). `team-switcher.tsx` — bỏ internal useState, derive activeTeam từ `useTenantStore`
+- ✅ Task 7: `query-client.ts` — cải thiện session error detection (401, JWT expired, session_not_found, User not found) + friendly toast trước redirect. `auth-store.ts` — thêm `isManualSignOut` flag. `_app/route.tsx` — thêm `onAuthStateChange` listener với unsubscribe cleanup
 
 ### Implementation Plan
-_[To be filled by dev agent]_
+1. DB migration với `active_tenant_id` column + update `custom_access_token_hook`
+2. `src/lib/timezones.ts` — extract COMMON_TIMEZONES dùng chung
+3. Settings feature: service, schema, hook
+4. `query-keys.ts` update (userProfile, tenantNames)
+5. `TimezoneSelector` component
+6. `profile.tsx` — thêm TimezoneSection
+7. `team.tsx` — import COMMON_TIMEZONES từ shared lib
+8. `team-switcher.tsx` — bỏ internal state, derive từ store
+9. `app-sidebar.tsx` — wire TeamSwitcher với real data + handleSwitch + queryClient.clear()
+10. `query-client.ts` — improved session invalidation handler
+11. `auth-store.ts` — isManualSignOut flag
+12. `_app/route.tsx` — onAuthStateChange listener
 
 ### File List
-_[To be filled by dev agent]_
+- `supabase/migrations/20260324000007_add_active_tenant_id_to_users.sql` ← TẠO MỚI
+- `src/lib/timezones.ts` ← TẠO MỚI
+- `src/lib/query-keys.ts` ← SỬA (thêm userProfile, tenantNames)
+- `src/lib/query-client.ts` ← SỬA (improved session invalidation)
+- `src/features/settings/services/settings.service.ts` ← TẠO MỚI
+- `src/features/settings/schemas/settings.schema.ts` ← TẠO MỚI
+- `src/features/settings/hooks/use-update-timezone.ts` ← TẠO MỚI
+- `src/features/settings/components/TimezoneSelector.tsx` ← TẠO MỚI
+- `src/components/layout/app-sidebar.tsx` ← SỬA (TeamSwitcher wire-up)
+- `src/components/layout/team-switcher.tsx` ← SỬA (remove internal state)
+- `src/routes/_app/route.tsx` ← SỬA (onAuthStateChange listener)
+- `src/routes/_app/settings/profile.tsx` ← SỬA (TimezoneSection)
+- `src/routes/_app/settings/team.tsx` ← SỬA (import COMMON_TIMEZONES)
+- `src/stores/auth-store.ts` ← SỬA (isManualSignOut flag)
 
 ## Change Log
 
 - 2026-03-24: Story 1.7 created — Tenant Switcher & Personal Profile
+- 2026-03-24: Story 1.7 implemented — Tất cả 7 tasks hoàn thành. DB migration applied, TypeScript 0 errors, ESLint 0 warnings, DB tests 17/17 PASS, Vite build thành công.

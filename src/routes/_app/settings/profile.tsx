@@ -1,14 +1,20 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { ChangePasswordForm } from '@/features/auth/components/ChangePasswordForm'
 import { useAuthStore } from '@/stores/auth-store'
 import { isSoleOwner } from '@/features/tenant/services/tenant.service'
+import { getUserProfile } from '@/features/settings/services/settings.service'
+import { useUpdateTimezone } from '@/features/settings/hooks/use-update-timezone'
+import { TimezoneSelector } from '@/features/settings/components/TimezoneSelector'
+import { QUERY_KEYS } from '@/lib/query-keys'
 
 export const Route = createFileRoute('/_app/settings/profile')({
   component: ProfilePage,
@@ -53,6 +59,9 @@ function ProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Timezone cá nhân — Story 1.7 */}
+      <TimezoneSection />
+
       {/* Xóa tài khoản */}
       <Card className='border-destructive/50'>
         <CardHeader>
@@ -91,5 +100,70 @@ function ProfilePage() {
         handleConfirm={() => setDeleteConfirmOpen(false)}
       />
     </div>
+  )
+}
+
+function TimezoneSection() {
+  const { user } = useAuthStore()
+
+  const { data: profile, isLoading, isError } = useQuery({
+    queryKey: [QUERY_KEYS.userProfile, user?.id],
+    queryFn: () => getUserProfile(user!.id),
+    enabled: !!user?.id,
+  })
+
+  const mutation = useUpdateTimezone()
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Timezone cá nhân</CardTitle>
+          <CardDescription>Timestamps trong app sẽ hiển thị theo timezone này</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className='h-10 w-full' />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Timezone cá nhân</CardTitle>
+          <CardDescription>Timestamps trong app sẽ hiển thị theo timezone này</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className='text-sm text-muted-foreground'>
+            Không thể tải thông tin timezone. Vui lòng tải lại trang.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Timezone cá nhân</CardTitle>
+        <CardDescription>Timestamps trong app sẽ hiển thị theo timezone này</CardDescription>
+      </CardHeader>
+      <CardContent className='space-y-4'>
+        {(!profile?.timezone || profile.timezone === 'UTC') && (
+          <Alert>
+            <AlertDescription>
+              Bạn chưa set timezone cá nhân. Vui lòng chọn timezone phù hợp.
+            </AlertDescription>
+          </Alert>
+        )}
+        <TimezoneSelector
+          value={profile?.timezone ?? 'UTC'}
+          onChange={(tz) => mutation.mutate(tz)}
+          disabled={mutation.isPending}
+        />
+      </CardContent>
+    </Card>
   )
 }

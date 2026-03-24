@@ -1,6 +1,9 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
-import { useAuthStore } from '@/stores/auth-store'
+import { useEffect } from 'react'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { toast } from 'sonner'
+import { useAuthStore, isManualSignOut } from '@/stores/auth-store'
 import { useTenantStore } from '@/stores/tenant-store'
+import { supabase } from '@/lib/supabase-browser'
 import { ROUTES } from '@/lib/routes'
 import { AuthenticatedLayout } from '@/components/layout/authenticated-layout'
 
@@ -39,5 +42,24 @@ export const Route = createFileRoute('/_app')({
 })
 
 function AppLayout() {
+  const navigate = useNavigate()
+
+  // Story 1.7: Detect server-side session invalidation real-time
+  // Khi user bị remove khỏi tenant (Story 1.6), admin.signOut() được gọi server-side
+  // → SIGNED_OUT event fire → redirect to sign-in với toast thông báo
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' && !isManualSignOut) {
+        // Server-side revocation — không phải user tự sign out
+        toast.error('Phiên đăng nhập của bạn đã bị thu hồi. Vui lòng đăng nhập lại.')
+        void navigate({ to: ROUTES.signIn })
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [navigate])
+
   return <AuthenticatedLayout />
 }

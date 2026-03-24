@@ -15,6 +15,10 @@ interface AuthState {
 let _subscription: ReturnType<typeof supabase.auth.onAuthStateChange>['data']['subscription'] | null =
   null
 
+// Flag để phân biệt manual sign-out vs server-side revocation (Story 1.7)
+// Module-level để accessible từ component listener trong _app/route.tsx
+export let isManualSignOut = false
+
 export const useAuthStore = create<AuthState>()((set) => {
   // Unsubscribe subscription cũ trước khi tạo mới (tránh duplicate listeners khi HMR)
   if (_subscription) {
@@ -62,6 +66,10 @@ export const useAuthStore = create<AuthState>()((set) => {
     },
 
     signOut: async () => {
+      // Supabase SDK dispatches SIGNED_OUT synchronously before signOut() resolves,
+      // so isManualSignOut is still true when the listener in _app/route.tsx fires.
+      // The finally block resets it only after all listeners have already run.
+      isManualSignOut = true  // Mark manual sign-out để tránh show "session revoked" toast
       set({ isLoading: true })
       try {
         await supabase.auth.signOut()
@@ -70,6 +78,8 @@ export const useAuthStore = create<AuthState>()((set) => {
         // Dù signOut fail, vẫn clear local state để tránh stuck
         set({ user: null, session: null, isLoading: false })
         throw error
+      } finally {
+        isManualSignOut = false
       }
     },
   }

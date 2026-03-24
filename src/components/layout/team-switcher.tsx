@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { useTenantStore } from '@/stores/tenant-store'
 
 type Team = {
   id: string // UUID từ tenants table — dùng làm React key (không dùng name vì không unique)
@@ -25,23 +26,17 @@ type Team = {
 
 type TeamSwitcherProps = {
   teams: Team[]
-  // onSwitch sẽ được implement trong Story 1.7 để trigger auth.refreshSession()
   onSwitch?: (teamId: string) => void
 }
 
 export function TeamSwitcher({ teams, onSwitch }: TeamSwitcherProps) {
   const { isMobile } = useSidebar()
+  const { activeTenantId } = useTenantStore()
+
+  // Derive activeTeam từ store thay vì internal state — store là source of truth
+  const activeTeam = teams.find((t) => t.id === activeTenantId) ?? teams[0]
 
   // Guard: nếu chưa có team nào, render placeholder
-  const [activeTeam, setActiveTeam] = React.useState<Team | undefined>(teams[0])
-
-  // Sync khi teams list thay đổi (ví dụ sau khi fetch xong)
-  React.useEffect(() => {
-    if (!activeTeam && teams.length > 0) {
-      setActiveTeam(teams[0])
-    }
-  }, [teams, activeTeam])
-
   if (!activeTeam) {
     return (
       <SidebarMenu>
@@ -52,12 +47,6 @@ export function TeamSwitcher({ teams, onSwitch }: TeamSwitcherProps) {
         </SidebarMenuItem>
       </SidebarMenu>
     )
-  }
-
-  const handleSwitch = (team: Team) => {
-    setActiveTeam(team)
-    // Story 1.7: gọi onSwitch để trigger auth.refreshSession() với active_tenant_id mới
-    onSwitch?.(team.id)
   }
 
   return (
@@ -94,14 +83,13 @@ export function TeamSwitcher({ teams, onSwitch }: TeamSwitcherProps) {
               // Dùng team.id (UUID) làm key, không dùng name vì name không unique
               <DropdownMenuItem
                 key={team.id}
-                onClick={() => handleSwitch(team)}
+                onClick={() => onSwitch?.(team.id)}
                 className='gap-2 p-2'
               >
                 <div className='flex size-6 items-center justify-center rounded-sm border'>
                   <team.logo className='size-4 shrink-0' />
                 </div>
                 {team.name}
-                {/* TODO Story 1.7: wire keyboard shortcuts thực sự (hiện tại chỉ decorative) */}
                 <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
               </DropdownMenuItem>
             ))}
