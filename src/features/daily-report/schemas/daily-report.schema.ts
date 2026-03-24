@@ -6,7 +6,7 @@ export const outputTypeSchema = z.enum(['pr', 'figma', 'document', 'other'])
 export type OutputType = z.infer<typeof outputTypeSchema>
 
 export const OUTPUT_TYPE_LABELS: Record<OutputType, string> = {
-  pr: 'PR (GitHub/GitLab)',
+  pr: 'PR / MR',
   figma: 'Figma',
   document: 'Document',
   other: 'Other',
@@ -27,18 +27,38 @@ export const taskItemSchema = z.object({
   // '' passes, valid URL passes, non-URL non-empty string fails
   // union order: z.literal('') first để Zod không emit confusing union error
   output_link: z.union([z.literal(''), z.string().url('Link không hợp lệ')]).optional(),
+  // Per-task hours (Story 4.5) — optional ở đây để backward compat với old reports trong DB.
+  // Dùng taskItemFormSchema (required) cho form submission mới.
+  hours: z
+    .number()
+    .min(0, 'Số giờ không được âm')
+    .max(24, 'Tối đa 24h')
+    .multipleOf(0.5, 'Bội số 0.5')
+    .optional(),
 })
 
 export type TaskItem = z.infer<typeof taskItemSchema>
 
+// ── Task Item Form Schema (hours required) ───────────────────────────────────
+// Dùng riêng cho form submission — extend taskItemSchema, require hours.
+
+export const taskItemFormSchema = taskItemSchema.extend({
+  hours: z
+    .number({ error: 'Bắt buộc' })
+    .min(0.5, 'Tối thiểu 0.5h')
+    .max(24, 'Tối đa 24h')
+    .multipleOf(0.5, 'Bội số 0.5'),
+})
+
+export type TaskFormItem = z.infer<typeof taskItemFormSchema>
+
 // ── Daily Report Form ────────────────────────────────────────────────────────
 
 export const dailyReportFormSchema = z.object({
-  tasks: z.array(taskItemSchema).min(1, 'Cần ít nhất 1 task'),
+  tasks: z.array(taskItemFormSchema).min(1, 'Cần ít nhất 1 task'),
   hours_logged: z
-    .number({ invalid_type_error: 'Vui lòng nhập số giờ' })
+    .number({ error: 'Vui lòng nhập số giờ' })
     .min(0, 'Số giờ không được âm')
-    .max(24, 'Số giờ không được vượt quá 24')
     .multipleOf(0.5, 'Số giờ phải là bội số của 0.5 (VD: 0.5, 1, 1.5...)'),
 })
 
@@ -49,9 +69,19 @@ export type DailyReportFormValues = z.infer<typeof dailyReportFormSchema>
 /**
  * Phát hiện potential discrepancy: nhiều giờ nhưng ít task/output.
  * Pure function — không side effects, không async.
- * Condition: hours > 4 AND tasks ≤ 1 AND không có output_link nào.
+ *
+ * Story 4.5: Nếu TẤT CẢ tasks đều có hours > 0 → user đã tracking đủ chi tiết
+ * → không cần cảnh báo discrepancy (hours đã là proof of work rõ ràng).
+ * Fallback về hoursLogged chỉ khi không có per-task hours.
+ *
+ * Condition (fallback only): hoursLogged > 4 AND tasks ≤ 1 AND không có output_link nào.
  */
 export function hasDiscrepancy(hoursLogged: number, tasks: TaskItem[]): boolean {
+  // Khi đã có per-task hours đầy đủ → hours đã được tracking granular, không cần flag
+  const allHasTaskHours = tasks.length > 0 && tasks.every(t => t.hours !== undefined && t.hours > 0)
+  if (allHasTaskHours) return false
+
+  // Fallback: dùng hoursLogged khi không có per-task hours
   const hasAnyOutputLink = tasks.some(t => t.output_link && t.output_link.trim() !== '')
   return hoursLogged > 4 && tasks.length <= 1 && !hasAnyOutputLink
 }

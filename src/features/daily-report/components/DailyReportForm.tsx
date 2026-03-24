@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useForm, useFieldArray, useWatch, type Control } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Trash2, Loader2, TriangleAlert } from 'lucide-react'
@@ -78,57 +79,80 @@ function TaskRow({ index, control, canRemove, onRemove }: TaskRowProps) {
         )}
       />
 
-      {/* Output type + Output link — cùng 1 hàng */}
-      <div className='space-y-1.5'>
-        {/* Section label dùng <p> thay vì FormLabel (FormLabel cần context FormItem).
-            Đây là label chung cho cả 2 fields, không cần htmlFor. */}
-        <p className='text-sm font-medium leading-none'>
-          {outputType === 'other' ? 'Output / Ghi chú' : 'Output link'}
-          {' '}
-          <span className='text-muted-foreground font-normal'>(optional)</span>
-        </p>
-        <div className='flex gap-2'>
-          {/* Output type — fixed width */}
-          <FormField
-            control={control}
-            name={`tasks.${index}.output_type`}
-            render={({ field }) => (
-              <FormItem className='w-[150px] shrink-0'>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+      {/* Hours (bắt buộc) + Output type/link (optional) — cùng 1 hàng ngang */}
+      <div className='flex gap-3 items-start'>
+        {/* Hours — required, label riêng */}
+        <FormField
+          control={control}
+          name={`tasks.${index}.hours`}
+          render={({ field }) => (
+            <FormItem className='w-[80px] shrink-0'>
+              <FormLabel>
+                Số giờ <span className='text-destructive'>*</span>
+              </FormLabel>
+              <FormControl>
+                <Input
+                  type='number'
+                  min={0.5}
+                  max={24}
+                  step={0.5}
+                  placeholder='VD: 2'
+                  value={field.value ?? ''}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value)
+                    field.onChange(isNaN(val) ? undefined : val)
+                  }}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Output type + link — ngang, flex-1 */}
+        <div className='flex-1 min-w-0 space-y-1.5'>
+          <p className='text-sm font-medium leading-none'>Output</p>
+          <div className='flex gap-2'>
+            <FormField
+              control={control}
+              name={`tasks.${index}.output_type`}
+              render={({ field }) => (
+                <FormItem className='w-[120px] shrink-0'>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder='Loại' />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {Object.entries(OUTPUT_TYPE_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={control}
+              name={`tasks.${index}.output_link`}
+              render={({ field }) => (
+                <FormItem className='flex-1 min-w-0'>
                   <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder='Loại output' />
-                    </SelectTrigger>
+                    <Input
+                      {...field}
+                      placeholder={OUTPUT_TYPE_PLACEHOLDERS[outputType]}
+                      type={outputType === 'other' ? 'text' : 'url'}
+                    />
                   </FormControl>
-                  <SelectContent>
-                    {Object.entries(OUTPUT_TYPE_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          {/* Output link — fill remaining */}
-          <FormField
-            control={control}
-            name={`tasks.${index}.output_link`}
-            render={({ field }) => (
-              <FormItem className='flex-1'>
-                <FormControl>
-                  <Input
-                    {...field}
-                    placeholder={OUTPUT_TYPE_PLACEHOLDERS[outputType]}
-                    type={outputType === 'other' ? 'text' : 'url'}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -146,7 +170,7 @@ export function DailyReportForm({ onSubmit, isPending }: Props) {
   const form = useForm<DailyReportFormValues>({
     resolver: zodResolver(dailyReportFormSchema),
     defaultValues: {
-      tasks: [{ description: '', output_type: 'other', output_link: '' }],
+      tasks: [{ description: '', output_type: 'other', output_link: '', hours: undefined }],
       hours_logged: 0,
     },
   })
@@ -156,9 +180,22 @@ export function DailyReportForm({ onSubmit, isPending }: Props) {
     name: 'tasks',
   })
 
-  // Watch reactive values cho discrepancy detection
+  // Watch reactive values cho discrepancy detection và total display
   const hoursWatched = useWatch({ control: form.control, name: 'hours_logged' })
   const tasksWatched = useWatch({ control: form.control, name: 'tasks' })
+
+  // Auto-compute hours_logged từ sum(task.hours) khi TẤT CẢ tasks đều có hours > 0.
+  // Reset về 0 khi không allFilled để tránh stale sum.
+  useEffect(() => {
+    const tasks = tasksWatched ?? []
+    const allFilled = tasks.length > 0 && tasks.every(t => t.hours !== undefined && t.hours > 0)
+    if (allFilled) {
+      const sum = tasks.reduce((acc, t) => acc + (t.hours ?? 0), 0)
+      form.setValue('hours_logged', sum, { shouldDirty: false, shouldValidate: false })
+    } else {
+      form.setValue('hours_logged', 0, { shouldDirty: false, shouldValidate: false })
+    }
+  }, [tasksWatched, form])
 
   // Computed — tự update khi field thay đổi, không cần useState
   const showFlag = hasDiscrepancy(hoursWatched ?? 0, tasksWatched ?? [])
@@ -185,7 +222,7 @@ export function DailyReportForm({ onSubmit, isPending }: Props) {
               type='button'
               variant='outline'
               size='sm'
-              onClick={() => append({ description: '', output_type: 'other', output_link: '' })}
+              onClick={() => append({ description: '', output_type: 'other', output_link: '', hours: undefined as unknown as number })}
               className='w-full'
             >
               <Plus className='mr-2 h-4 w-4' />
@@ -195,28 +232,15 @@ export function DailyReportForm({ onSubmit, isPending }: Props) {
 
           <Separator />
 
-          {/* Hours logged */}
-          <FormField
-            control={form.control}
-            name='hours_logged'
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Số giờ đã làm việc</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    type='number'
-                    min={0}
-                    max={24}
-                    step={0.5}
-                    placeholder='VD: 8'
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+          {/* Tổng giờ — auto-computed từ per-task hours, không editable */}
+          <div className='flex items-center justify-between rounded-lg border px-4 py-3'>
+            <p className='text-sm font-medium'>Tổng giờ làm việc</p>
+            {(hoursWatched ?? 0) > 0 ? (
+              <p className='text-sm font-semibold'>{hoursWatched}h</p>
+            ) : (
+              <p className='text-sm text-muted-foreground'>—</p>
             )}
-          />
+          </div>
 
           {/* Discrepancy flag — hiện khi hours > 4 AND tasks ≤ 1 AND không có output link */}
           {showFlag && (
@@ -233,7 +257,7 @@ export function DailyReportForm({ onSubmit, isPending }: Props) {
                     size='sm'
                     variant='outline'
                     className='border-yellow-300 bg-white text-yellow-800 hover:bg-yellow-50'
-                    onClick={() => append({ description: '', output_type: 'other', output_link: '' })}
+                    onClick={() => append({ description: '', output_type: 'other', output_link: '', hours: undefined as unknown as number })}
                   >
                     <Plus className='mr-1 h-3 w-3' />
                     Thêm task

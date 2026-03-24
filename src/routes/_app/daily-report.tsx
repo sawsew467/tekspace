@@ -100,6 +100,8 @@ function DailyReportPage() {
         output_type: t.output_type,
         // Omit empty output_link
         ...(t.output_link ? { output_link: t.output_link } : {}),
+        // Per-task hours — omit nếu undefined (Story 4.5)
+        ...(t.hours !== undefined ? { hours: t.hours } : {}),
       })),
       hoursLogged: values.hours_logged,
     })

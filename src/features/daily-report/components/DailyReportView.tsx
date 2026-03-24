@@ -9,6 +9,7 @@ type TaskData = {
   description: string
   output_type: string
   output_link?: string
+  hours?: number  // Per-task hours (Story 4.5) — optional, backward compat với old reports
 }
 
 type Props = {
@@ -71,7 +72,15 @@ export function DailyReportView({ report, timezone }: Props) {
             return (
               <div key={idx} className='rounded-lg border p-3 space-y-1.5'>
                 <div className='flex items-start justify-between gap-2'>
-                  <p className='text-sm font-medium leading-snug'>{task.description}</p>
+                  <div className='flex items-center gap-2 min-w-0'>
+                    <p className='text-sm font-medium leading-snug'>{task.description}</p>
+                    {/* Per-task hours badge — chỉ hiện nếu > 0, backward compat với old reports */}
+                    {task.hours !== undefined && task.hours > 0 && (
+                      <span className='text-xs text-muted-foreground shrink-0 bg-muted px-1.5 py-0.5 rounded'>
+                        {task.hours}h
+                      </span>
+                    )}
+                  </div>
                   <Badge variant='secondary' className='text-xs shrink-0'>
                     {OUTPUT_TYPE_LABELS[task.output_type as OutputType] ?? task.output_type}
                   </Badge>

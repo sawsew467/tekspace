@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   dailyReportFormSchema,
   taskItemSchema,
+  taskItemFormSchema,
   outputTypeSchema,
   OUTPUT_TYPE_LABELS,
   OUTPUT_TYPE_PLACEHOLDERS,
@@ -97,13 +98,103 @@ describe('taskItemSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+
+  // ── hours field (taskItemSchema — optional, backward compat) ──────────────
+  it('hours: 0.5 → valid', () => {
+    const result = taskItemSchema.safeParse({ description: 'Task', output_type: 'other', hours: 0.5 })
+    expect(result.success).toBe(true)
+  })
+
+  it('hours: 0 → valid (optional, 0 >= 0)', () => {
+    const result = taskItemSchema.safeParse({ description: 'Task', output_type: 'other', hours: 0 })
+    expect(result.success).toBe(true)
+  })
+
+  it('hours: undefined → valid (optional in taskItemSchema)', () => {
+    const result = taskItemSchema.safeParse({ description: 'Task', output_type: 'other', hours: undefined })
+    expect(result.success).toBe(true)
+  })
+
+  it('hours: -1 → invalid (min 0)', () => {
+    const result = taskItemSchema.safeParse({ description: 'Task', output_type: 'other', hours: -1 })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('Số giờ không được âm')
+  })
+
+  it('hours: 25 → invalid (max 24)', () => {
+    const result = taskItemSchema.safeParse({ description: 'Task', output_type: 'other', hours: 25 })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('Tối đa 24h')
+  })
+
+  it('hours: 0.3 → invalid (không phải bội số 0.5)', () => {
+    const result = taskItemSchema.safeParse({ description: 'Task', output_type: 'other', hours: 0.3 })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('Bội số 0.5')
+  })
+
+  it('hours: 24 → valid (boundary)', () => {
+    const result = taskItemSchema.safeParse({ description: 'Task', output_type: 'other', hours: 24 })
+    expect(result.success).toBe(true)
+  })
+})
+
+// ── taskItemFormSchema (hours required) ──────────────────────────────────────
+
+describe('taskItemFormSchema — hours required', () => {
+  it('valid task with hours passes', () => {
+    const result = taskItemFormSchema.safeParse({ description: 'Task', output_type: 'other', hours: 2 })
+    expect(result.success).toBe(true)
+  })
+
+  it('hours missing → invalid (required)', () => {
+    const result = taskItemFormSchema.safeParse({ description: 'Task', output_type: 'other' })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('Bắt buộc')
+  })
+
+  it('hours: undefined → invalid (required)', () => {
+    const result = taskItemFormSchema.safeParse({ description: 'Task', output_type: 'other', hours: undefined })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('Bắt buộc')
+  })
+
+  it('hours: 0 → invalid (min 0.5)', () => {
+    const result = taskItemFormSchema.safeParse({ description: 'Task', output_type: 'other', hours: 0 })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('Tối thiểu 0.5h')
+  })
+
+  it('hours: 0.5 → valid', () => {
+    const result = taskItemFormSchema.safeParse({ description: 'Task', output_type: 'other', hours: 0.5 })
+    expect(result.success).toBe(true)
+  })
+
+  it('hours: 24 → valid (boundary)', () => {
+    const result = taskItemFormSchema.safeParse({ description: 'Task', output_type: 'other', hours: 24 })
+    expect(result.success).toBe(true)
+  })
+
+  it('hours: 25 → invalid (max 24)', () => {
+    const result = taskItemFormSchema.safeParse({ description: 'Task', output_type: 'other', hours: 25 })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('Tối đa 24h')
+  })
+
+  it('hours: 1.3 → invalid (không phải bội số 0.5)', () => {
+    // 1.3 > 0.5 nên min passes, nhưng 1.3 không phải bội số 0.5
+    const result = taskItemFormSchema.safeParse({ description: 'Task', output_type: 'other', hours: 1.3 })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('Bội số 0.5')
+  })
 })
 
 // ── dailyReportFormSchema ────────────────────────────────────────────────────
 
 describe('dailyReportFormSchema', () => {
+  // hours bắt buộc trong form schema (Story 4.5 update)
   const validForm = {
-    tasks: [{ description: 'Fix bug', output_type: 'pr', output_link: '' }],
+    tasks: [{ description: 'Fix bug', output_type: 'pr', output_link: '', hours: 2 }],
     hours_logged: 8,
   }
 
@@ -130,9 +221,9 @@ describe('dailyReportFormSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects hours_logged > 24', () => {
+  it('accepts hours_logged > 24 (no max cap — derived from multi-task sum)', () => {
     const result = dailyReportFormSchema.safeParse({ ...validForm, hours_logged: 25 })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   it('accepts fractional hours_logged (8.5)', () => {
@@ -142,9 +233,9 @@ describe('dailyReportFormSchema', () => {
   it('accepts multiple tasks', () => {
     const result = dailyReportFormSchema.safeParse({
       tasks: [
-        { description: 'Task 1', output_type: 'pr', output_link: 'https://github.com/org/repo/pull/1' },
-        { description: 'Task 2', output_type: 'figma', output_link: '' },
-        { description: 'Task 3', output_type: 'other' },
+        { description: 'Task 1', output_type: 'pr', output_link: 'https://github.com/org/repo/pull/1', hours: 3 },
+        { description: 'Task 2', output_type: 'figma', output_link: '', hours: 2 },
+        { description: 'Task 3', output_type: 'other', hours: 1 },
       ],
       hours_logged: 6,
     })
@@ -159,8 +250,8 @@ describe('OUTPUT_TYPE_LABELS', () => {
     expect(Object.keys(OUTPUT_TYPE_LABELS)).toEqual(['pr', 'figma', 'document', 'other'])
   })
 
-  it('pr label contains GitHub/GitLab', () => {
-    expect(OUTPUT_TYPE_LABELS.pr).toContain('GitHub')
+  it('pr label is PR / MR', () => {
+    expect(OUTPUT_TYPE_LABELS.pr).toBe('PR / MR')
   })
 })
 
@@ -238,6 +329,40 @@ describe('hasDiscrepancy', () => {
 
   it('returns true: task without output_link field, hours > 4', () => {
     expect(hasDiscrepancy(8, [taskNoLinkField])).toBe(true)
+  })
+
+  // ── Per-task hours path (Story 4.5) ──────────────────────────────────────
+  it('per-task hours: all tasks have hours:2.5, sum=2.5, 1 task no link → false (allHasTaskHours bypasses flag)', () => {
+    const task: TaskItem = { description: 'Task', output_type: 'other', output_link: '', hours: 2.5 }
+    expect(hasDiscrepancy(0, [task])).toBe(false)
+  })
+
+  it('per-task hours: 1 task hours:5, sum=5 > 4, no link → false (allHasTaskHours → no flag)', () => {
+    const task: TaskItem = { description: 'Task', output_type: 'other', output_link: '', hours: 5 }
+    expect(hasDiscrepancy(0, [task])).toBe(false)
+  })
+
+  it('per-task hours: all tasks hours:2, sum=4, 1 task no link → false (allHasTaskHours → no flag)', () => {
+    const task: TaskItem = { description: 'Task', output_type: 'other', output_link: '', hours: 2 }
+    expect(hasDiscrepancy(0, [task])).toBe(false)
+  })
+
+  it('per-task hours: all tasks hours:3, sum=6, task has output_link → false', () => {
+    const task: TaskItem = { description: 'Task', output_type: 'pr', output_link: 'https://github.com/org/repo/pull/1', hours: 3 }
+    expect(hasDiscrepancy(0, [task])).toBe(false)
+  })
+
+  it('per-task hours: 1 of 2 tasks has hours → not allHasTaskHours → fallback to hoursLogged', () => {
+    const taskWithHours: TaskItem = { description: 'Task A', output_type: 'other', output_link: '', hours: 5 }
+    const taskNoHours: TaskItem = { description: 'Task B', output_type: 'other', output_link: '' }
+    // Not allHasTaskHours → use hoursLogged=8, 2 tasks (length > 1) → false
+    expect(hasDiscrepancy(8, [taskWithHours, taskNoHours])).toBe(false)
+  })
+
+  it('per-task hours fallback: only 1 task no hours, hoursLogged=5, no link → true', () => {
+    const task: TaskItem = { description: 'Task', output_type: 'other', output_link: '' }
+    // task.hours = undefined → not allHasTaskHours → fallback to hoursLogged=5
+    expect(hasDiscrepancy(5, [task])).toBe(true)
   })
 })
 

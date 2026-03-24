@@ -25,6 +25,7 @@ export type TaskPayload = {
   description: string
   output_type: string
   output_link?: string
+  hours?: number  // Per-task hours (Story 4.5) — optional, jsonb field
 }
 
 export const DailyReportService = {
