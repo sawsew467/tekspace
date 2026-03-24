@@ -1,6 +1,7 @@
 import { AlertCircle, Users } from 'lucide-react'
 import { useTenantMembers } from '@/features/tenant/hooks/use-tenant-members'
 import { InviteMemberDialog } from '@/features/tenant/components/InviteMemberDialog'
+import { RoleActionDropdown } from '@/features/tenant/components/RoleActionDropdown'
 import { Badge } from '@/components/ui/badge'
 
 const ROLE_LABEL: Record<string, string> = {
@@ -15,7 +16,12 @@ const ROLE_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   member: 'outline',
 }
 
-export function MemberList({ canManage }: { canManage: boolean }) {
+interface MemberListProps {
+  canManage: boolean
+  currentUserId: string
+}
+
+export function MemberList({ canManage, currentUserId }: MemberListProps) {
   // P14: destructure isError để xử lý trường hợp query thất bại
   const { data: members, isLoading, isError } = useTenantMembers()
 
@@ -59,9 +65,20 @@ export function MemberList({ canManage }: { canManage: boolean }) {
                   {member.users.email ?? member.users.timezone}
                 </p>
               </div>
-              <Badge variant={ROLE_VARIANT[member.role] ?? 'outline'}>
-                {ROLE_LABEL[member.role] ?? member.role}
-              </Badge>
+              <div className='flex items-center gap-2'>
+                <Badge variant={ROLE_VARIANT[member.role] ?? 'outline'}>
+                  {ROLE_LABEL[member.role] ?? member.role}
+                </Badge>
+                {/* Chỉ Owner thấy role action dropdown */}
+                {canManage && member.role !== 'owner' && (
+                  <RoleActionDropdown
+                    userId={member.user_id}
+                    memberName={member.users.full_name}
+                    currentRole={member.role}
+                    currentUserId={currentUserId}
+                  />
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -43,15 +43,7 @@ Deno.serve(async (req) => {
     })
   }
 
-  // Không cho phép xóa chính mình
-  if (userId === caller.id) {
-    return new Response(JSON.stringify({ error: 'Không thể xóa chính bạn khỏi team.' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
-  // Verify caller là owner/manager của tenant (P12: destructure error để phân biệt DB fail vs 403)
+  // Verify caller là owner của tenant (chỉ owner mới promote được — AC#2)
   const { data: callerMembership, error: callerError } = await supabaseAdmin
     .from('tenant_members')
     .select('role')
@@ -66,14 +58,14 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
-  if (!callerMembership || !['owner', 'manager'].includes(callerMembership.role)) {
-    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+  if (!callerMembership || callerMembership.role !== 'owner') {
+    return new Response(JSON.stringify({ error: 'Chỉ Owner mới có thể nâng quyền thành viên.' }), {
       status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  // Verify target thuộc tenant và lấy role để check hierarchy (P1, P6)
+  // Verify target là member đang active (không promote manager lên manager)
   const { data: targetMembership, error: targetError } = await supabaseAdmin
     .from('tenant_members')
     .select('role')
@@ -83,62 +75,42 @@ Deno.serve(async (req) => {
     .single()
 
   if (targetError || !targetMembership) {
-    return new Response(JSON.stringify({ error: 'Không tìm thấy thành viên trong team.' }), {
+    return new Response(JSON.stringify({ error: 'Không tìm thấy thành viên.' }), {
       status: 404,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
-
-  // P1: Manager không thể xóa manager hoặc owner — chỉ owner mới xóa được manager
-  if (callerMembership.role === 'manager' && targetMembership.role !== 'member') {
-    return new Response(JSON.stringify({ error: 'Manager chỉ có thể xóa member, không thể xóa manager hoặc owner.' }), {
-      status: 403,
+  if (targetMembership.role !== 'member') {
+    return new Response(JSON.stringify({ error: 'Chỉ có thể nâng quyền Member lên Manager.' }), {
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  // Get tenant name for notification
-  const { data: tenant } = await supabaseAdmin
-    .from('tenants')
-    .select('name')
-    .eq('id', tenantId)
-    .single()
-
-  // 1. UPDATE tenant_members → inactive (P6: dùng .select('id') để verify row affected)
+  // UPDATE role → manager
   const { data: updated, error: updateError } = await supabaseAdmin
     .from('tenant_members')
-    .update({ status: 'inactive' })
+    .update({ role: 'manager' })
     .eq('user_id', userId)
     .eq('tenant_id', tenantId)
+    .eq('status', 'active')
     .select('id')
     .single()
 
   if (updateError || !updated) {
-    return new Response(JSON.stringify({ error: 'Không thể xóa thành viên. Vui lòng thử lại.' }), {
+    return new Response(JSON.stringify({ error: 'Không thể nâng quyền thành viên. Vui lòng thử lại.' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  // 2. Invalidate session ngay lập tức (ignore error nếu user đã sign out)
-  await supabaseAdmin.auth.admin.signOut(userId)
-
-  // 3. INSERT in-app notification cho user bị xóa
-  await supabaseAdmin.from('notifications').insert({
-    tenant_id: tenantId,
-    user_id: userId,
-    type: 'member_removed',
-    message: `Bạn đã bị xóa khỏi ${tenant?.name ?? 'team'}.`,
-    link_to: null,
-  })
-
-  // 4. INSERT audit log (service role bypass — không cần RLS INSERT policy)
+  // INSERT audit log (service role bypass — không cần RLS INSERT policy)
   await supabaseAdmin.from('member_audit_logs').insert({
     tenant_id: tenantId,
     actor_id: caller.id,
     target_id: userId,
-    action: 'remove',
-    details: { tenantName: tenant?.name ?? null },
+    action: 'promote_manager',
+    details: { previousRole: 'member', newRole: 'manager' },
   })
 
   return new Response(JSON.stringify({ ok: true }), {

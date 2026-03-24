@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useTenantStore } from '@/stores/tenant-store'
+import { useAuthStore } from '@/stores/auth-store'
+import { usePermissions } from '@/hooks/use-permissions'
 import { QUERY_KEYS } from '@/lib/query-keys'
 import {
   teamSettingsSchema,
@@ -14,6 +16,8 @@ import {
   updateTenantSettings,
 } from '@/features/tenant/services/tenant.service'
 import { MemberList } from '@/features/tenant/components/MemberList'
+import { InviteListSection } from '@/features/tenant/components/InviteListSection'
+import { Can } from '@/components/can'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -68,10 +72,10 @@ const HOURS = Array.from({ length: 24 }, (_, i) => ({
 }))
 
 function TeamSettingsPage() {
-  const { activeTenantId, activeRole } = useTenantStore()
+  const { activeTenantId } = useTenantStore()
+  const { user } = useAuthStore()
   const queryClient = useQueryClient()
-  const isOwner = activeRole === 'owner'
-  const canManage = activeRole === 'owner' || activeRole === 'manager'
+  const { canManageMembers, canManageTenant } = usePermissions()
 
   const { data: settings, isLoading } = useQuery({
     queryKey: [QUERY_KEYS.tenantSettings, activeTenantId],
@@ -143,16 +147,19 @@ function TeamSettingsPage() {
         <TabsList>
           <TabsTrigger value='members'>Thành viên</TabsTrigger>
           <TabsTrigger value='settings'>Cài đặt</TabsTrigger>
+          <Can do='manageMembers'>
+            <TabsTrigger value='invites'>Lời mời</TabsTrigger>
+          </Can>
         </TabsList>
 
         {/* ── Tab: Members ── */}
         <TabsContent value='members' className='mt-6'>
-          <MemberList canManage={canManage} />
+          <MemberList canManage={canManageMembers} currentUserId={user?.id ?? ''} />
         </TabsContent>
 
         {/* ── Tab: Team Settings ── */}
         <TabsContent value='settings' className='mt-6'>
-          {!isOwner ? (
+          {!canManageTenant ? (
             <div className='text-muted-foreground py-8 text-center text-sm'>
               Chỉ Owner mới có thể thay đổi cài đặt nhóm.
             </div>
@@ -317,6 +324,13 @@ function TeamSettingsPage() {
             </Form>
           )}
         </TabsContent>
+
+        {/* ── Tab: Invites ── */}
+        <Can do='manageMembers'>
+          <TabsContent value='invites' className='mt-6'>
+            <InviteListSection canManage={canManageMembers} />
+          </TabsContent>
+        </Can>
       </Tabs>
     </div>
   )

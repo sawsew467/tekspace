@@ -1,6 +1,6 @@
 # Story 1.6: Team Role & Membership Management
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -28,63 +28,63 @@ So that the team structure always reflects current organizational reality.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Tạo migration member_audit_logs (AC: 1, 2, 3)
-  - [ ] Tạo `supabase/migrations/20260323000014_create_member_audit_logs.sql`
-  - [ ] Columns: id (uuid pk), tenant_id (fk tenants), actor_id (fk users), target_id (fk users), action (text, e.g. 'remove'/'promote'/'transfer_ownership'), details (jsonb nullable), created_at (timestamptz)
-  - [ ] Thêm RLS: chỉ manager/owner mới SELECT được, INSERT qua Edge Function (service role bypass)
+- [x] Task 1: Tạo migration member_audit_logs (AC: 1, 2, 3)
+  - [x] Tạo `supabase/migrations/20260324000006_create_member_audit_logs.sql`
+  - [x] Columns: id (uuid pk), tenant_id (fk tenants), actor_id (fk users), target_id (fk users), action (text, e.g. 'remove'/'promote'/'transfer_ownership'), details (jsonb nullable), created_at (timestamptz)
+  - [x] Thêm RLS: chỉ manager/owner mới SELECT được, INSERT qua Edge Function (service role bypass)
 
-- [ ] Task 2: Implement `remove-member` Edge Function (AC: 1)
-  - [ ] Sửa `supabase/functions/remove-member/index.ts`
-  - [ ] Parse body: `{ userId, tenantId }` — verify caller là owner/manager
-  - [ ] UPDATE `tenant_members` SET status='inactive' WHERE user_id=? AND tenant_id=?
-  - [ ] Gọi `supabaseAdmin.auth.admin.signOut(userId)` để invalidate session ngay lập tức
-  - [ ] INSERT vào `notifications`: type='member_removed', message="Bạn đã bị xóa khỏi [Team Name].", user_id=removedUserId, tenant_id
-  - [ ] INSERT vào `member_audit_logs`: actor=callerId, target=userId, action='remove'
-  - [ ] Return `{ ok: true }`
+- [x] Task 2: Implement `remove-member` Edge Function (AC: 1)
+  - [x] Sửa `supabase/functions/remove-member/index.ts`
+  - [x] Parse body: `{ userId, tenantId }` — verify caller là owner/manager
+  - [x] UPDATE `tenant_members` SET status='inactive' WHERE user_id=? AND tenant_id=?
+  - [x] Gọi `supabaseAdmin.auth.admin.signOut(userId)` để invalidate session ngay lập tức
+  - [x] INSERT vào `notifications`: type='member_removed', message="Bạn đã bị xóa khỏi [Team Name].", user_id=removedUserId, tenant_id
+  - [x] INSERT vào `member_audit_logs`: actor=callerId, target=userId, action='remove'
+  - [x] Return `{ ok: true }`
 
-- [ ] Task 3: Extend tenant.service.ts (AC: 1, 2, 3, 5, 6)
-  - [ ] Thêm `removeMember(userId: string)` → `supabase.functions.invoke('remove-member', { body: { userId, tenantId } })`
-  - [ ] Thêm `promoteToManager(userId: string, tenantId: string)` → UPDATE tenant_members SET role='manager'
-  - [ ] Thêm `transferOwnership(newOwnerId: string, tenantId: string)` → 2 UPDATE trong sequence
-  - [ ] Thêm `getInvites(tenantId: string)` → SELECT tenant_invites WHERE tenant_id=?
-  - [ ] Thêm `resendInvite(inviteId: string, tenantId: string, email: string)` → UPDATE old status='revoked' + invoke send-invite
-  - [ ] Thêm `isSoleOwner(userId: string)` → check xem user có là sole owner của bất kỳ tenant nào không
+- [x] Task 3: Extend tenant.service.ts (AC: 1, 2, 3, 5, 6)
+  - [x] Thêm `removeMember(userId: string)` → `supabase.functions.invoke('remove-member', { body: { userId, tenantId } })`
+  - [x] Thêm `promoteToManager(userId: string, tenantId: string)` → UPDATE tenant_members SET role='manager'
+  - [x] Thêm `transferOwnership(newOwnerId: string, tenantId: string)` → 2 UPDATE trong sequence
+  - [x] Thêm `getInvites(tenantId: string)` → SELECT tenant_invites WHERE tenant_id=?
+  - [x] Thêm `resendInvite(inviteId: string, tenantId: string, email: string)` → UPDATE old status='revoked' + invoke send-invite
+  - [x] Thêm `isSoleOwner(userId: string)` → check xem user có là sole owner của bất kỳ tenant nào không
 
-- [ ] Task 4: Tạo use-permissions.ts hook (AC: 7)
-  - [ ] Tạo `src/hooks/use-permissions.ts`
-  - [ ] Dùng `useTenantStore` lấy `activeRole`
-  - [ ] Dùng `hasPermission()` từ `@/lib/permissions`
-  - [ ] Return object: `{ canManageMembers, canManageTenant, canManageSchedule, canCreateIncident, canViewAnalytics, ... }`
+- [x] Task 4: Tạo use-permissions.ts hook (AC: 7)
+  - [x] Tạo `src/hooks/use-permissions.ts`
+  - [x] Dùng `useTenantStore` lấy `activeRole`
+  - [x] Dùng `hasPermission()` từ `@/lib/permissions`
+  - [x] Return object: `{ canManageMembers, canManageTenant, canManageSchedule, canCreateIncident, canViewAnalytics, ... }`
 
-- [ ] Task 5: Tạo can.tsx component (AC: 8)
-  - [ ] Tạo `src/components/can.tsx`
-  - [ ] Props: `do: Permission`, `children: ReactNode`, `fallback?: ReactNode`
-  - [ ] Dùng `usePermissions()` để check
+- [x] Task 5: Tạo can.tsx component (AC: 8)
+  - [x] Tạo `src/components/can.tsx`
+  - [x] Props: `do: Permission`, `children: ReactNode`, `fallback?: ReactNode`
+  - [x] Dùng `usePermissions()` để check
 
-- [ ] Task 6: Tạo hooks (AC: 1, 2, 3, 4, 5)
-  - [ ] Tạo `src/features/tenant/hooks/use-remove-member.ts` → useMutation wrap removeMember()
-  - [ ] Tạo `src/features/tenant/hooks/use-promote-member.ts` → useMutation wrap promoteToManager()
-  - [ ] Tạo `src/features/tenant/hooks/use-transfer-ownership.ts` → useMutation wrap transferOwnership()
-  - [ ] Tạo `src/features/tenant/hooks/use-tenant-invites.ts` → useQuery wrap getInvites()
-  - [ ] Tạo `src/features/tenant/hooks/use-resend-invite.ts` → useMutation wrap resendInvite()
+- [x] Task 6: Tạo hooks (AC: 1, 2, 3, 4, 5)
+  - [x] Tạo `src/features/tenant/hooks/use-remove-member.ts` → useMutation wrap removeMember()
+  - [x] Tạo `src/features/tenant/hooks/use-promote-member.ts` → useMutation wrap promoteToManager()
+  - [x] Tạo `src/features/tenant/hooks/use-transfer-ownership.ts` → useMutation wrap transferOwnership()
+  - [x] Tạo `src/features/tenant/hooks/use-tenant-invites.ts` → useQuery wrap getInvites()
+  - [x] Tạo `src/features/tenant/hooks/use-resend-invite.ts` → useMutation wrap resendInvite()
 
-- [ ] Task 7: Tạo components (AC: 1, 2, 3, 4)
-  - [ ] Tạo `src/features/tenant/components/RemoveMemberDialog.tsx` — confirm dialog
-  - [ ] Tạo `src/features/tenant/components/RoleActionDropdown.tsx` — dropdown với "Nâng lên Manager", "Chuyển quyền Owner", "Xóa"
-  - [ ] Tạo `src/features/tenant/components/InviteListSection.tsx` — table với invite history + resend action
-  - [ ] Tạo `src/features/tenant/components/TransferOwnershipDialog.tsx` — confirm dialog
+- [x] Task 7: Tạo components (AC: 1, 2, 3, 4)
+  - [x] Tạo `src/features/tenant/components/RemoveMemberDialog.tsx` — confirm dialog
+  - [x] Tạo `src/features/tenant/components/RoleActionDropdown.tsx` — dropdown với "Nâng lên Manager", "Chuyển quyền Owner", "Xóa"
+  - [x] Tạo `src/features/tenant/components/InviteListSection.tsx` — table với invite history + resend action
+  - [x] Tạo `src/features/tenant/components/TransferOwnershipDialog.tsx` — confirm dialog
 
-- [ ] Task 8: Cập nhật settings/team.tsx (AC: 1, 2, 3, 4, 5)
-  - [ ] Thêm Tab "Lời mời" (tab thứ 3 sau "Cài đặt nhóm" và "Thành viên")
-  - [ ] Thêm role management actions vào Members tab: `RoleActionDropdown` bên cạnh mỗi member (chỉ hiện cho Owner)
-  - [ ] Integrate `InviteListSection` vào tab "Lời mời"
-  - [ ] Dùng `<Can do="manageMembers">` để guard invite button và role actions
+- [x] Task 8: Cập nhật settings/team.tsx (AC: 1, 2, 3, 4, 5)
+  - [x] Thêm Tab "Lời mời" (tab thứ 3 sau "Cài đặt nhóm" và "Thành viên")
+  - [x] Thêm role management actions vào Members tab: `RoleActionDropdown` bên cạnh mỗi member (chỉ hiện cho Owner)
+  - [x] Integrate `InviteListSection` vào tab "Lời mời"
+  - [x] Dùng `<Can do="manageMembers">` để guard invite button và role actions
 
-- [ ] Task 9: Cập nhật settings/profile.tsx (AC: 6)
-  - [ ] Thêm section "Xóa tài khoản" với nút "Xóa tài khoản"
-  - [ ] Check `isSoleOwner()` trước khi hiện confirm dialog
-  - [ ] Nếu sole owner → hiện alert message, không cho proceed
-  - [ ] Nếu không sole owner → hiện confirm dialog (stub — chỉ UI, không gọi API thật)
+- [x] Task 9: Cập nhật settings/profile.tsx (AC: 6)
+  - [x] Thêm section "Xóa tài khoản" với nút "Xóa tài khoản"
+  - [x] Check `isSoleOwner()` trước khi hiện confirm dialog
+  - [x] Nếu sole owner → hiện alert message, không cho proceed
+  - [x] Nếu không sole owner → hiện confirm dialog (stub — chỉ UI, không gọi API thật)
 
 ## Dev Notes
 
@@ -470,20 +470,50 @@ supabase/
 ## Dev Agent Record
 
 ### Agent Model Used
-_[To be filled by dev agent]_
+Claude Sonnet 4.5
 
 ### Debug Log References
-_[To be filled by dev agent]_
+- Không có lỗi runtime. TypeScript pass clean (zero errors).
+- Supabase DB tests: 17/17 PASS sau khi apply migration 20260324000006.
+- RLS `member_audit_logs`: chỉ có SELECT policy (is_tenant_manager) — không có client INSERT policy vì INSERT thực hiện qua Edge Function service role.
 
 ### Completion Notes List
-_[To be filled by dev agent]_
+- ✅ Task 1: Migration `member_audit_logs` đã apply thành công, RLS enabled, SELECT policy đúng.
+- ✅ Task 2: `remove-member` Edge Function implement đầy đủ: verify caller → update inactive → signOut → notify → audit log.
+- ✅ Task 3: Thêm 6 functions vào tenant.service.ts: `removeMember`, `promoteToManager`, `transferOwnership`, `getInvites`, `resendInvite`, `isSoleOwner`.
+- ✅ Task 4: `use-permissions.ts` hook với semantic API, không dùng raw role check.
+- ✅ Task 5: `can.tsx` component với `do` prop và optional fallback.
+- ✅ Task 6: 5 hooks (useMutation/useQuery) với invalidateQueries sau success.
+- ✅ Task 7: 4 components — RemoveMemberDialog, TransferOwnershipDialog, RoleActionDropdown, InviteListSection.
+- ✅ Task 8: settings/team.tsx — thêm tab "Lời mời", RoleActionDropdown vào Members tab, dùng `<Can>` guards, dùng `usePermissions()` thay vì raw role.
+- ✅ Task 9: settings/profile.tsx — "Xóa tài khoản" section với isSoleOwner check + alert + stub confirm dialog.
 
 ### Implementation Plan
-_[To be filled by dev agent]_
+Thứ tự implement theo Dev Notes: Migration → usePermissions → Can → Edge Function → Service → Hooks → Components → Team page → Profile page. Đã follow đúng thứ tự.
 
 ### File List
-_[To be filled by dev agent]_
+**Tạo mới:**
+- `supabase/migrations/20260324000006_create_member_audit_logs.sql`
+- `src/hooks/use-permissions.ts`
+- `src/components/can.tsx`
+- `src/features/tenant/hooks/use-remove-member.ts`
+- `src/features/tenant/hooks/use-promote-member.ts`
+- `src/features/tenant/hooks/use-transfer-ownership.ts`
+- `src/features/tenant/hooks/use-tenant-invites.ts`
+- `src/features/tenant/hooks/use-resend-invite.ts`
+- `src/features/tenant/components/RemoveMemberDialog.tsx`
+- `src/features/tenant/components/TransferOwnershipDialog.tsx`
+- `src/features/tenant/components/RoleActionDropdown.tsx`
+- `src/features/tenant/components/InviteListSection.tsx`
+
+**Sửa đổi:**
+- `supabase/functions/remove-member/index.ts` (implement thực sự từ stub)
+- `src/features/tenant/services/tenant.service.ts` (thêm 6 functions mới)
+- `src/features/tenant/components/MemberList.tsx` (thêm RoleActionDropdown, currentUserId prop)
+- `src/routes/_app/settings/team.tsx` (thêm tab Lời mời, usePermissions, Can guards)
+- `src/routes/_app/settings/profile.tsx` (thêm Delete Account section)
 
 ## Change Log
 
 - 2026-03-24: Story 1.6 created — Team Role & Membership Management
+- 2026-03-24: Story 1.6 implemented — All 9 tasks complete, status → review

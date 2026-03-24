@@ -6,7 +6,8 @@ export type Permission =
   | 'approveSchedule'
   | 'submitDailyReport'
   | 'viewTeamDashboard'
-  | 'manageMembers'
+  | 'manageMembers'   // Owner + Manager: remove member, resend invite, view invite tab
+  | 'promoteMembers'  // Owner only: promote to manager, transfer ownership
   | 'manageTenant'
   | 'createIncident'
   | 'viewAnalytics'
@@ -19,6 +20,7 @@ export const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     'submitDailyReport',
     'viewTeamDashboard',
     'manageMembers',
+    'promoteMembers',
     'manageTenant',
     'createIncident',
     'viewAnalytics',
@@ -29,6 +31,7 @@ export const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     'approveSchedule',
     'submitDailyReport',
     'viewTeamDashboard',
+    'manageMembers',  // Manager can remove members + manage invites (AC#1, AC#4, AC#5)
     'createIncident',
     'viewAnalytics',
   ],

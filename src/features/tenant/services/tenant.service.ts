@@ -181,3 +181,158 @@ export const acceptInvite = async (token: string): Promise<{ tenantId: string }>
   if (!data?.tenantId) throw new Error('Phản hồi không hợp lệ từ server.')
   return data as { tenantId: string }
 }
+
+// ================================================================
+// Story 1.6: Member role & membership management
+// ================================================================
+
+export const removeMember = async (userId: string, tenantId: string): Promise<void> => {
+  // Gọi Edge Function remove-member — thực hiện: set inactive + signOut + notify + audit log
+  const { error } = await supabase.functions.invoke('remove-member', {
+    body: { userId, tenantId },
+  })
+  if (error) {
+    let serverMessage: string | undefined
+    try {
+      const body = await (error as unknown as { context: Response }).context.json()
+      serverMessage = body?.error
+    } catch {
+      /* ignore */
+    }
+    throw new Error(serverMessage ?? 'Không thể xóa thành viên. Vui lòng thử lại.')
+  }
+}
+
+export const promoteToManager = async (userId: string, tenantId: string): Promise<void> => {
+  // Route qua Edge Function để có audit log với service role (P4: AC#2)
+  const { error } = await supabase.functions.invoke('promote-member', {
+    body: { userId, tenantId },
+  })
+  if (error) {
+    let serverMessage: string | undefined
+    try {
+      const body = await (error as unknown as { context: Response }).context.json()
+      serverMessage = body?.error
+    } catch {
+      /* ignore */
+    }
+    throw new Error(serverMessage ?? 'Không thể nâng quyền thành viên. Vui lòng thử lại.')
+  }
+}
+
+export const transferOwnership = async (
+  newOwnerId: string,
+  tenantId: string,
+  currentOwnerId: string  // kept for API compatibility, server uses JWT
+): Promise<void> => {
+  // Route qua Edge Function — server validates caller via JWT, guards P9/P10, inserts audit logs × 2 (P4: AC#3)
+  void currentOwnerId  // server identifies caller via JWT; param kept for call-site clarity
+  const { error } = await supabase.functions.invoke('transfer-ownership', {
+    body: { newOwnerId, tenantId },
+  })
+  if (error) {
+    let serverMessage: string | undefined
+    try {
+      const body = await (error as unknown as { context: Response }).context.json()
+      serverMessage = body?.error
+    } catch {
+      /* ignore */
+    }
+    throw new Error(serverMessage ?? 'Không thể chuyển quyền Owner. Vui lòng thử lại.')
+  }
+}
+
+export type TenantInvite = {
+  id: string
+  email: string
+  status: 'pending' | 'accepted' | 'expired' | 'declined' | 'revoked'
+  created_at: string
+  expires_at: string
+  invited_by: string | null
+}
+
+export const getInvites = async (tenantId: string): Promise<TenantInvite[]> => {
+  const { data, error } = await supabase
+    .from('tenant_invites')
+    .select('id, email, status, created_at, expires_at, invited_by')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as TenantInvite[]
+}
+
+export const resendInvite = async (
+  inviteId: string,
+  tenantId: string,
+  email: string
+): Promise<void> => {
+  // Fetch original status for rollback if step 2 fails (P3)
+  // Also validates that invite is in resendable state before revoking (P11)
+  const { data: originalInvite, error: fetchError } = await supabase
+    .from('tenant_invites')
+    .select('status')
+    .eq('id', inviteId)
+    .eq('tenant_id', tenantId)
+    .single()
+  if (fetchError) throw fetchError
+  if (!originalInvite || !['pending', 'expired'].includes(originalInvite.status)) {
+    throw new Error('Lời mời không ở trạng thái có thể gửi lại.')
+  }
+  const originalStatus = originalInvite.status as 'pending' | 'expired'
+
+  // Step 1: Revoke old invite
+  const { error: revokeError } = await supabase
+    .from('tenant_invites')
+    .update({ status: 'revoked' })
+    .eq('id', inviteId)
+    .eq('tenant_id', tenantId)
+  if (revokeError) throw revokeError
+
+  // Step 2: Create new invite via Edge Function (generates token + sends email)
+  const { error: inviteError } = await supabase.functions.invoke('send-invite', {
+    body: { tenantId, email },
+  })
+  if (inviteError) {
+    // P3: Rollback — restore original invite status so user can retry
+    await supabase
+      .from('tenant_invites')
+      .update({ status: originalStatus })
+      .eq('id', inviteId)
+      .eq('tenant_id', tenantId)
+    let serverMessage: string | undefined
+    try {
+      const body = await (inviteError as unknown as { context: Response }).context.json()
+      serverMessage = body?.error
+    } catch {
+      /* ignore */
+    }
+    throw new Error(serverMessage ?? 'Không thể gửi lại lời mời.')
+  }
+}
+
+export const isSoleOwner = async (userId: string): Promise<boolean> => {
+  // Lấy tất cả tenants user đang là owner
+  const { data: ownerships, error } = await supabase
+    .from('tenant_members')
+    .select('tenant_id')
+    .eq('user_id', userId)
+    .eq('role', 'owner')
+    .eq('status', 'active')
+  if (error) throw error
+  if (!ownerships || ownerships.length === 0) return false
+
+  // Với mỗi tenant user là owner, check có owner khác không
+  for (const { tenant_id } of ownerships) {
+    const { count, error: countError } = await supabase
+      .from('tenant_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant_id)
+      .eq('role', 'owner')
+      .eq('status', 'active')
+    if (countError) throw countError
+    // P2: count===null = RLS filtered result (cross-tenant scope issue) → treat as sole owner
+    // to conservatively block deletion rather than silently permitting it
+    if (count === null || count <= 1) return true  // sole owner!
+  }
+  return false
+}
