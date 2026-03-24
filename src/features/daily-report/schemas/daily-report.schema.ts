@@ -43,3 +43,15 @@ export const dailyReportFormSchema = z.object({
 })
 
 export type DailyReportFormValues = z.infer<typeof dailyReportFormSchema>
+
+// ── Discrepancy Detection ─────────────────────────────────────────────────────
+
+/**
+ * Phát hiện potential discrepancy: nhiều giờ nhưng ít task/output.
+ * Pure function — không side effects, không async.
+ * Condition: hours > 4 AND tasks ≤ 1 AND không có output_link nào.
+ */
+export function hasDiscrepancy(hoursLogged: number, tasks: TaskItem[]): boolean {
+  const hasAnyOutputLink = tasks.some(t => t.output_link && t.output_link.trim() !== '')
+  return hoursLogged > 4 && tasks.length <= 1 && !hasAnyOutputLink
+}

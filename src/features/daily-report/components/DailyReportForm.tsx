@@ -1,6 +1,6 @@
 import { useForm, useFieldArray, useWatch, type Control } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Loader2, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,12 +20,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   dailyReportFormSchema,
   type DailyReportFormValues,
   OUTPUT_TYPE_LABELS,
   OUTPUT_TYPE_PLACEHOLDERS,
   type OutputType,
+  hasDiscrepancy,
 } from '@/features/daily-report/schemas/daily-report.schema'
 
 // ── TaskRow — sub-component để tránh form.watch() trong map callback ─────────
@@ -148,6 +150,13 @@ export function DailyReportForm({ onSubmit, isPending }: Props) {
     name: 'tasks',
   })
 
+  // Watch reactive values cho discrepancy detection
+  const hoursWatched = useWatch({ control: form.control, name: 'hours_logged' })
+  const tasksWatched = useWatch({ control: form.control, name: 'tasks' })
+
+  // Computed — tự update khi field thay đổi, không cần useState
+  const showFlag = hasDiscrepancy(hoursWatched ?? 0, tasksWatched ?? [])
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
@@ -202,6 +211,40 @@ export function DailyReportForm({ onSubmit, isPending }: Props) {
               </FormItem>
             )}
           />
+
+          {/* Discrepancy flag — hiện khi hours > 4 AND tasks ≤ 1 AND không có output link */}
+          {showFlag && (
+            <Alert className='border-yellow-200 bg-yellow-50 text-yellow-800'>
+              <TriangleAlert className='h-4 w-4 text-yellow-600' aria-hidden='true' />
+              <AlertDescription>
+                <p>
+                  Bạn báo cáo {hoursWatched}h nhưng số lượng tasks có vẻ ít — muốn thêm task
+                  không?
+                </p>
+                <div className='mt-2 flex gap-2'>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='outline'
+                    className='border-yellow-300 bg-white text-yellow-800 hover:bg-yellow-50'
+                    onClick={() => append({ description: '', output_type: 'other', output_link: '' })}
+                  >
+                    <Plus className='mr-1 h-3 w-3' />
+                    Thêm task
+                  </Button>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='ghost'
+                    className='text-yellow-700 hover:bg-yellow-100'
+                    onClick={() => form.handleSubmit(onSubmit)()}
+                  >
+                    Bỏ qua, nộp luôn
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Button type='submit' className='w-full'>
             {isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}

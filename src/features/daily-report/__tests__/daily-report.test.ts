@@ -5,6 +5,8 @@ import {
   outputTypeSchema,
   OUTPUT_TYPE_LABELS,
   OUTPUT_TYPE_PLACEHOLDERS,
+  hasDiscrepancy,
+  type TaskItem,
 } from '../schemas/daily-report.schema'
 
 // ── outputTypeSchema ─────────────────────────────────────────────────────────
@@ -172,5 +174,68 @@ describe('OUTPUT_TYPE_PLACEHOLDERS', () => {
 
   it('figma placeholder is a Figma URL', () => {
     expect(OUTPUT_TYPE_PLACEHOLDERS.figma).toMatch(/^https:\/\/figma\.com/)
+  })
+})
+
+// ── hasDiscrepancy ────────────────────────────────────────────────────────────
+
+const taskNoLink: TaskItem = { description: 'Fix bug', output_type: 'pr', output_link: '' }
+const taskWithLink: TaskItem = {
+  description: 'Fix bug',
+  output_type: 'pr',
+  output_link: 'https://github.com/org/repo/pull/1',
+}
+const taskNoLinkField: TaskItem = { description: 'Fix bug', output_type: 'pr' }
+
+describe('hasDiscrepancy', () => {
+  it('returns true: hours > 4, 1 task, no output_link', () => {
+    expect(hasDiscrepancy(5, [taskNoLink])).toBe(true)
+  })
+
+  it('returns false: hours = 4 (boundary — not strictly greater)', () => {
+    expect(hasDiscrepancy(4, [taskNoLink])).toBe(false)
+  })
+
+  it('returns false: hours = 4.0 (same boundary)', () => {
+    expect(hasDiscrepancy(4.0, [taskNoLink])).toBe(false)
+  })
+
+  it('returns true: hours = 4.5 (above boundary)', () => {
+    expect(hasDiscrepancy(4.5, [taskNoLink])).toBe(true)
+  })
+
+  it('returns false: hours > 4, 2 tasks (length > 1)', () => {
+    expect(hasDiscrepancy(8, [taskNoLink, taskNoLink])).toBe(false)
+  })
+
+  it('returns false: hours > 4, 1 task with valid output_link', () => {
+    expect(hasDiscrepancy(8, [taskWithLink])).toBe(false)
+  })
+
+  it('returns false: hours <= 4 even with 1 task no link', () => {
+    expect(hasDiscrepancy(3, [taskNoLink])).toBe(false)
+  })
+
+  it('returns true: hours > 4, tasks = [] (empty array, length 0 ≤ 1)', () => {
+    expect(hasDiscrepancy(5, [])).toBe(true)
+  })
+
+  it('returns true: output_link is whitespace — trim() nên không tính là có link', () => {
+    const taskWhitespaceLink: TaskItem = {
+      description: 'task',
+      output_type: 'other',
+      output_link: '   ',
+    }
+    // whitespace link → .trim() === '' → không tính là có link → discrepancy still true
+    expect(hasDiscrepancy(5, [taskWhitespaceLink])).toBe(true)
+  })
+
+  it('returns false: task without output_link field (undefined)', () => {
+    // 1 task, no link field at all, but hours <= 4 → false
+    expect(hasDiscrepancy(3, [taskNoLinkField])).toBe(false)
+  })
+
+  it('returns true: task without output_link field, hours > 4', () => {
+    expect(hasDiscrepancy(8, [taskNoLinkField])).toBe(true)
   })
 })
