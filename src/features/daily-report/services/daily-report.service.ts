@@ -3,6 +3,24 @@ import type { Tables } from '@/lib/supabase-types'
 
 export type DailyReport = Tables<'daily_reports'>
 
+export type TeamReportRow = {
+  id: string
+  tenant_id: string
+  user_id: string
+  report_date: string
+  tasks: DailyReport['tasks']  // jsonb — same type as DailyReport.tasks, DailyReportView guards with Array.isArray
+  hours_logged: number
+  is_late: boolean
+  submitted_at: string
+  created_at: string
+  // users có thể null nếu user bị xóa sau khi submit (FK orphan từ PostgREST JOIN)
+  users: {
+    id: string
+    full_name: string
+    avatar_url: string | null
+  } | null
+}
+
 export type TaskPayload = {
   description: string
   output_type: string
@@ -56,5 +74,25 @@ export const DailyReportService = {
       .single()
     if (error) throw error
     return data
+  },
+
+  /**
+   * Lấy tất cả reports của team cho một ngày cụ thể.
+   * RLS policy cho phép manager/owner xem tất cả reports trong tenant.
+   * Explicit fields bắt buộc khi có JOIN (architecture rule).
+   */
+  getTeamReportsForDate: async (
+    tenantId: string,
+    reportDate: string,
+  ): Promise<TeamReportRow[]> => {
+    const { data, error } = await supabase
+      .from('daily_reports')
+      .select('id, tenant_id, user_id, report_date, tasks, hours_logged, is_late, submitted_at, created_at, users(id, full_name, avatar_url)')
+      .eq('tenant_id', tenantId)
+      .eq('report_date', reportDate)
+      .order('submitted_at', { ascending: false })
+    if (error) throw error
+    // F8: filter out orphaned rows where JOIN returned users=null (user deleted after submit)
+    return ((data ?? []) as TeamReportRow[]).filter(r => r.users != null)
   },
 }

@@ -364,6 +364,30 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Edge Functions JWT verification
+# verify_jwt = false vì tất cả functions đã tự verify JWT qua getUserFromJwt()
+# Edge Runtime dùng HS256 secret cũ nhưng GoTrue mới sign bằng ES256 → mismatch nếu verify tại đây
+[functions.send-invite]
+verify_jwt = false
+
+[functions.accept-invite]
+verify_jwt = false
+
+[functions.promote-member]
+verify_jwt = false
+
+[functions.remove-member]
+verify_jwt = false
+
+[functions.transfer-ownership]
+verify_jwt = false
+
+[functions.notify-schedule-change]
+verify_jwt = false
+
+[functions.notify-schedule-reminder]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

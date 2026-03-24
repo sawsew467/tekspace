@@ -1,20 +1,26 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { format } from 'date-fns'
+import { format, addDays, parseISO, isValid } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Users } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
 import { useAuthStore } from '@/stores/auth-store'
 import { useTenantStore } from '@/stores/tenant-store'
+import { usePermissions } from '@/hooks/use-permissions'
 import { QUERY_KEYS } from '@/lib/query-keys'
 import { getUserProfile } from '@/features/settings/services/settings.service'
 import { ScheduleService } from '@/features/schedule/services/schedule.service'
 import { useTodayReport } from '@/features/daily-report/hooks/use-today-report'
 import { useSubmitReport } from '@/features/daily-report/hooks/use-submit-report'
+import { useTeamReports, useActiveMembers } from '@/features/daily-report/hooks/use-team-reports'
 import { DailyReportForm } from '@/features/daily-report/components/DailyReportForm'
 import { DailyReportView } from '@/features/daily-report/components/DailyReportView'
+import { TeamReportList } from '@/features/daily-report/components/TeamReportList'
 import type { DailyReportFormValues } from '@/features/daily-report/schemas/daily-report.schema'
 
 // Validate timezone string để tránh RangeError từ toZonedTime
@@ -38,6 +44,8 @@ export const Route = createFileRoute('/_app/daily-report')({
 function DailyReportPage() {
   const { user } = useAuthStore()
   const { activeTenantId } = useTenantStore()
+  const { activeRole } = usePermissions()
+  const isManager = activeRole === 'manager' || activeRole === 'owner'
 
   // User profile (lấy timezone của user)
   const { data: userProfile, isLoading: isProfileLoading } = useQuery({
@@ -99,6 +107,59 @@ function DailyReportPage() {
     [timezone],
   )
 
+  // ── Manager view: date navigation ────────────────────────────────────────────
+
+  // viewDate: ngày đang xem trong Team Reports (mặc định = ngày hôm nay)
+  // Sync với reportDate sau khi timezone được resolve (tránh init với 'UTC' rồi nhảy)
+  const [viewDate, setViewDate] = useState(reportDate)
+  useEffect(() => {
+    setViewDate(reportDate)
+  }, [reportDate])
+
+  // F6: isValid guard để tránh RangeError khi viewDate không phải ISO hợp lệ
+  const handlePrevDay = () =>
+    setViewDate(prev => {
+      const parsed = parseISO(prev)
+      return isValid(parsed) ? format(addDays(parsed, -1), 'yyyy-MM-dd') : prev
+    })
+  // F4: clamp không vượt quá reportDate (today) + F6: isValid guard
+  const handleNextDay = () =>
+    setViewDate(prev => {
+      const parsed = parseISO(prev)
+      if (!isValid(parsed)) return prev
+      const next = format(addDays(parsed, 1), 'yyyy-MM-dd')
+      return next <= reportDate ? next : prev
+    })
+  const isViewingToday = viewDate === reportDate
+
+  // F6: isValid guard cho useMemo
+  const viewDateDisplay = useMemo(() => {
+    const parsed = parseISO(viewDate)
+    return isValid(parsed) ? format(parsed, 'EEEE, dd/MM/yyyy') : viewDate
+  }, [viewDate])
+
+  // Manager queries — chỉ fetch khi isManager (truyền null để disable)
+  const {
+    data: teamReports = [],
+    isLoading: isTeamLoading,
+    isError: isTeamError,
+    refetch: refetchTeamReports,
+  } = useTeamReports(
+    isManager ? activeTenantId : null,
+    viewDate,
+  )
+  const {
+    data: activeMembers = [],
+    isLoading: isMembersLoading,
+    isError: isMembersError,
+    refetch: refetchMembers,
+  } = useActiveMembers(
+    isManager ? activeTenantId : null,
+  )
+
+  const isManagerDataLoading = isTeamLoading || isMembersLoading
+  const isManagerDataError = isTeamError || isMembersError
+
   return (
     <div className='container max-w-2xl py-6 space-y-4'>
       {/* Header */}
@@ -110,7 +171,7 @@ function DailyReportPage() {
         </div>
       </div>
 
-      {/* Content */}
+      {/* My report card (tất cả roles đều thấy) */}
       <Card>
         <CardHeader>
           <CardTitle className='text-base'>
@@ -141,6 +202,114 @@ function DailyReportPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Team Reports panel — chỉ Manager/Owner thấy */}
+      {isManager && (
+        <Card>
+          <CardHeader>
+            <div className='flex items-center justify-between flex-wrap gap-2'>
+              <div className='flex items-center gap-2'>
+                <Users className='h-4 w-4 text-muted-foreground' />
+                <CardTitle className='text-base'>Team Reports</CardTitle>
+              </div>
+
+              {/* Date navigation — F1: date span là clickable Popover/Calendar */}
+              <div className='flex items-center gap-1'>
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='h-7 w-7'
+                  onClick={handlePrevDay}
+                  aria-label='Ngày trước'
+                >
+                  <ChevronLeft className='h-4 w-4' />
+                </Button>
+
+                {/* F1: date picker qua Popover + Calendar */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='h-7 min-w-[160px] text-sm text-muted-foreground capitalize'
+                      aria-label='Chọn ngày'
+                    >
+                      {viewDateDisplay}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className='w-auto p-0' align='center'>
+                    <Calendar
+                      mode='single'
+                      selected={parseISO(viewDate)}
+                      onSelect={date => {
+                        if (date) setViewDate(format(date, 'yyyy-MM-dd'))
+                      }}
+                      // Disable future dates (chỉ xem lịch sử)
+                      disabled={date => format(date, 'yyyy-MM-dd') > reportDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                {/* F4: disabled khi viewDate >= reportDate (không cho navigate vào tương lai) */}
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='h-7 w-7'
+                  onClick={handleNextDay}
+                  disabled={viewDate >= reportDate}
+                  aria-label='Ngày sau'
+                >
+                  <ChevronRight className='h-4 w-4' />
+                </Button>
+                {!isViewingToday && (
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    className='h-7 text-xs text-muted-foreground'
+                    onClick={() => setViewDate(reportDate)}
+                  >
+                    Hôm nay
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isManagerDataLoading ? (
+              <div className='space-y-2'>
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className='h-12 w-full rounded-lg' />
+                ))}
+              </div>
+            ) : isManagerDataError ? (
+              // F5: error state — network error / RLS rejection
+              <div className='flex flex-col items-center justify-center py-8 text-center gap-3'>
+                <p className='text-sm text-muted-foreground'>
+                  Không thể tải dữ liệu team reports. Vui lòng thử lại.
+                </p>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => {
+                    void refetchTeamReports()
+                    void refetchMembers()
+                  }}
+                >
+                  Thử lại
+                </Button>
+              </div>
+            ) : (
+              <TeamReportList
+                members={activeMembers}
+                reports={teamReports}
+                timezone={timezone}
+                currentUserId={user?.id ?? null}
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
