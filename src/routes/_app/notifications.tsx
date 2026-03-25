@@ -7,11 +7,12 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useTenantStore } from '@/stores/tenant-store'
 import { QUERY_KEYS } from '@/lib/query-keys'
 import { getUserProfile } from '@/features/settings/services/settings.service'
-import { useNotifications } from '@/features/notifications/hooks/use-notifications'
+import { useInfiniteNotifications } from '@/features/notifications/hooks/use-infinite-notifications'
 import { useUnreadCount } from '@/features/notifications/hooks/use-unread-count'
 import { useMarkRead } from '@/features/notifications/hooks/use-mark-read'
 import { useMarkAllRead } from '@/features/notifications/hooks/use-mark-all-read'
 import { NotificationList } from '@/features/notifications/components/NotificationList'
+import { PageContainer } from '@/components/layout/page-container'
 
 // Validate timezone string để tránh RangeError
 function isValidTimezone(tz: string | null | undefined): tz is string {
@@ -52,9 +53,17 @@ function NotificationsPage() {
     return isValidTimezone(raw) ? raw : 'UTC'
   }, [userProfile?.timezone, isProfileLoading])
 
-  const { data: notifications = [], isLoading } = useNotifications(
-    activeTenantId,
-    user?.id ?? null
+  const {
+    data: notificationsData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteNotifications(activeTenantId, user?.id ?? null)
+
+  const notifications = useMemo(
+    () => notificationsData?.pages.flatMap((p) => p) ?? [],
+    [notificationsData?.pages],
   )
 
   // P1: Truyền thêm userId để useMarkRead có thể làm optimistic update đúng queryKey
@@ -66,7 +75,7 @@ function NotificationsPage() {
   const hasUnread = unreadCount > 0
 
   return (
-    <div className="container max-w-2xl py-6 space-y-4">
+    <PageContainer className='space-y-4'>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -90,7 +99,10 @@ function NotificationsPage() {
         userTimezone={timezone}
         isLoading={isLoading}
         onMarkRead={(id) => markRead.mutate(id)}
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        onLoadMore={fetchNextPage}
       />
-    </div>
+    </PageContainer>
   )
 }

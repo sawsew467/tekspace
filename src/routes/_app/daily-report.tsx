@@ -18,14 +18,21 @@ import { getUserProfile } from '@/features/settings/services/settings.service'
 import { ScheduleService } from '@/features/schedule/services/schedule.service'
 import { useTodayReport } from '@/features/daily-report/hooks/use-today-report'
 import { useSubmitReport } from '@/features/daily-report/hooks/use-submit-report'
+import { useUpdateReport } from '@/features/daily-report/hooks/use-update-report'
 import { useTeamReports, useActiveMembers } from '@/features/daily-report/hooks/use-team-reports'
-import { useAllReports } from '@/features/daily-report/hooks/use-all-reports'
+import { useInfiniteReports } from '@/features/daily-report/hooks/use-infinite-reports'
 import { useReportDates } from '@/features/daily-report/hooks/use-report-dates'
 import { DailyReportForm } from '@/features/daily-report/components/DailyReportForm'
 import { DailyReportView } from '@/features/daily-report/components/DailyReportView'
 import { TeamReportList } from '@/features/daily-report/components/TeamReportList'
 import { ReportHistoryList } from '@/features/daily-report/components/ReportHistoryList'
-import { computeStreak, type DailyReportFormValues } from '@/features/daily-report/schemas/daily-report.schema'
+import {
+  computeStreak,
+  isWithinEditWindow,
+  type DailyReportFormValues,
+} from '@/features/daily-report/schemas/daily-report.schema'
+import type { TaskPayload } from '@/features/daily-report/services/daily-report.service'
+import { PageContainer } from '@/components/layout/page-container'
 
 // Validate timezone string để tránh RangeError từ toZonedTime
 function isValidTimezone(tz: string | null | undefined): tz is string {
@@ -67,6 +74,16 @@ function DailyReportPage() {
     staleTime: 10 * 60 * 1000,
   })
 
+  // Story 4.6: Daily report deadline hour — dùng để tính edit window
+  const { data: deadlineHourRaw, isLoading: isDeadlineLoading } = useQuery({
+    queryKey: ['tenant-deadline', activeTenantId],
+    queryFn: () => ScheduleService.getTenantDailyReportDeadline(activeTenantId!),
+    enabled: !!activeTenantId,
+    staleTime: 10 * 60 * 1000,
+  })
+  // null-safe: service đã ?? 3, nhưng double-guard ở đây cho TypeScript type safety
+  const resolvedDeadlineHour = deadlineHourRaw ?? 3
+
   // Timezone ưu tiên: user timezone → tenant timezone → 'UTC'
   // Validate trước để toZonedTime không throw RangeError với giá trị invalid
   const rawTimezone = userProfile?.timezone || tenantTimezone || 'UTC'
@@ -86,8 +103,49 @@ function DailyReportPage() {
   )
 
   const submitReport = useSubmitReport()
+  const updateReport = useUpdateReport()
 
   const isLoading = isProfileLoading || isTenantLoading || isReportLoading
+
+  // Story 4.6: Edit mode state
+  const [isEditing, setIsEditing] = useState(false)
+
+  // Story 4.6: Tick mỗi 30s để canEdit tự expire sau deadline (P-6)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Story 4.6: Reset editing khi chuyển ngày (timezone thay đổi → reportDate thay đổi)
+  useEffect(() => {
+    setIsEditing(false)
+  }, [reportDate])
+
+  // Story 4.6: Tính canEdit — chờ deadline query load xong, check realtime qua tick (P-6, P-7)
+  const canEdit = useMemo(() => {
+    if (!todayReport || isDeadlineLoading) return false
+    return isWithinEditWindow(todayReport.report_date, resolvedDeadlineHour, timezone)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayReport, isDeadlineLoading, resolvedDeadlineHour, timezone, tick])
+
+  // Story 4.6: Derive defaultValues từ todayReport cho edit form (pre-fill)
+  const editDefaultValues = useMemo((): DailyReportFormValues | undefined => {
+    if (!todayReport) return undefined
+    const rawTasks = Array.isArray(todayReport.tasks) ? todayReport.tasks : []
+    const tasks = (rawTasks as Array<{
+      description: string
+      output_type: string
+      output_link?: string
+      hours?: number
+    }>).map(t => ({
+      description: t.description,
+      output_type: t.output_type as DailyReportFormValues['tasks'][number]['output_type'],
+      output_link: t.output_link ?? '',
+      hours: t.hours,  // Story 4.5 per-task hours (optional, backward compat)
+    }))
+    return { tasks, hours_logged: todayReport.hours_logged }
+  }, [todayReport])
 
   function handleSubmit(values: DailyReportFormValues) {
     if (!activeTenantId || !user?.id) return
@@ -107,6 +165,21 @@ function DailyReportPage() {
     })
   }
 
+  // Story 4.6: Submit update report
+  function handleUpdate(values: DailyReportFormValues) {
+    if (!todayReport) return
+    const tasks: TaskPayload[] = values.tasks.map((t) => ({
+      description: t.description,
+      output_type: t.output_type,
+      ...(t.output_link ? { output_link: t.output_link } : {}),
+      ...(t.hours !== undefined ? { hours: t.hours } : {}),
+    }))
+    updateReport.mutate(
+      { reportId: todayReport.id, tasks, hoursLogged: values.hours_logged },
+      { onSuccess: () => setIsEditing(false) },
+    )
+  }
+
   // Format ngày hiển thị theo locale VN — memo cùng dependency với reportDate
   const reportDateDisplay = useMemo(
     () => format(toZonedTime(new Date(), timezone), 'EEEE, dd/MM/yyyy'),
@@ -118,9 +191,20 @@ function DailyReportPage() {
   // Chỉ fetch full history data khi user click tab "Lịch sử" lần đầu
   const [historyEnabled, setHistoryEnabled] = useState(false)
 
-  const { data: allReports = [], isLoading: isHistoryLoading } = useAllReports(
+  const {
+    data: allReportsData,
+    isLoading: isHistoryLoading,
+    fetchNextPage: fetchNextReportsPage,
+    hasNextPage: hasNextReportsPage,
+    isFetchingNextPage: isFetchingNextReportsPage,
+  } = useInfiniteReports(
     historyEnabled ? activeTenantId ?? null : null,
     historyEnabled ? (user?.id ?? null) : null,
+  )
+
+  const allReports = useMemo(
+    () => allReportsData?.pages.flatMap((p) => p) ?? [],
+    [allReportsData?.pages],
   )
 
   // ── Streak — eager lightweight fetch (chỉ lấy dates, không cần click tab) ────
@@ -196,7 +280,7 @@ function DailyReportPage() {
   }, [isManager, teamReports, activeMembers])
 
   return (
-    <div className='container max-w-2xl py-6 space-y-4'>
+    <PageContainer className='space-y-4'>
       {/* Header */}
       <div className='flex items-center gap-3'>
         <CalendarDays className='h-6 w-6 text-primary' />
@@ -211,6 +295,7 @@ function DailyReportPage() {
         defaultValue='today'
         onValueChange={(val) => {
           if (val === 'history') setHistoryEnabled(true)
+          if (val !== 'today') setIsEditing(false)  // P-9: reset edit mode khi rời tab Hôm nay
         }}
       >
         <TabsList className={isManager ? 'grid w-full grid-cols-3' : 'grid w-full grid-cols-2'}>
@@ -244,7 +329,7 @@ function DailyReportPage() {
                 {isLoading
                   ? 'Đang tải...'
                   : todayReport
-                    ? 'Report hôm nay'
+                    ? isEditing ? 'Chỉnh sửa report' : 'Report hôm nay'
                     : 'Nộp report hôm nay'}
               </CardTitle>
               {!isLoading && !todayReport && (
@@ -262,7 +347,24 @@ function DailyReportPage() {
                   <Skeleton className='h-10 w-full' />
                 </div>
               ) : todayReport ? (
-                <DailyReportView report={todayReport} timezone={timezone} />
+                // Story 4.6: toggle giữa edit form và read-only view
+                isEditing ? (
+                  <DailyReportForm
+                    key={`edit-${todayReport.id}-${todayReport.updated_at ?? 'init'}`}
+                    onSubmit={handleUpdate}
+                    isPending={updateReport.isPending}
+                    defaultValues={editDefaultValues}
+                    submitLabel='Cập nhật Report'
+                    onCancel={() => setIsEditing(false)}
+                  />
+                ) : (
+                  <DailyReportView
+                    report={todayReport}
+                    timezone={timezone}
+                    showEditButton={canEdit}
+                    onEdit={() => setIsEditing(true)}
+                  />
+                )
               ) : (
                 <DailyReportForm onSubmit={handleSubmit} isPending={submitReport.isPending} />
               )}
@@ -270,7 +372,7 @@ function DailyReportPage() {
           </Card>
         </TabsContent>
 
-        {/* Tab: Lịch sử */}
+        {/* Tab: Lịch sử — read-only, không có edit button */}
         <TabsContent value='history'>
           <Card>
             <CardHeader>
@@ -281,6 +383,9 @@ function DailyReportPage() {
                 reports={allReports}
                 timezone={timezone}
                 isLoading={isHistoryLoading}
+                hasNextPage={hasNextReportsPage}
+                isFetchingNextPage={isFetchingNextReportsPage}
+                onLoadMore={fetchNextReportsPage}
               />
             </CardContent>
           </Card>
@@ -396,6 +501,6 @@ function DailyReportPage() {
           </TabsContent>
         )}
       </Tabs>
-    </div>
+    </PageContainer>
   )
 }

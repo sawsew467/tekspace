@@ -1,13 +1,20 @@
 import { z } from 'zod'
 import type { Enums } from '@/lib/supabase-types'
 
-type IncidentCategory = Enums<'incident_category'>
+export type IncidentCategory = Enums<'incident_category'>
 
 export const INCIDENT_CATEGORY_LABELS: Record<IncidentCategory, string> = {
   late_schedule:    'Đăng ký lịch trễ',
   missed_report:    'Bỏ lỡ Daily Report',
   low_commitment:   'Cam kết giờ thấp',
   policy_violation: 'Vi phạm quy định',
+}
+
+export const CATEGORY_BADGE_VARIANT: Record<IncidentCategory, 'destructive' | 'secondary' | 'outline'> = {
+  policy_violation: 'destructive',
+  late_schedule:    'secondary',
+  missed_report:    'secondary',
+  low_commitment:   'outline',
 }
 
 export const createIncidentSchema = z.object({

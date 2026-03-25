@@ -1,4 +1,5 @@
-import { BellOff } from 'lucide-react'
+import { useRef, useEffect } from 'react'
+import { BellOff, Loader2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { NotificationItem } from '@/features/notifications/components/NotificationItem'
 import type { Notification } from '@/features/notifications/services/notifications.service'
@@ -8,6 +9,10 @@ type NotificationListProps = {
   userTimezone: string | null // null khi timezone chưa load — tooltip sẽ ẩn
   isLoading: boolean
   onMarkRead: (id: string) => void
+  // Infinite scroll props
+  hasNextPage?: boolean
+  isFetchingNextPage?: boolean
+  onLoadMore?: () => void
 }
 
 export function NotificationList({
@@ -15,7 +20,34 @@ export function NotificationList({
   userTimezone,
   isLoading,
   onMarkRead,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
 }: NotificationListProps) {
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !onLoadMore) return
+    // P-3: sync check — nếu sentinel đang trong viewport khi effect re-run (hasNextPage flip), trigger ngay
+    if (hasNextPage && !isFetchingNextPage) {
+      const rect = el.getBoundingClientRect()
+      if (rect.top < window.innerHeight + 200) {
+        onLoadMore()
+      }
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          onLoadMore()
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, onLoadMore])
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -48,6 +80,12 @@ export function NotificationList({
           userTimezone={userTimezone}
         />
       ))}
+      <div ref={sentinelRef} className="py-2 flex justify-center">
+        {isFetchingNextPage && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        {hasNextPage === false && notifications.length > 0 && (
+          <p className="text-xs text-muted-foreground">Đã tải hết thông báo</p>
+        )}
+      </div>
     </div>
   )
 }

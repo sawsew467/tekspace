@@ -50,4 +50,21 @@ export const NotificationsService = {
       .eq('is_read', false)
     if (error) throw error
   },
+
+  getNotificationsPaged: async (
+    tenantId: string,
+    userId: string,
+    from: number,
+    to: number
+  ): Promise<Notification[]> => {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+    if (error) throw error
+    return data ?? []
+  },
 }

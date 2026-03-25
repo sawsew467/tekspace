@@ -183,4 +183,25 @@ export const DailyReportService = {
     // F8: filter out orphaned rows where JOIN returned users=null (user deleted after submit)
     return ((data ?? []) as TeamReportRow[]).filter(r => r.users != null)
   },
+
+  /**
+   * Lấy history reports phân trang (dùng cho infinite scroll).
+   * Không giới hạn tổng số rows — client kiểm soát qua `from`/`to`.
+   */
+  getAllReportsPaged: async (
+    tenantId: string,
+    userId: string,
+    from: number,
+    to: number,
+  ): Promise<DailyReport[]> => {
+    const { data, error } = await supabase
+      .from('daily_reports')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('user_id', userId)
+      .order('report_date', { ascending: false })
+      .range(from, to)
+    if (error) throw error
+    return (data ?? []) as DailyReport[]
+  },
 }

@@ -1,21 +1,24 @@
 import { useMemo, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { fromZonedTime } from 'date-fns-tz'
 import { ShieldAlert } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth-store'
 import { useTenantStore } from '@/stores/tenant-store'
 import { QUERY_KEYS } from '@/lib/query-keys'
 import { getUserProfile } from '@/features/settings/services/settings.service'
 import { getMembers } from '@/features/tenant/services/tenant.service'
-import { useIncidents } from '@/features/incidents/hooks/use-incidents'
+import { useInfiniteIncidents } from '@/features/incidents/hooks/use-infinite-incidents'
 import { useAppeals } from '@/features/incidents/hooks/use-appeals'
 import { useIncidentAppealsRealtime } from '@/features/incidents/hooks/use-incident-appeals-realtime'
 import { usePermissions } from '@/hooks/use-permissions'
 import { IncidentList } from '@/features/incidents/components/IncidentList'
+import { IncidentFilters } from '@/features/incidents/components/IncidentFilters'
 import { CreateIncidentDialog } from '@/features/incidents/components/CreateIncidentDialog'
 import { AppealDialog } from '@/features/incidents/components/AppealDialog'
 import { Can } from '@/components/can'
 import { Button } from '@/components/ui/button'
+import { PageContainer } from '@/components/layout/page-container'
 
 // Validate timezone string để tránh RangeError
 function isValidTimezone(tz: string | null | undefined): tz is string {
@@ -38,10 +41,18 @@ export const Route = createFileRoute('/_app/incidents/')({
 function IncidentsPage() {
   const { user } = useAuthStore()
   const { activeTenantId } = useTenantStore()
+  const navigate = useNavigate()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [appealIncidentId, setAppealIncidentId] = useState<string | null>(null)
 
   const { canCreateIncident } = usePermissions()
+
+  // Filter state — chỉ active cho manager view
+  const [filterMemberId,     setFilterMemberId]     = useState('')
+  const [filterCategory,     setFilterCategory]     = useState('')
+  const [filterDateFrom,     setFilterDateFrom]     = useState('')
+  const [filterDateTo,       setFilterDateTo]       = useState('')
+  const [filterAppealStatus, setFilterAppealStatus] = useState('')
 
   // User profile để lấy timezone (pattern từ notifications.tsx)
   const { data: userProfile, isLoading: isProfileLoading } = useQuery({
@@ -58,8 +69,19 @@ function IncidentsPage() {
     return isValidTimezone(raw) ? raw : 'UTC'
   }, [userProfile?.timezone, isProfileLoading])
 
-  // Incidents list
-  const { data: incidents = [], isLoading: isIncidentsLoading } = useIncidents(activeTenantId)
+  // Incidents list — infinite scroll (20/page)
+  const {
+    data: incidentsData,
+    isLoading: isIncidentsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteIncidents(activeTenantId)
+
+  const allIncidents = useMemo(
+    () => incidentsData?.pages.flatMap((p) => p) ?? [],
+    [incidentsData?.pages],
+  )
 
   // Appeals — RLS tự lọc: member chỉ thấy của mình, manager thấy tất cả
   const { data: appeals = [] } = useAppeals(activeTenantId)
@@ -75,8 +97,48 @@ function IncidentsPage() {
     enabled: !!activeTenantId,
   })
 
+  // Client-side filter — chỉ apply cho manager view (member: RLS đã xử lý)
+  // Note: filter chạy trên data đã load — cần scroll để load thêm rồi filter
+  const filteredIncidents = useMemo(() => {
+    if (!canCreateIncident) return allIncidents
+
+    const tz = timezone ?? 'UTC'
+
+    return allIncidents.filter((incident) => {
+      if (filterMemberId && incident.member_id !== filterMemberId) return false
+      if (filterCategory && incident.category !== filterCategory) return false
+      if (filterDateFrom) {
+        // fromZonedTime: chuyển "00:00:00 theo tz của user" sang UTC để so sánh đúng
+        // P-6: guard invalid date string (e.g. partial input) để tránh NaN comparison
+        const fromRaw = new Date(filterDateFrom + 'T00:00:00')
+        if (!isNaN(fromRaw.getTime())) {
+          const from = fromZonedTime(fromRaw, tz)
+          if (new Date(incident.created_at) < from) return false
+        }
+      }
+      if (filterDateTo) {
+        const toRaw = new Date(filterDateTo + 'T23:59:59')
+        if (!isNaN(toRaw.getTime())) {
+          const to = fromZonedTime(toRaw, tz)
+          if (new Date(incident.created_at) > to) return false
+        }
+      }
+      if (filterAppealStatus === 'appealed'     && !appeals.some((a) => a.incident_id === incident.id)) return false
+      if (filterAppealStatus === 'not_appealed' &&  appeals.some((a) => a.incident_id === incident.id)) return false
+      return true
+    })
+  }, [allIncidents, appeals, filterMemberId, filterCategory, filterDateFrom, filterDateTo, filterAppealStatus, canCreateIncident, timezone])
+
+  const handleResetFilters = () => {
+    setFilterMemberId('')
+    setFilterCategory('')
+    setFilterDateFrom('')
+    setFilterDateTo('')
+    setFilterAppealStatus('')
+  }
+
   return (
-    <div className='container max-w-3xl py-6 space-y-4'>
+    <PageContainer className='space-y-4'>
       {/* Header */}
       <div className='flex items-center justify-between'>
         <div className='flex items-center gap-3'>
@@ -95,15 +157,37 @@ function IncidentsPage() {
         </Can>
       </div>
 
+      {/* Filter bar — chỉ hiển thị cho manager/owner */}
+      {canCreateIncident && (
+        <IncidentFilters
+          members={members}
+          filterMemberId={filterMemberId}
+          filterCategory={filterCategory}
+          filterDateFrom={filterDateFrom}
+          filterDateTo={filterDateTo}
+          filterAppealStatus={filterAppealStatus}
+          onFilterMemberChange={setFilterMemberId}
+          onFilterCategoryChange={setFilterCategory}
+          onFilterDateFromChange={setFilterDateFrom}
+          onFilterDateToChange={setFilterDateTo}
+          onFilterAppealStatusChange={setFilterAppealStatus}
+          onReset={handleResetFilters}
+        />
+      )}
+
       {/* Incident list */}
       <IncidentList
-        incidents={incidents}
+        incidents={filteredIncidents}
         isLoading={isIncidentsLoading}
         members={members}
         userTimezone={timezone}
         appeals={appeals}
         canAppeal={!canCreateIncident}
         onAppeal={(incidentId) => setAppealIncidentId(incidentId)}
+        onViewDetail={(incidentId) => navigate({ to: '/incidents/$incidentId', params: { incidentId } })}
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        onLoadMore={fetchNextPage}
       />
 
       {/* Log Incident Dialog — chỉ render khi có permission */}
@@ -126,6 +210,6 @@ function IncidentsPage() {
           currentUserId={user?.id}
         />
       )}
-    </div>
+    </PageContainer>
   )
 }

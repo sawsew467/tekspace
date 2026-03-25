@@ -1,5 +1,6 @@
+import { useRef, useEffect } from 'react'
 import { format } from 'date-fns'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Loader2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ReportStatusBadge } from '@/features/daily-report/components/ReportStatusBadge'
@@ -10,6 +11,10 @@ type Props = {
   reports: DailyReport[]
   timezone: string
   isLoading?: boolean
+  // Infinite scroll props
+  hasNextPage?: boolean
+  isFetchingNextPage?: boolean
+  onLoadMore?: () => void
 }
 
 /**
@@ -27,7 +32,38 @@ function formatDateLabel(dateStr: string): string {
   }
 }
 
-export function ReportHistoryList({ reports, timezone, isLoading }: Props) {
+export function ReportHistoryList({
+  reports,
+  timezone,
+  isLoading,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+}: Props) {
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !onLoadMore) return
+    // P-3: sync check — nếu sentinel đang trong viewport khi effect re-run (hasNextPage flip), trigger ngay
+    if (hasNextPage && !isFetchingNextPage) {
+      const rect = el.getBoundingClientRect()
+      if (rect.top < window.innerHeight + 200) {
+        onLoadMore()
+      }
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          onLoadMore()
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, onLoadMore])
+
   if (isLoading) {
     return (
       <div className='space-y-2'>
@@ -77,7 +113,12 @@ export function ReportHistoryList({ reports, timezone, isLoading }: Props) {
           </Collapsible>
         )
       })}
+      <div ref={sentinelRef} className='py-2 flex justify-center'>
+        {isFetchingNextPage && <Loader2 className='h-4 w-4 animate-spin text-muted-foreground' />}
+        {hasNextPage === false && reports.length > 0 && (
+          <p className='text-xs text-muted-foreground'>Đã tải hết lịch sử</p>
+        )}
+      </div>
     </div>
   )
 }
-

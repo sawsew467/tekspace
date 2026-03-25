@@ -3,6 +3,7 @@ import type { Tables } from '@/lib/supabase-types'
 
 export type Incident = Tables<'incidents'>
 export type IncidentAppeal = Tables<'incident_appeals'>
+export type IncidentOutcomeNote = Tables<'incident_outcome_notes'>
 
 export const IncidentService = {
   getIncidents: async (tenantId: string): Promise<Incident[]> => {
@@ -101,4 +102,73 @@ export const IncidentService = {
 
     return appeal
   },
+
+  getIncidentOutcomeNotes: async (
+    incidentId: string,
+    tenantId: string
+  ): Promise<IncidentOutcomeNote[]> => {
+    const { data, error } = await supabase
+      .from('incident_outcome_notes')
+      .select('*')
+      .eq('incident_id', incidentId)
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true })  // chronological — cũ nhất trước (audit trail)
+    if (error) throw error
+    return data ?? []
+  },
+
+  createOutcomeNote: async (params: {
+    tenantId:   string
+    incidentId: string
+    managerId:  string
+    memberId:   string   // member của incident — để Edge Function INSERT notification
+    note:       string
+  }): Promise<IncidentOutcomeNote> => {
+    // INSERT outcome note — manager_id = auth.uid(), RLS enforce is_tenant_manager()
+    const { data: outcomeNote, error: noteError } = await supabase
+      .from('incident_outcome_notes')
+      .insert({
+        tenant_id:   params.tenantId,
+        incident_id: params.incidentId,
+        manager_id:  params.managerId,
+        note:        params.note,
+      })
+      .select()
+      .single()
+    if (noteError) throw noteError
+
+    // Notify member qua Edge Function (service role bypass RLS)
+    // notifications_insert_policy: user_id = auth.uid() → manager không thể INSERT cho member trực tiếp
+    // Best-effort: outcome note đã tạo thành công dù notification fail
+    try {
+      await supabase.functions.invoke('notify-outcome-note', {
+        body: {
+          incidentId: params.incidentId,
+          memberId:   params.memberId,
+          tenantId:   params.tenantId,
+        },
+      })
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[createOutcomeNote] notification failed (best-effort):', err)
+    }
+
+    return outcomeNote
+  },
+
+  getIncidentsPaged: async (
+    tenantId: string,
+    from: number,
+    to: number
+  ): Promise<Incident[]> => {
+    const { data, error } = await supabase
+      .from('incidents')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+    if (error) throw error
+    return data ?? []
+  },
 }
+

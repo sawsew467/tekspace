@@ -1,7 +1,8 @@
+import { useRef, useEffect } from 'react'
 import { format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
 import { vi } from 'date-fns/locale'
-import { ShieldAlert } from 'lucide-react'
+import { Loader2, ShieldAlert } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -13,17 +14,12 @@ import {
 } from '@/components/ui/tooltip'
 import {
   INCIDENT_CATEGORY_LABELS,
+  CATEGORY_BADGE_VARIANT,
 } from '@/features/incidents/schemas/incident.schema'
 import type { Incident, IncidentAppeal } from '@/features/incidents/services/incident.service'
 import type { TenantMemberWithUser } from '@/features/tenant/services/tenant.service'
 
-// Badge variant per category
-const CATEGORY_BADGE_VARIANT: Record<string, 'destructive' | 'secondary' | 'outline'> = {
-  policy_violation: 'destructive',
-  late_schedule:    'secondary',
-  missed_report:    'secondary',
-  low_commitment:   'outline',
-}
+// Badge variant per category — defined in incident.schema.ts (shared with detail page)
 
 interface IncidentListProps {
   incidents: Incident[]
@@ -33,6 +29,11 @@ interface IncidentListProps {
   appeals: IncidentAppeal[]
   canAppeal: boolean                         // true = member; false = manager/owner
   onAppeal: (incidentId: string) => void     // callback mở AppealDialog
+  onViewDetail?: (incidentId: string) => void  // cả member lẫn manager đều có thể navigate
+  // Infinite scroll props
+  hasNextPage?: boolean
+  isFetchingNextPage?: boolean
+  onLoadMore?: () => void
 }
 
 function getMemberName(members: TenantMemberWithUser[], userId: string): string {
@@ -47,7 +48,35 @@ export function IncidentList({
   appeals,
   canAppeal,
   onAppeal,
+  onViewDetail,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
 }: IncidentListProps) {
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !onLoadMore) return
+    // P-3: sync check — nếu sentinel đang trong viewport khi effect re-run (hasNextPage flip), trigger ngay
+    if (hasNextPage && !isFetchingNextPage) {
+      const rect = el.getBoundingClientRect()
+      if (rect.top < window.innerHeight + 200) {
+        onLoadMore()
+      }
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          onLoadMore()
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, onLoadMore])
+
   if (isLoading) {
     return (
       <div className='space-y-3'>
@@ -60,9 +89,13 @@ export function IncidentList({
 
   if (incidents.length === 0) {
     return (
-      <div className='flex flex-col items-center justify-center py-16 text-muted-foreground gap-3'>
-        <ShieldAlert className='h-10 w-10 opacity-30' />
-        <p className='text-sm'>Chưa có incident nào được ghi nhận.</p>
+      <div>
+        <div className='flex flex-col items-center justify-center py-16 text-muted-foreground gap-3'>
+          <ShieldAlert className='h-10 w-10 opacity-30' />
+          <p className='text-sm'>Chưa có incident nào được ghi nhận.</p>
+        </div>
+        {/* P-1: sentinel luôn mount kể cả khi filtered empty — cho phép load thêm pages có data */}
+        <div ref={sentinelRef} />
       </div>
     )
   }
@@ -115,12 +148,25 @@ export function IncidentList({
                     : 'Chưa appeal'}
                 </Badge>
               </div>
-              <time
-                dateTime={incident.created_at}
-                className='shrink-0 text-xs text-muted-foreground'
-              >
-                {formattedDate}
-              </time>
+              <div className='flex items-center gap-2 shrink-0'>
+                <time
+                  dateTime={incident.created_at}
+                  className='text-xs text-muted-foreground'
+                >
+                  {formattedDate}
+                </time>
+                {/* Xem chi tiết — hiển thị cho tất cả users khi onViewDetail được provide */}
+                {onViewDetail && (
+                  <Button
+                    size='sm'
+                    variant='ghost'
+                    className='h-7 text-xs px-2'
+                    onClick={() => onViewDetail(incident.id)}
+                  >
+                    Xem chi tiết →
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Note — truncated with tooltip if long */}
@@ -177,6 +223,12 @@ export function IncidentList({
           </div>
         )
       })}
+      <div ref={sentinelRef} className='py-2 flex justify-center'>
+        {isFetchingNextPage && <Loader2 className='h-4 w-4 animate-spin text-muted-foreground' />}
+        {hasNextPage === false && incidents.length > 0 && (
+          <p className='text-xs text-muted-foreground'>Đã tải hết incidents</p>
+        )}
+      </div>
     </div>
   )
 }
