@@ -136,29 +136,30 @@ export const updateMemberCommittedHours = async (
   if (!updated) throw new Error('Update blocked — session may be stale, please refresh')
 
   // Bước 2b: Close record lịch sử cũ (effective_to = today)
-  // Không throw lỗi — record có thể chưa có nếu seed chưa chạy
-  await supabase
+  const { error: closeError } = await supabase
     .from('committed_hours_history')
     .update({ effective_to: today })
     .eq('tenant_id', tenantId)
     .eq('user_id', member.user_id)
     .is('effective_to', null)
+  if (closeError) throw closeError
 
-  // Bước 2c: INSERT record mới chỉ khi committedHours có giá trị
+  // Bước 2c: UPSERT record mới chỉ khi committedHours có giá trị
   // NULL = "dùng tenant default" → không track explicit value
+  // Dùng upsert để handle cùng-ngày update (UNIQUE constraint trên tenant_id,user_id,effective_from)
   if (committedHours !== null) {
     const { data: { user } } = await supabase.auth.getUser()
-    const { error: insertError } = await supabase
+    const { error: upsertError } = await supabase
       .from('committed_hours_history')
-      .insert({
+      .upsert({
         tenant_id: tenantId,
         user_id: member.user_id,
         committed_hours: committedHours,
         effective_from: today,
         effective_to: null,
         set_by: user?.id ?? null,
-      })
-    if (insertError) throw insertError
+      }, { onConflict: 'tenant_id,user_id,effective_from' })
+    if (upsertError) throw upsertError
   }
 }
 

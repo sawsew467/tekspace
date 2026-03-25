@@ -26,6 +26,7 @@ import {
   getTimeRange,
   buildWeeklyChartData,
 } from '@/features/analytics/utils/analytics.utils'
+import { PageContainer } from '@/components/layout/page-container'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -81,11 +82,13 @@ function AnalyticsPage() {
     weekEnd,
   )
 
-  const { data: memberWeeklyHours = [], isLoading: isTrendLoading } = useMemberTrend(
+  const { data: trendData, isLoading: isTrendLoading } = useMemberTrend(
     selectedUserId,
     trendStart,
     trendEnd,
   )
+  const memberWeeklyHours = trendData?.weeklyHours ?? []
+  const memberCommittedHistory = trendData?.committedHistory ?? []
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
@@ -109,6 +112,7 @@ function AnalyticsPage() {
         memberWeeklyHours,
         trendStart,
         trendEnd,
+        memberCommittedHistory,
         selectedMemberCommitted,
       )
     : []
@@ -125,14 +129,14 @@ function AnalyticsPage() {
 
   if (isPageLoading) {
     return (
-      <div className="p-4 space-y-4">
+      <PageContainer variant='wide' className='space-y-4'>
         <Skeleton className="h-7 w-40" />
         <div className="space-y-2 rounded-lg border border-border p-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-full" />
           ))}
         </div>
-      </div>
+      </PageContainer>
     )
   }
 
@@ -145,7 +149,7 @@ function AnalyticsPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-4 space-y-6">
+    <PageContainer variant='wide' className='space-y-6'>
       {/* Page header */}
       <div className="flex items-center gap-2">
         <BarChart3 className="size-5 text-muted-foreground shrink-0" />
@@ -205,6 +209,6 @@ function AnalyticsPage() {
           />
         </section>
       )}
-    </div>
+    </PageContainer>
   )
 }

@@ -14,6 +14,7 @@ describe('SelfAnalytics — highlight logic', () => {
       [{ weekOf: '2026-03-16', actualHours: 20 }],
       '2026-03-09',
       '2026-03-22',
+      [],
       35,
     )
     expect(data).toHaveLength(2)
@@ -24,7 +25,7 @@ describe('SelfAnalytics — highlight logic', () => {
   })
 
   it('buildWeeklyChartData formats weekLabel as dd/MM', () => {
-    const data = buildWeeklyChartData([], '2026-03-16', '2026-03-22', 35)
+    const data = buildWeeklyChartData([], '2026-03-16', '2026-03-22', [], 35)
     expect(data).toHaveLength(1)
     expect(data[0].weekLabel).toBe('16/03')
   })

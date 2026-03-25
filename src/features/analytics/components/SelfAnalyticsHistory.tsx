@@ -74,10 +74,12 @@ export function SelfAnalyticsHistory() {
   })
 
   const {
-    data: weeklyHours = [],
+    data: analyticsData,
     isLoading: isHoursLoading,
     isError: isHoursError,
   } = useSelfAnalytics(startDate, endDate)
+  const weeklyHours = analyticsData?.weeklyHours ?? []
+  const committedHistory = analyticsData?.committedHistory ?? []
 
   // ── Compute effective committed hours ─────────────────────────────────────
 
@@ -87,7 +89,9 @@ export function SelfAnalyticsHistory() {
 
   // ── Chart data ─────────────────────────────────────────────────────────────
 
-  const chartData = buildWeeklyChartData(weeklyHours, startDate, endDate, effectiveCommittedHours)
+  const chartData = buildWeeklyChartData(
+    weeklyHours, startDate, endDate, committedHistory, effectiveCommittedHours,
+  )
   const avgRate = calcAvgCommitmentRate(weeklyHours, effectiveCommittedHours)
   const avgRateColorClass = getCommitmentRateColorClass(avgRate)
 

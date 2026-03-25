@@ -7,6 +7,7 @@ import {
   getCommitmentRateColorClass,
   getCurrentWeekRange,
   getTimeRange,
+  getCommittedHoursAtDate,
 } from '../utils/analytics.utils'
 
 // ── groupReportsByWeek ────────────────────────────────────────────────────────
@@ -62,17 +63,54 @@ describe('groupReportsByWeek', () => {
   })
 })
 
+// ── getCommittedHoursAtDate ───────────────────────────────────────────────────
+
+describe('getCommittedHoursAtDate', () => {
+  const history = [
+    { effective_from: '2026-01-06', effective_to: '2026-03-16', committed_hours: 40 },
+    { effective_from: '2026-03-16', effective_to: null, committed_hours: 32 },
+  ]
+
+  it('trả về giá trị đúng theo tuần — trước khi đổi', () => {
+    expect(getCommittedHoursAtDate(history, '2026-03-09', 40)).toBe(40)
+  })
+
+  it('trả về giá trị đúng theo tuần — tuần đổi (effective_from = weekStart)', () => {
+    expect(getCommittedHoursAtDate(history, '2026-03-16', 40)).toBe(32)
+  })
+
+  it('trả về giá trị đúng theo tuần — sau khi đổi', () => {
+    expect(getCommittedHoursAtDate(history, '2026-03-23', 40)).toBe(32)
+  })
+
+  it('trả về fallback khi history rỗng', () => {
+    expect(getCommittedHoursAtDate([], '2026-03-23', 40)).toBe(40)
+  })
+
+  it('trả về fallback khi không có record nào bao gồm weekStart', () => {
+    // weekStart trước tất cả records
+    expect(getCommittedHoursAtDate(history, '2026-01-01', 40)).toBe(40)
+  })
+
+  it('record với effective_to = ngày trước weekStart không áp dụng', () => {
+    // effective_to = '2026-03-16' → không áp dụng cho weekStart = '2026-03-16'
+    // vì effective_to > weekStart phải đúng (> không phải >=)
+    const singleRecord = [{ effective_from: '2026-01-06', effective_to: '2026-03-16', committed_hours: 40 }]
+    expect(getCommittedHoursAtDate(singleRecord, '2026-03-16', 99)).toBe(99)
+  })
+})
+
 // ── buildWeeklyChartData ──────────────────────────────────────────────────────
 
 describe('buildWeeklyChartData', () => {
   it('generates data point for every week in range', () => {
     // Range: 4 weeks (Mon 2026-03-02 → Sun 2026-03-29)
-    const result = buildWeeklyChartData([], '2026-03-02', '2026-03-29', 40)
+    const result = buildWeeklyChartData([], '2026-03-02', '2026-03-29', [], 40)
     expect(result).toHaveLength(4)
   })
 
   it('sets actual to 0 for weeks with no reports', () => {
-    const result = buildWeeklyChartData([], '2026-03-23', '2026-03-29', 40)
+    const result = buildWeeklyChartData([], '2026-03-23', '2026-03-29', [], 40)
     expect(result).toHaveLength(1)
     expect(result[0].actual).toBe(0)
     expect(result[0].committed).toBe(40)
@@ -80,20 +118,42 @@ describe('buildWeeklyChartData', () => {
 
   it('merges actual hours from weeklyHours data', () => {
     const weeklyHours = [{ weekOf: '2026-03-23', actualHours: 35 }]
-    const result = buildWeeklyChartData(weeklyHours, '2026-03-23', '2026-03-29', 40)
+    const result = buildWeeklyChartData(weeklyHours, '2026-03-23', '2026-03-29', [], 40)
     expect(result[0].actual).toBe(35)
     expect(result[0].committed).toBe(40)
   })
 
   it('formats week labels as dd/MM', () => {
-    const result = buildWeeklyChartData([], '2026-03-23', '2026-03-29', 40)
+    const result = buildWeeklyChartData([], '2026-03-23', '2026-03-29', [], 40)
     expect(result[0].weekLabel).toBe('23/03')
   })
 
   it('generates correct number of weeks for 4-week range', () => {
     const { startDate, endDate } = getTimeRange(4)
-    const result = buildWeeklyChartData([], startDate, endDate, 40)
+    const result = buildWeeklyChartData([], startDate, endDate, [], 40)
     expect(result).toHaveLength(4)
+  })
+
+  it('dùng committed hours lịch sử đúng cho từng tuần', () => {
+    const history = [
+      { effective_from: '2026-01-01', effective_to: '2026-03-16', committed_hours: 40 },
+      { effective_from: '2026-03-16', effective_to: null, committed_hours: 32 },
+    ]
+    const result = buildWeeklyChartData(
+      [],
+      '2026-03-09',
+      '2026-03-22',
+      history,
+      40,
+    )
+    expect(result).toHaveLength(2)
+    expect(result[0].committed).toBe(40) // tuần 09/03 — trước khi đổi
+    expect(result[1].committed).toBe(32) // tuần 16/03 — sau khi đổi
+  })
+
+  it('fallback committed khi history rỗng', () => {
+    const result = buildWeeklyChartData([], '2026-03-23', '2026-03-29', [], 35)
+    expect(result[0].committed).toBe(35)
   })
 })
 
@@ -230,19 +290,19 @@ describe('getCurrentWeekRange', () => {
 describe('getTimeRange', () => {
   it('returns 4 weeks for weeksBack=4', () => {
     const { startDate, endDate } = getTimeRange(4)
-    const result = buildWeeklyChartData([], startDate, endDate, 40)
+    const result = buildWeeklyChartData([], startDate, endDate, [], 40)
     expect(result).toHaveLength(4)
   })
 
   it('returns 8 weeks for weeksBack=8', () => {
     const { startDate, endDate } = getTimeRange(8)
-    const result = buildWeeklyChartData([], startDate, endDate, 40)
+    const result = buildWeeklyChartData([], startDate, endDate, [], 40)
     expect(result).toHaveLength(8)
   })
 
   it('returns 12 weeks for weeksBack=12', () => {
     const { startDate, endDate } = getTimeRange(12)
-    const result = buildWeeklyChartData([], startDate, endDate, 40)
+    const result = buildWeeklyChartData([], startDate, endDate, [], 40)
     expect(result).toHaveLength(12)
   })
 

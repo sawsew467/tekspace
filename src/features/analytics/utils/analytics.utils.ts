@@ -1,5 +1,5 @@
 import { format, startOfISOWeek, endOfISOWeek, subWeeks, addDays } from 'date-fns'
-import type { WeeklyHoursRow } from '@/features/analytics/services/analytics.service'
+import type { WeeklyHoursRow, CommittedHoursHistoryRow } from '@/features/analytics/services/analytics.service'
 
 // ── Date range helpers ─────────────────────────────────────────────────────────
 
@@ -59,15 +59,34 @@ export function groupReportsByWeek(
 // ── Chart data builder ─────────────────────────────────────────────────────────
 
 /**
+ * getCommittedHoursAtDate — tìm committed hours có hiệu lực tại một ngày cụ thể.
+ * Lookup: effective_from <= weekStart AND (effective_to IS NULL OR effective_to > weekStart)
+ * Trả về fallbackHours nếu không tìm thấy record nào phù hợp.
+ */
+export function getCommittedHoursAtDate(
+  history: CommittedHoursHistoryRow[],
+  weekStart: string,       // 'yyyy-MM-dd'
+  fallbackHours: number,   // member.committed_hours ?? tenant.default_committed_hours
+): number {
+  const record = history.find((r) =>
+    r.effective_from <= weekStart &&
+    (r.effective_to === null || r.effective_to > weekStart)
+  )
+  return record?.committed_hours ?? fallbackHours
+}
+
+/**
  * buildWeeklyChartData — merge weekly hours data với committed hours per week.
  * Tạo đủ data points cho mọi tuần trong range (kể cả tuần không có report = 0h).
  * Label hiển thị dạng "dd/MM" (ví dụ "17/03").
+ * Mỗi tuần dùng committed hours có hiệu lực tại week_start (từ history).
  */
 export function buildWeeklyChartData(
   weeklyHours: WeeklyHoursRow[],
   startDate: string,
   endDate: string,
-  committedHoursPerWeek: number,
+  committedHoursHistory: CommittedHoursHistoryRow[],
+  fallbackCommittedHours: number,  // member.committed_hours ?? tenant.default_committed_hours
 ): { weekLabel: string; actual: number; committed: number }[] {
   const hoursMap = new Map(weeklyHours.map(w => [w.weekOf, w.actualHours]))
 
@@ -81,7 +100,7 @@ export function buildWeeklyChartData(
     result.push({
       weekLabel,
       actual: hoursMap.get(weekOf) ?? 0,
-      committed: committedHoursPerWeek,
+      committed: getCommittedHoursAtDate(committedHoursHistory, weekOf, fallbackCommittedHours),
     })
     current = addDays(current, 7)
   }
