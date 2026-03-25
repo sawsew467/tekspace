@@ -1,9 +1,11 @@
 import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { ROUTES } from '@/lib/routes'
+import { useAuthStore } from '@/stores/auth-store'
 
 export function NotFoundPage() {
   const navigate = useNavigate()
+  const session = useAuthStore((s) => s.session)
 
   return (
     <div className='flex min-h-svh flex-col items-center justify-center gap-4 p-4 text-center'>
@@ -13,9 +15,15 @@ export function NotFoundPage() {
         <Button variant='outline' onClick={() => window.history.back()}>
           Quay lại
         </Button>
-        <Button onClick={() => navigate({ to: ROUTES.app.dashboard }).catch(console.error)}>
-          Về Dashboard
-        </Button>
+        {session ? (
+          <Button onClick={() => navigate({ to: ROUTES.app.dashboard }).catch(console.error)}>
+            Về Dashboard
+          </Button>
+        ) : (
+          <Button onClick={() => navigate({ to: ROUTES.signIn }).catch(console.error)}>
+            Đăng nhập
+          </Button>
+        )}
       </div>
     </div>
   )

@@ -233,3 +233,8 @@ _Không có lỗi trong quá trình implement._
 | Date | Change |
 |------|--------|
 | 2026-03-25 | Story implemented: tạo NotFoundPage, ErrorPage, update createRouter() trong main.tsx |
+| 2026-03-25 | Bug fix: `_app/route.tsx` — handle `AuthSessionMissingError` (Supabase local error, không có `status=401`) → redirect sign-in thay vì crash ErrorBoundary |
+| 2026-03-25 | Enhancement: `not-found.tsx` — auth-aware button: session có → "Về Dashboard", không có → "Đăng nhập" |
+| 2026-03-25 | Enhancement: `error-page.tsx` — auth-aware buttons: session có → "Thử lại" + "Về Dashboard"; không có → "Đăng nhập". Thêm `reset` prop để retry error boundary. |
+| 2026-03-25 | Bug fix: `src/routes/index.tsx` — tạo mới, redirect `/` → `/dashboard` (trước đây `/` hiển thị 404) |
+| 2026-03-25 | Seed fix: `seed-dev.sql` comment password đúng là `123456789`; `seed-dashboard-test.sql` đổi NULL → `crypt('123456789', gen_salt('bf'))` cho 5 test accounts |

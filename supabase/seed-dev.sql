@@ -2,7 +2,7 @@
 -- Dev Seed — TekSpace local
 -- Tạo: 1 owner (login được) + 5 members + data đầy đủ
 --
--- Login:  thang@tekmium.com  /  Test@123456
+-- Login:  thang@tekmium.com  /  123456789
 -- Tenant: Tekmium (aaaa0001-0000-4000-8000-000000000001)
 --
 -- Xóa sạch: DELETE FROM auth.users WHERE id LIKE 'cccc%';

@@ -1,8 +1,14 @@
 import { useEffect } from 'react'
 import type { ErrorComponentProps } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
+import { ROUTES } from '@/lib/routes'
+import { useAuthStore } from '@/stores/auth-store'
 
-export function ErrorPage({ error }: ErrorComponentProps) {
+export function ErrorPage({ error, reset }: ErrorComponentProps) {
+  const navigate = useNavigate()
+  const session = useAuthStore((s) => s.session)
+
   useEffect(() => {
     if (import.meta.env.DEV) {
       console.error('[ErrorBoundary]', error)
@@ -17,7 +23,20 @@ export function ErrorPage({ error }: ErrorComponentProps) {
         <Button variant='outline' onClick={() => window.history.back()}>
           Quay lại
         </Button>
-        <Button onClick={() => window.location.reload()}>Tải lại trang</Button>
+        {session ? (
+          <>
+            <Button variant='outline' onClick={() => reset?.()}>
+              Thử lại
+            </Button>
+            <Button onClick={() => navigate({ to: ROUTES.app.dashboard }).catch(console.error)}>
+              Về Dashboard
+            </Button>
+          </>
+        ) : (
+          <Button onClick={() => navigate({ to: ROUTES.signIn }).catch(console.error)}>
+            Đăng nhập
+          </Button>
+        )}
       </div>
     </div>
   )

@@ -21,10 +21,13 @@ export const Route = createFileRoute('/_app')({
     } = await context.supabase.auth.getUser()
 
     if (userError) {
-      // Chỉ redirect khi xác định là auth failure (HTTP 401)
+      // Chỉ redirect khi xác định là auth failure:
+      //   - HTTP 401: token revoked server-side
+      //   - AuthSessionMissingError: không có session trong storage (chưa login / đã logout)
       // Network error / server error (status 0 hoặc 5xx) → throw để error boundary xử lý,
       // tránh hiện tượng mạng chập chờn silently đẩy user đang login ra sign-in
-      if (userError.status === 401) {
+      const isNoSession = userError.name === 'AuthSessionMissingError'
+      if (userError.status === 401 || isNoSession) {
         throw redirect({
           to: ROUTES.signIn,
           search: { redirect: location.pathname + location.search },
