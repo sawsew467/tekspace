@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase-browser'
 import { QUERY_KEYS } from '@/lib/query-keys'
+import { playNotificationSound } from '@/features/notifications/utils/notification-sound'
 
 export function useNotificationsRealtime(
   tenantId: string | null,
@@ -26,7 +27,7 @@ export function useNotificationsRealtime(
         },
         (payload) => {
           // Client-side tenant filter: chỉ invalidate khi notification thuộc tenant đang active
-          const row = payload.new as { tenant_id?: string; type?: string }
+          const row = payload.new as { tenant_id?: string; type?: string; message?: string }
           if (row.tenant_id !== tenantId) return
 
           queryClient.invalidateQueries({
@@ -45,6 +46,30 @@ export function useNotificationsRealtime(
             queryClient.invalidateQueries({
               queryKey: [QUERY_KEYS.incidentAppeals, tenantId],
             })
+          }
+
+          // Âm thanh ping — luôn phát khi có notification mới (bất kể tab state)
+          playNotificationSound()
+
+          // Browser Notification — chỉ khi granted VÀ tab không active
+          if (
+            typeof window !== 'undefined' &&
+            'Notification' in window &&
+            Notification.permission === 'granted' &&
+            document.visibilityState !== 'visible'
+          ) {
+            const body =
+              typeof row.message === 'string' && row.message.trim()
+                ? row.message
+                : 'Bạn có thông báo mới'
+            try {
+              new Notification('TekSpace', {
+                body,
+                icon: '/favicon.ico',
+              })
+            } catch {
+              // Silent fail — permission có thể bị revoke mid-session
+            }
           }
         }
       )
