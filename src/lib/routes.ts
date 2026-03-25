@@ -5,10 +5,10 @@ export const ROUTES = {
   acceptInvite: '/accept-invite',
   app: {
     createTenant: '/create-tenant',
-    dashboard: '/dashboard',
-    myDashboard: '/my-dashboard',
-    schedule: '/schedule',
-    scheduleManage: '/schedule/manage',
+    teamSchedule: '/team-schedule',       // Team Dashboard (overview of all members)
+    dashboard: '/dashboard',               // Personal Dashboard (SelfDashboard)
+    schedule: '/my-schedule',              // My Schedule registration
+    scheduleManage: '/my-schedule/manage', // Schedule manage
     dailyReport: '/daily-report',
     analytics: '/analytics',
     notifications: '/notifications',

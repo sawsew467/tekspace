@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { queryClient } from '@/lib/query-client'
 import { supabase } from '@/lib/supabase-browser'
+import { NotFoundPage } from '@/components/not-found'
+import { ErrorPage } from '@/components/error-page'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 // Styles
@@ -14,6 +16,8 @@ const router = createRouter({
   context: { queryClient, supabase },
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 0,
+  defaultNotFoundComponent: NotFoundPage,
+  defaultErrorComponent: ErrorPage,
 })
 
 // Register the router instance for type safety

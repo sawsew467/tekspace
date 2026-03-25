@@ -8,12 +8,13 @@ import {
   Settings,
   Users,
   Mail,
-  User,
+  Home,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
+import { ROUTES } from '@/lib/routes'
 
-// TekSpace sidebar data — sẽ được điền đầy đủ trong Story 1.2+
-// Navigation sử dụng ROUTES constant (import lúc cần runtime)
+// TekSpace sidebar data
+// Navigation sử dụng ROUTES constant — single source of truth cho path strings
 export const sidebarData: SidebarData = {
   user: {
     name: 'User',
@@ -33,17 +34,17 @@ export const sidebarData: SidebarData = {
       items: [
         {
           title: 'Dashboard',
-          url: '/dashboard',
+          url: ROUTES.app.dashboard,
+          icon: Home,
+        },
+        {
+          title: 'Team Schedule',
+          url: ROUTES.app.teamSchedule,
           icon: LayoutDashboard,
         },
         {
-          title: 'My Dashboard',
-          url: '/my-dashboard',
-          icon: User,
-        },
-        {
           title: 'Analytics',
-          url: '/analytics',
+          url: ROUTES.app.analytics,
           icon: BarChart3,
         },
       ],
@@ -53,22 +54,22 @@ export const sidebarData: SidebarData = {
       items: [
         {
           title: 'Lịch làm việc',
-          url: '/schedule',
+          url: ROUTES.app.schedule,
           icon: CalendarDays,
         },
         {
           title: 'Báo cáo ngày',
-          url: '/daily-report',
+          url: ROUTES.app.dailyReport,
           icon: FileText,
         },
         {
           title: 'Notifications',
-          url: '/notifications',
+          url: ROUTES.app.notifications,
           icon: Bell,
         },
         {
           title: 'Incidents',
-          url: '/incidents',
+          url: ROUTES.app.incidents,
           icon: AlertTriangle,
         },
       ],
@@ -78,21 +79,23 @@ export const sidebarData: SidebarData = {
       items: [
         {
           title: 'Thành viên',
-          url: '/team/members',
+          url: ROUTES.app.team.members,
           icon: Users,
+          roles: ['owner', 'manager'],
         },
         {
           title: 'Lời mời',
-          url: '/team/invites',
+          url: ROUTES.app.team.invites,
           icon: Mail,
+          roles: ['owner', 'manager'],
         },
         {
           title: 'Cài đặt nhóm',
-          url: '/team/settings',
+          url: ROUTES.app.team.settings,
           icon: Settings,
+          roles: ['owner'],
         },
       ],
     },
   ],
 }
-

@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { TeamDashboard } from '@/features/dashboard/components/TeamDashboard'
+import { SelfDashboard } from '@/features/dashboard/components/SelfDashboard'
 
 export const Route = createFileRoute('/_app/dashboard')({
   head: () => ({
-    meta: [{ title: 'Team Dashboard — TekSpace' }],
+    meta: [{ title: 'Dashboard — TekSpace' }],
   }),
-  component: TeamDashboard,
+  component: SelfDashboard,
 })

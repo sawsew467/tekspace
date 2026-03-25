@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
+import { PageContainer } from '@/components/layout/page-container'
 
 export const Route = createFileRoute('/_app/account')({
   component: AccountLayout,
@@ -6,8 +7,8 @@ export const Route = createFileRoute('/_app/account')({
 
 function AccountLayout() {
   return (
-    <div className='container mx-auto max-w-2xl py-8'>
+    <PageContainer>
       <Outlet />
-    </div>
+    </PageContainer>
   )
 }

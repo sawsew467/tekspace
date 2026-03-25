@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import {
   SidebarMenu,
@@ -5,10 +6,12 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { ROUTES } from '@/lib/routes'
 
 export function AppTitle() {
   const { setOpenMobile, state } = useSidebar()
   const isCollapsed = state === 'collapsed'
+  const navigate = useNavigate()
 
   return (
     <SidebarMenu>
@@ -21,7 +24,7 @@ export function AppTitle() {
           )}
           onClick={() => {
             setOpenMobile(false)
-            window.location.href = '/dashboard'
+            void navigate({ to: ROUTES.app.dashboard })
           }}
         >
           <div className='flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm'>

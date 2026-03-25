@@ -36,6 +36,7 @@ dist-ssr
 .agents/
 .trae/
 .playwright-mcp/
+.tanstack/
 
 # Test output
 test-results/

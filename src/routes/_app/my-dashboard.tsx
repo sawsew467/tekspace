@@ -1,9 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { SelfDashboard } from '@/features/dashboard/components/SelfDashboard'
+import { createFileRoute, redirect } from '@tanstack/react-router'
+import { ROUTES } from '@/lib/routes'
 
 export const Route = createFileRoute('/_app/my-dashboard')({
-  head: () => ({
-    meta: [{ title: 'My Dashboard — TekSpace' }],
-  }),
-  component: SelfDashboard,
+  beforeLoad: () => {
+    throw redirect({ to: ROUTES.app.dashboard, replace: true })
+  },
+  component: () => null,
 })
