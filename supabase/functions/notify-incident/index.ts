@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     tenant_id: tenantId,
     user_id:   memberId,
     type:      'incident_logged',
-    message:   'Một incident đã được ghi nhận. Bạn có thể xem chi tiết trong mục Incidents.',
+    message:   '🚨 Một incident đã được ghi nhận cho bạn. Xem chi tiết và có thể gửi appeal nếu cần.',
     link_to:   '/incidents',
   })
 

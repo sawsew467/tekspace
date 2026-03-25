@@ -112,17 +112,54 @@ export const updateMemberCommittedHours = async (
   tenantId: string,
   committedHours: number | null
 ): Promise<void> => {
-  // P-02: chain .select('id') để detect silent RLS-blocked update
-  // Defense-in-depth: thêm tenant_id filter để tránh silent fail khi JWT stale
-  const { data, error } = await supabase
+  // Bước 1: Lấy user_id từ tenant_members (cần để thao tác committed_hours_history)
+  const { data: member, error: fetchError } = await supabase
+    .from('tenant_members')
+    .select('user_id')
+    .eq('id', memberId)
+    .eq('tenant_id', tenantId)
+    .single()
+  if (fetchError) throw fetchError
+
+  const today = new Date().toISOString().split('T')[0]  // 'YYYY-MM-DD'
+
+  // Bước 2a: UPDATE tenant_members (giữ nguyên — dùng cho current week lookup)
+  // P-02: chain .select('id').single() để detect silent RLS-blocked update
+  const { data: updated, error: updateError } = await supabase
     .from('tenant_members')
     .update({ committed_hours: committedHours })
     .eq('id', memberId)
     .eq('tenant_id', tenantId)
     .select('id')
     .single()
-  if (error) throw error
-  if (!data) throw new Error('Update blocked — session may be stale, please refresh')
+  if (updateError) throw updateError
+  if (!updated) throw new Error('Update blocked — session may be stale, please refresh')
+
+  // Bước 2b: Close record lịch sử cũ (effective_to = today)
+  // Không throw lỗi — record có thể chưa có nếu seed chưa chạy
+  await supabase
+    .from('committed_hours_history')
+    .update({ effective_to: today })
+    .eq('tenant_id', tenantId)
+    .eq('user_id', member.user_id)
+    .is('effective_to', null)
+
+  // Bước 2c: INSERT record mới chỉ khi committedHours có giá trị
+  // NULL = "dùng tenant default" → không track explicit value
+  if (committedHours !== null) {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error: insertError } = await supabase
+      .from('committed_hours_history')
+      .insert({
+        tenant_id: tenantId,
+        user_id: member.user_id,
+        committed_hours: committedHours,
+        effective_from: today,
+        effective_to: null,
+        set_by: user?.id ?? null,
+      })
+    if (insertError) throw insertError
+  }
 }
 
 export const getMembers = async (tenantId: string): Promise<TenantMemberWithUser[]> => {
@@ -232,22 +269,51 @@ export const promoteToManager = async (userId: string, tenantId: string): Promis
   if (error) {
     let serverMessage: string | undefined
     try {
-      const body = await (error as unknown as { context: Response }).context.json()
-      serverMessage = body?.error
+      const ctx = (error as unknown as { context?: unknown }).context
+      if (ctx instanceof Response) {
+        const ct = ctx.headers.get('content-type') ?? ''
+        if (ct.includes('application/json')) {
+          const body = await ctx.json()
+          serverMessage = body?.error
+        }
+      }
     } catch {
       /* ignore */
     }
     throw new Error(serverMessage ?? 'Không thể nâng quyền thành viên. Vui lòng thử lại.')
   }
+  // Refresh JWT để tenant_roles claim được cập nhật — thiếu bước này → RLS dùng role cũ
+  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+  if (refreshError) throw refreshError
+  if (!refreshData.session) throw new Error('Session refresh returned null sau promote — vui lòng tải lại trang.')
 }
 
 export const demoteToMember = async (userId: string, tenantId: string): Promise<void> => {
-  const { error } = await supabase
-    .from('tenant_members')
-    .update({ role: 'member' })
-    .eq('user_id', userId)
-    .eq('tenant_id', tenantId)
-  if (error) throw new Error(error.message ?? 'Không thể hạ quyền thành viên. Vui lòng thử lại.')
+  // Route qua Edge Function demote-member để có audit log + server-side validation
+  // Trước đây: direct DB call → thiếu audit log, không detect silent RLS block
+  const { error } = await supabase.functions.invoke('demote-member', {
+    body: { userId, tenantId },
+  })
+  if (error) {
+    let serverMessage: string | undefined
+    try {
+      const ctx = (error as unknown as { context?: unknown }).context
+      if (ctx instanceof Response) {
+        const ct = ctx.headers.get('content-type') ?? ''
+        if (ct.includes('application/json')) {
+          const body = await ctx.json()
+          serverMessage = body?.error
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(serverMessage ?? 'Không thể hạ quyền thành viên. Vui lòng thử lại.')
+  }
+  // Refresh JWT để tenant_roles claim được cập nhật — thiếu bước này → RLS dùng role cũ
+  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+  if (refreshError) throw refreshError
+  if (!refreshData.session) throw new Error('Session refresh returned null sau demote — vui lòng tải lại trang.')
 }
 
 export const transferOwnership = async (
@@ -263,13 +329,24 @@ export const transferOwnership = async (
   if (error) {
     let serverMessage: string | undefined
     try {
-      const body = await (error as unknown as { context: Response }).context.json()
-      serverMessage = body?.error
+      const ctx = (error as unknown as { context?: unknown }).context
+      if (ctx instanceof Response) {
+        const ct = ctx.headers.get('content-type') ?? ''
+        if (ct.includes('application/json')) {
+          const body = await ctx.json()
+          serverMessage = body?.error
+        }
+      }
     } catch {
       /* ignore */
     }
     throw new Error(serverMessage ?? 'Không thể chuyển quyền Owner. Vui lòng thử lại.')
   }
+  }
+  // Refresh JWT để tenant_roles claim được cập nhật — owner mới cần role mới trong JWT ngay
+  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+  if (refreshError) throw refreshError
+  if (!refreshData.session) throw new Error('Session refresh returned null sau transfer — vui lòng tải lại trang.')
 }
 
 export type TenantInvite = {
@@ -279,12 +356,13 @@ export type TenantInvite = {
   created_at: string
   expires_at: string
   invited_by: string | null
+  token: string
 }
 
 export const getInvites = async (tenantId: string): Promise<TenantInvite[]> => {
   const { data, error } = await supabase
     .from('tenant_invites')
-    .select('id, email, status, created_at, expires_at, invited_by')
+    .select('id, email, status, created_at, expires_at, invited_by, token')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
   if (error) throw error

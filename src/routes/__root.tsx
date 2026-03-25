@@ -1,5 +1,5 @@
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createRootRouteWithContext, Outlet } from '@tanstack/react-router'
+import { createRootRouteWithContext, HeadContent, Outlet } from '@tanstack/react-router'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { Toaster } from '@/components/ui/sonner'
@@ -13,10 +13,14 @@ interface RouterContext {
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
+  head: () => ({
+    meta: [{ title: 'TekSpace' }],
+  }),
   component: () => {
     return (
       // KHÔNG wrap Suspense ở đây — để từng route tự handle
       <QueryClientProvider client={queryClient}>
+        <HeadContent />
         <Outlet />
         <Toaster duration={5000} />
         {import.meta.env.MODE === 'development' && (

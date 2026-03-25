@@ -164,7 +164,7 @@ async function handleScheduleReminder(weekOf: string): Promise<{ reminded_count:
     )
 
     for (const member of pendingMembers) {
-      const message = `Nhắc nhở: Hạn đăng ký lịch tuần tới là ${deadlineDisplay}. Hãy đăng ký ngay!`
+      const message = `⏰ Lịch tuần tới chưa đăng ký — hạn chót ${deadlineDisplay}. Đăng ký ngay!`
 
       // Idempotent check: nếu đã gửi trong 24h → skip cả in-app lẫn email
       const { data: existing } = await supabaseAdmin
@@ -260,7 +260,7 @@ async function handleDeadlineMissed(weekOf: string): Promise<{ notified_count: n
       // 1. In-app notification cho member
       // Safety net: auto_create_missing_schedules (2.4) có thể đã insert — idempotent guard ngăn duplicate
       const memberMessage =
-        'Bạn chưa đăng ký lịch tuần này. Lịch trống đã được tạo — hãy cập nhật sớm nhất có thể.'
+        '⚠️ Bạn đã bỏ lỡ hạn đăng ký lịch tuần này. Lịch trống đã được tạo tự động — cập nhật lịch ngay nếu có thể.'
 
       const { data: existingMember } = await supabaseAdmin
         .from('notifications')
@@ -311,7 +311,7 @@ async function handleDeadlineMissed(weekOf: string): Promise<{ notified_count: n
         if (mgr.user_id === member.user_id) continue
 
         // message dùng raw full_name cho in-app (không escape HTML trong plain text)
-        const mgrMessage = `${member.users.full_name} chưa đăng ký lịch tuần mới.`
+        const mgrMessage = `⚠️ ${member.users.full_name} đã bỏ lỡ hạn đăng ký lịch tuần mới.`
 
         // Dùng message làm một phần dedup key vì manager nhận N notifications
         // (một per pending member) — cần phân biệt từng member cụ thể
@@ -467,7 +467,7 @@ async function handleDailyReportReminder(): Promise<{ reminded_count: number }> 
         tenant_id: tenant.id,
         user_id: member.user_id,
         type: 'daily_report_reminder',
-        message: 'Nhắc nhở: Bạn chưa nộp daily report hôm nay.',
+        message: '📝 Nhắc nhở: Bạn chưa nộp daily report hôm nay. Ghi lại công việc để team cập nhật tiến độ!',
         link_to: '/daily-report',
       })
       if (insertErr) {

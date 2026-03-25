@@ -14,10 +14,9 @@ Deno.serve(async (req) => {
     })
   }
 
-  // Verify caller via JWT
-  const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(
-    authHeader.replace('Bearer ', '')
-  )
+  // Verify caller via JWT (slice(7) thay vì replace để handle case-insensitive & first-only)
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader
+  const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(token)
   if (authError || !caller) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
@@ -120,15 +119,38 @@ Deno.serve(async (req) => {
     })
   }
 
-  // 2. Invalidate session ngay lập tức (ignore error nếu user đã sign out)
-  await supabaseAdmin.auth.admin.signOut(userId)
+  // 2. Invalidate session ngay lập tức bằng GoTrue admin REST API
+  // Lý do: supabaseAdmin.auth.admin.signOut(jwt) nhận JWT string, không phải userId UUID
+  // → dùng REST endpoint /auth/v1/admin/users/{id}/logout để revoke tất cả sessions theo user_id
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('[remove-member] SUPABASE_URL hoặc SUPABASE_SERVICE_ROLE_KEY chưa được cấu hình — bỏ qua logout')
+  } else {
+    try {
+      const logoutRes = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}/logout`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+        },
+      })
+      if (!logoutRes.ok) {
+        // Log warning — session có thể chưa bị revoke, nhưng status=inactive là guard chính
+        console.warn(`[remove-member] GoTrue logout returned ${logoutRes.status} cho user ${userId}`)
+      }
+    } catch (err) {
+      // Network error — log để debug, nhưng không fail request
+      console.warn('[remove-member] Network error khi logout user session:', err)
+    }
+  }
 
   // 3. INSERT in-app notification cho user bị xóa
   await supabaseAdmin.from('notifications').insert({
     tenant_id: tenantId,
     user_id: userId,
     type: 'member_removed',
-    message: `Bạn đã được xóa khỏi ${tenant?.name ?? 'team'}. Cảm ơn bạn đã tham gia!`,
+    message: `Bạn đã bị xóa khỏi${tenant?.name ? ` team ${tenant.name}` : ' team'}. Cảm ơn đã tham gia cùng team!`,
     link_to: null,
   })
 

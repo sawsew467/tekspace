@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertCircle, MailCheck, RefreshCw } from 'lucide-react'
+import { AlertCircle, Copy, MailCheck, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,6 +31,7 @@ export function InviteListSection({ canManage }: InviteListSectionProps) {
   const { mutateAsync: resend, isPending: isResending, variables } = useResendInvite()
   // P13: confirm dialog cho pending invite (gửi lại sẽ hủy link cũ)
   const [pendingResendInvite, setPendingResendInvite] = useState<TenantInvite | null>(null)
+  const [copyingId, setCopyingId] = useState<string | null>(null)
 
   const handleResend = async (invite: TenantInvite) => {
     try {
@@ -49,6 +50,20 @@ export function InviteListSection({ canManage }: InviteListSectionProps) {
     } else {
       // expired: không cần warn, link cũ đã vô hiệu
       void handleResend(invite)
+    }
+  }
+
+  const handleCopyLink = async (invite: TenantInvite) => {
+    if (copyingId === invite.id) return
+    setCopyingId(invite.id)
+    const inviteUrl = `${window.location.origin}/accept-invite?token=${invite.token}`
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      toast.success('Đã copy link lời mời')
+    } catch {
+      toast.error('Không thể copy link. Vui lòng thử lại.')
+    } finally {
+      setCopyingId(null)
     }
   }
 
@@ -97,6 +112,17 @@ export function InviteListSection({ canManage }: InviteListSectionProps) {
                   <Badge variant={STATUS_CONFIG[invite.status].variant} className={STATUS_CONFIG[invite.status].className}>
                     {STATUS_CONFIG[invite.status].label}
                   </Badge>
+                  {canManage && invite.status === 'pending' && (
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => void handleCopyLink(invite)}
+                      disabled={copyingId === invite.id}
+                      title='Copy link lời mời'
+                    >
+                      <Copy className='h-3 w-3' />
+                    </Button>
+                  )}
                   {canResend && (
                     <Button
                       variant='outline'
