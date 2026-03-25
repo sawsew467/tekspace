@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { addDays, format, parseISO } from 'date-fns'
@@ -53,6 +53,8 @@ interface SlotFormProps {
   onOpenChange: (open: boolean) => void
   weekOf: string                 // Monday ISO date "YYYY-MM-DD"
   defaultDate?: string           // AC3: "YYYY-MM-DD" — pre-fill dropdown Ngày khi click "+"
+  defaultStartTime?: string      // 'HH:mm', 30-min aligned — từ drag-to-create (AC8)
+  defaultEndTime?: string        // 'HH:mm', 30-min aligned — từ drag-to-create (AC8)
   existingSlots: ScheduleSlot[]
   onSubmit: (values: SlotFormValues) => void
   isLoading?: boolean
@@ -80,6 +82,8 @@ export function SlotForm({
   onOpenChange,
   weekOf,
   defaultDate,
+  defaultStartTime,
+  defaultEndTime,
   existingSlots,
   onSubmit,
   isLoading = false,
@@ -99,24 +103,27 @@ export function SlotForm({
     resolver: zodResolver(slotFormSchema),
     defaultValues: {
       slotDate: defaultDate ?? weekOf,
-      startTime: '09:00',
-      endTime: '17:00',
+      startTime: defaultStartTime ?? '09:00',
+      endTime: defaultEndTime ?? '17:00',
       isOvernight: false,
     },
   })
 
-  // Reset form khi open thay đổi hoặc defaultDate thay đổi (AC3)
-  // form từ react-hook-form là stable ref — thêm vào deps để lint không complain
+  // Reset form chỉ khi open transition từ false → true (P6)
+  // Dùng wasOpenRef để tránh reset khi props thay đổi trong lúc form đang mở,
+  // vì react-hook-form.reset() sẽ xóa input của user đang gõ dở.
+  const wasOpenRef = useRef(false)
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpenRef.current) {
       form.reset({
         slotDate: defaultDate ?? weekOf,
-        startTime: '09:00',
-        endTime: '17:00',
+        startTime: defaultStartTime ?? '09:00',
+        endTime: defaultEndTime ?? '17:00',
         isOvernight: false,
       })
     }
-  }, [open, defaultDate, weekOf, form])
+    wasOpenRef.current = open
+  }, [open, defaultDate, defaultStartTime, defaultEndTime, weekOf, form])
 
   const watchedValues = form.watch()
   const { startTime, endTime, isOvernight } = watchedValues

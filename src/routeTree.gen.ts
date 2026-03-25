@@ -14,8 +14,11 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppTeamScheduleRouteImport } from './routes/_app/team-schedule'
 import { Route as AppScheduleRouteImport } from './routes/_app/schedule'
 import { Route as AppNotificationsRouteImport } from './routes/_app/notifications'
+import { Route as AppMyScheduleRouteImport } from './routes/_app/my-schedule'
 import { Route as AppMyDashboardRouteImport } from './routes/_app/my-dashboard'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppDailyReportRouteImport } from './routes/_app/daily-report'
@@ -27,6 +30,7 @@ import { Route as AppIncidentsIndexRouteImport } from './routes/_app/incidents/i
 import { Route as AppTeamSettingsRouteImport } from './routes/_app/team/settings'
 import { Route as AppTeamMembersRouteImport } from './routes/_app/team/members'
 import { Route as AppTeamInvitesRouteImport } from './routes/_app/team/invites'
+import { Route as AppIncidentsIncidentIdRouteImport } from './routes/_app/incidents/$incidentId'
 import { Route as AppAccountSecurityRouteImport } from './routes/_app/account/security'
 import { Route as AppAccountProfileRouteImport } from './routes/_app/account/profile'
 
@@ -54,6 +58,16 @@ const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppTeamScheduleRoute = AppTeamScheduleRouteImport.update({
+  id: '/team-schedule',
+  path: '/team-schedule',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppScheduleRoute = AppScheduleRouteImport.update({
   id: '/schedule',
   path: '/schedule',
@@ -62,6 +76,11 @@ const AppScheduleRoute = AppScheduleRouteImport.update({
 const AppNotificationsRoute = AppNotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppMyScheduleRoute = AppMyScheduleRouteImport.update({
+  id: '/my-schedule',
+  path: '/my-schedule',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppMyDashboardRoute = AppMyDashboardRouteImport.update({
@@ -119,6 +138,11 @@ const AppTeamInvitesRoute = AppTeamInvitesRouteImport.update({
   path: '/invites',
   getParentRoute: () => AppTeamRouteRoute,
 } as any)
+const AppIncidentsIncidentIdRoute = AppIncidentsIncidentIdRouteImport.update({
+  id: '/incidents/$incidentId',
+  path: '/incidents/$incidentId',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppAccountSecurityRoute = AppAccountSecurityRouteImport.update({
   id: '/security',
   path: '/security',
@@ -131,7 +155,7 @@ const AppAccountProfileRoute = AppAccountProfileRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppRouteRouteWithChildren
+  '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -143,17 +167,20 @@ export interface FileRoutesByFullPath {
   '/daily-report': typeof AppDailyReportRoute
   '/dashboard': typeof AppDashboardRoute
   '/my-dashboard': typeof AppMyDashboardRoute
+  '/my-schedule': typeof AppMyScheduleRoute
   '/notifications': typeof AppNotificationsRoute
   '/schedule': typeof AppScheduleRoute
+  '/team-schedule': typeof AppTeamScheduleRoute
   '/account/profile': typeof AppAccountProfileRoute
   '/account/security': typeof AppAccountSecurityRoute
+  '/incidents/$incidentId': typeof AppIncidentsIncidentIdRoute
   '/team/invites': typeof AppTeamInvitesRoute
   '/team/members': typeof AppTeamMembersRoute
   '/team/settings': typeof AppTeamSettingsRoute
   '/incidents/': typeof AppIncidentsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof AppRouteRouteWithChildren
+  '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -165,10 +192,13 @@ export interface FileRoutesByTo {
   '/daily-report': typeof AppDailyReportRoute
   '/dashboard': typeof AppDashboardRoute
   '/my-dashboard': typeof AppMyDashboardRoute
+  '/my-schedule': typeof AppMyScheduleRoute
   '/notifications': typeof AppNotificationsRoute
   '/schedule': typeof AppScheduleRoute
+  '/team-schedule': typeof AppTeamScheduleRoute
   '/account/profile': typeof AppAccountProfileRoute
   '/account/security': typeof AppAccountSecurityRoute
+  '/incidents/$incidentId': typeof AppIncidentsIncidentIdRoute
   '/team/invites': typeof AppTeamInvitesRoute
   '/team/members': typeof AppTeamMembersRoute
   '/team/settings': typeof AppTeamSettingsRoute
@@ -176,6 +206,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_app': typeof AppRouteRouteWithChildren
   '/accept-invite': typeof AcceptInviteRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -188,10 +219,13 @@ export interface FileRoutesById {
   '/_app/daily-report': typeof AppDailyReportRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/my-dashboard': typeof AppMyDashboardRoute
+  '/_app/my-schedule': typeof AppMyScheduleRoute
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/schedule': typeof AppScheduleRoute
+  '/_app/team-schedule': typeof AppTeamScheduleRoute
   '/_app/account/profile': typeof AppAccountProfileRoute
   '/_app/account/security': typeof AppAccountSecurityRoute
+  '/_app/incidents/$incidentId': typeof AppIncidentsIncidentIdRoute
   '/_app/team/invites': typeof AppTeamInvitesRoute
   '/_app/team/members': typeof AppTeamMembersRoute
   '/_app/team/settings': typeof AppTeamSettingsRoute
@@ -212,10 +246,13 @@ export interface FileRouteTypes {
     | '/daily-report'
     | '/dashboard'
     | '/my-dashboard'
+    | '/my-schedule'
     | '/notifications'
     | '/schedule'
+    | '/team-schedule'
     | '/account/profile'
     | '/account/security'
+    | '/incidents/$incidentId'
     | '/team/invites'
     | '/team/members'
     | '/team/settings'
@@ -234,16 +271,20 @@ export interface FileRouteTypes {
     | '/daily-report'
     | '/dashboard'
     | '/my-dashboard'
+    | '/my-schedule'
     | '/notifications'
     | '/schedule'
+    | '/team-schedule'
     | '/account/profile'
     | '/account/security'
+    | '/incidents/$incidentId'
     | '/team/invites'
     | '/team/members'
     | '/team/settings'
     | '/incidents'
   id:
     | '__root__'
+    | '/'
     | '/_app'
     | '/accept-invite'
     | '/forgot-password'
@@ -256,10 +297,13 @@ export interface FileRouteTypes {
     | '/_app/daily-report'
     | '/_app/dashboard'
     | '/_app/my-dashboard'
+    | '/_app/my-schedule'
     | '/_app/notifications'
     | '/_app/schedule'
+    | '/_app/team-schedule'
     | '/_app/account/profile'
     | '/_app/account/security'
+    | '/_app/incidents/$incidentId'
     | '/_app/team/invites'
     | '/_app/team/members'
     | '/_app/team/settings'
@@ -267,6 +311,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AppRouteRoute: typeof AppRouteRouteWithChildren
   AcceptInviteRoute: typeof AcceptInviteRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
@@ -311,6 +356,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/team-schedule': {
+      id: '/_app/team-schedule'
+      path: '/team-schedule'
+      fullPath: '/team-schedule'
+      preLoaderRoute: typeof AppTeamScheduleRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/schedule': {
       id: '/_app/schedule'
       path: '/schedule'
@@ -323,6 +382,13 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/notifications'
       preLoaderRoute: typeof AppNotificationsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/my-schedule': {
+      id: '/_app/my-schedule'
+      path: '/my-schedule'
+      fullPath: '/my-schedule'
+      preLoaderRoute: typeof AppMyScheduleRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/my-dashboard': {
@@ -402,6 +468,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTeamInvitesRouteImport
       parentRoute: typeof AppTeamRouteRoute
     }
+    '/_app/incidents/$incidentId': {
+      id: '/_app/incidents/$incidentId'
+      path: '/incidents/$incidentId'
+      fullPath: '/incidents/$incidentId'
+      preLoaderRoute: typeof AppIncidentsIncidentIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/account/security': {
       id: '/_app/account/security'
       path: '/security'
@@ -457,8 +530,11 @@ interface AppRouteRouteChildren {
   AppDailyReportRoute: typeof AppDailyReportRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppMyDashboardRoute: typeof AppMyDashboardRoute
+  AppMyScheduleRoute: typeof AppMyScheduleRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppScheduleRoute: typeof AppScheduleRoute
+  AppTeamScheduleRoute: typeof AppTeamScheduleRoute
+  AppIncidentsIncidentIdRoute: typeof AppIncidentsIncidentIdRoute
   AppIncidentsIndexRoute: typeof AppIncidentsIndexRoute
 }
 
@@ -470,8 +546,11 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppDailyReportRoute: AppDailyReportRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppMyDashboardRoute: AppMyDashboardRoute,
+  AppMyScheduleRoute: AppMyScheduleRoute,
   AppNotificationsRoute: AppNotificationsRoute,
   AppScheduleRoute: AppScheduleRoute,
+  AppTeamScheduleRoute: AppTeamScheduleRoute,
+  AppIncidentsIncidentIdRoute: AppIncidentsIncidentIdRoute,
   AppIncidentsIndexRoute: AppIncidentsIndexRoute,
 }
 
@@ -480,6 +559,7 @@ const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AppRouteRoute: AppRouteRouteWithChildren,
   AcceptInviteRoute: AcceptInviteRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,

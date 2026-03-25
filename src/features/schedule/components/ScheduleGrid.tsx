@@ -1,6 +1,5 @@
 import { addDays, format, parseISO } from 'date-fns'
 import { vi } from 'date-fns/locale'
-import { toZonedTime, format as formatTz } from 'date-fns-tz'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,24 +7,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { type ScheduleSlot } from '../services/schedule.service'
-import { getSlotEditMode, type SlotEditMode } from '../utils/schedule.utils'
+import { getSlotEditMode, formatSlotTime, formatSlotDuration, type SlotEditMode } from '../utils/schedule.utils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatSlotTime(startTime: string, durationMinutes: number, timezone: string): string {
-  const start = toZonedTime(new Date(startTime), timezone)
-  const endMs = new Date(startTime).getTime() + durationMinutes * 60 * 1000
-  const end = toZonedTime(new Date(endMs), timezone)
-  return `${formatTz(start, 'HH:mm', { timeZone: timezone })} → ${formatTz(end, 'HH:mm', { timeZone: timezone })}`
-}
-
-function formatSlotDuration(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}p`
-  if (m === 0) return `${h} giờ`
-  return `${h}h${m}p`
-}
+// formatSlotTime và formatSlotDuration được import từ schedule.utils.ts (tái dùng trong TimeGrid)
 
 function totalWeekHours(slots: ScheduleSlot[]): number {
   return slots.reduce((sum, s) => sum + s.duration_minutes, 0) / 60

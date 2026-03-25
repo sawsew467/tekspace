@@ -1,6 +1,6 @@
 import type { ScheduleSlot, SlotInput } from '../services/schedule.service'
 import { addDays, format, parseISO } from 'date-fns'
-import { toZonedTime } from 'date-fns-tz'
+import { toZonedTime, format as formatTz } from 'date-fns-tz'
 
 /**
  * SlotEditMode — 3-tier lock model (Story 2.5)
@@ -78,6 +78,51 @@ export function shiftSlotsToCurrentWeek(
 
     return { slotDate, startTimeUTC, durationMinutes: slot.duration_minutes }
   })
+}
+
+/**
+ * formatSlotTime — format time range từ UTC start_time + durationMinutes trong user timezone
+ * Di chuyển từ ScheduleGrid.tsx để tái sử dụng trong TimeGrid.tsx
+ */
+export function formatSlotTime(startTime: string, durationMinutes: number, timezone: string): string {
+  const start = toZonedTime(new Date(startTime), timezone)
+  const endMs = new Date(startTime).getTime() + durationMinutes * 60 * 1000
+  const end = toZonedTime(new Date(endMs), timezone)
+  return `${formatTz(start, 'HH:mm', { timeZone: timezone })} → ${formatTz(end, 'HH:mm', { timeZone: timezone })}`
+}
+
+/**
+ * formatSlotDuration — format duration phút → human-readable string (VD: "2h30p", "1 giờ", "45p")
+ * Di chuyển từ ScheduleGrid.tsx để tái sử dụng trong TimeGrid.tsx
+ */
+export function formatSlotDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m}p`
+  if (m === 0) return `${h} giờ`
+  return `${h}h${m}p`
+}
+
+/**
+ * minutesToTimeString — convert minutes-from-midnight → 'HH:mm'
+ * Input: any integer. Uses true modulo to handle negative values safely
+ * (JS % is remainder, not modulo: -1 % 1440 = -1, not 1439).
+ */
+export function minutesToTimeString(minutes: number): string {
+  const DAY = 24 * 60
+  // True modulo: always non-negative
+  const totalMins = ((minutes % DAY) + DAY) % DAY
+  const h = Math.floor(totalMins / 60)
+  const m = totalMins % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+/**
+ * snapTo30 — snap minutes to nearest 30-minute boundary
+ * snap(45) = 60 (rounds up at 15-min mark), snap(14) = 0, snap(15) = 30
+ */
+export function snapTo30(minutes: number): number {
+  return Math.round(minutes / 30) * 30
 }
 
 /**
