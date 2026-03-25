@@ -14,4 +14,5 @@ export const QUERY_KEYS = {
   teamSchedule: 'team-schedule',  // Story 3.1: team overview dashboard
   selfWeekHours: 'self-week-hours',        // Story 3.3: member's own hours this week
   teamAvgCommitment: 'team-avg-commitment', // Story 3.3: anonymous team average commitment rate
+  selfStreak: 'self-streak',               // Story 8.12: consecutive report days streak
 } as const
