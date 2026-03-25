@@ -8,8 +8,12 @@ import { QUERY_KEYS } from '@/lib/query-keys'
 import { getUserProfile } from '@/features/settings/services/settings.service'
 import { getMembers } from '@/features/tenant/services/tenant.service'
 import { useIncidents } from '@/features/incidents/hooks/use-incidents'
+import { useAppeals } from '@/features/incidents/hooks/use-appeals'
+import { useIncidentAppealsRealtime } from '@/features/incidents/hooks/use-incident-appeals-realtime'
+import { usePermissions } from '@/hooks/use-permissions'
 import { IncidentList } from '@/features/incidents/components/IncidentList'
 import { CreateIncidentDialog } from '@/features/incidents/components/CreateIncidentDialog'
+import { AppealDialog } from '@/features/incidents/components/AppealDialog'
 import { Can } from '@/components/can'
 import { Button } from '@/components/ui/button'
 
@@ -35,6 +39,9 @@ function IncidentsPage() {
   const { user } = useAuthStore()
   const { activeTenantId } = useTenantStore()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [appealIncidentId, setAppealIncidentId] = useState<string | null>(null)
+
+  const { canCreateIncident } = usePermissions()
 
   // User profile để lấy timezone (pattern từ notifications.tsx)
   const { data: userProfile, isLoading: isProfileLoading } = useQuery({
@@ -53,6 +60,12 @@ function IncidentsPage() {
 
   // Incidents list
   const { data: incidents = [], isLoading: isIncidentsLoading } = useIncidents(activeTenantId)
+
+  // Appeals — RLS tự lọc: member chỉ thấy của mình, manager thấy tất cả
+  const { data: appeals = [] } = useAppeals(activeTenantId)
+
+  // Realtime: khi member submit appeal → invalidate cache ngay, không cần F5
+  useIncidentAppealsRealtime(activeTenantId)
 
   // Members list — để resolve names trong IncidentList
   const { data: members = [] } = useQuery({
@@ -88,9 +101,12 @@ function IncidentsPage() {
         isLoading={isIncidentsLoading}
         members={members}
         userTimezone={timezone}
+        appeals={appeals}
+        canAppeal={!canCreateIncident}
+        onAppeal={(incidentId) => setAppealIncidentId(incidentId)}
       />
 
-      {/* Dialog — chỉ render khi có permission (tránh fetch members thừa) */}
+      {/* Log Incident Dialog — chỉ render khi có permission */}
       <Can do='createIncident'>
         <CreateIncidentDialog
           open={dialogOpen}
@@ -99,6 +115,17 @@ function IncidentsPage() {
           currentUserId={user?.id}
         />
       </Can>
+
+      {/* Appeal Dialog — chỉ render cho member */}
+      {!canCreateIncident && (
+        <AppealDialog
+          open={!!appealIncidentId}
+          onOpenChange={(open) => { if (!open) setAppealIncidentId(null) }}
+          incidentId={appealIncidentId ?? ''}
+          tenantId={activeTenantId}
+          currentUserId={user?.id}
+        />
+      )}
     </div>
   )
 }

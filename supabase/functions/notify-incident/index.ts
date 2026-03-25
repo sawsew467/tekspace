@@ -1,24 +1,16 @@
 import { corsHeaders } from '../_shared/cors.ts'
 import { supabaseAdmin } from '../_shared/supabase-admin.ts'
+import { getUserFromJwt } from '../_shared/jwt.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Verify caller JWT
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(
-    authHeader.replace('Bearer ', '')
-  )
-  if (authError || !caller) {
+  // Auth via JWT decode (getUserFromJwt — tránh JWT issuer mismatch trong local dev)
+  // supabaseAdmin.auth.getUser() gọi HTTP → GoTrue reject iss mismatch → hang → timeout
+  const caller = getUserFromJwt(req.headers.get('Authorization'))
+  if (!caller) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

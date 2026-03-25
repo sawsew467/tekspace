@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase-browser'
 import type { Tables } from '@/lib/supabase-types'
 
 export type Incident = Tables<'incidents'>
+export type IncidentAppeal = Tables<'incident_appeals'>
 
 export const IncidentService = {
   getIncidents: async (tenantId: string): Promise<Incident[]> => {
@@ -47,9 +48,57 @@ export const IncidentService = {
         },
       })
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.warn('[createIncident] notification failed (best-effort):', err)
     }
 
     return incident
+  },
+
+  getIncidentAppeals: async (tenantId: string): Promise<IncidentAppeal[]> => {
+    const { data, error } = await supabase
+      .from('incident_appeals')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data ?? []
+  },
+
+  createAppeal: async (params: {
+    tenantId: string
+    incidentId: string
+    memberId: string
+    response: string
+  }): Promise<IncidentAppeal> => {
+    // INSERT appeal — member_id = auth.uid(), RLS enforce victim check tự động
+    const { data: appeal, error: appealError } = await supabase
+      .from('incident_appeals')
+      .insert({
+        tenant_id:   params.tenantId,
+        incident_id: params.incidentId,
+        member_id:   params.memberId,
+        response:    params.response,
+      })
+      .select()
+      .single()
+    if (appealError) throw appealError
+
+    // Notify managers qua Edge Function (service role bypass RLS)
+    // Member không thể INSERT notification cho manager trực tiếp
+    // Best-effort: appeal đã tạo thành công dù notification fail
+    try {
+      await supabase.functions.invoke('notify-appeal', {
+        body: {
+          incidentId: params.incidentId,
+          tenantId:   params.tenantId,
+        },
+      })
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[createAppeal] notification failed (best-effort):', err)
+    }
+
+    return appeal
   },
 }

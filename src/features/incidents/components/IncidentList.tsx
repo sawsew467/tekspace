@@ -3,6 +3,7 @@ import { toZonedTime } from 'date-fns-tz'
 import { vi } from 'date-fns/locale'
 import { ShieldAlert } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
@@ -13,7 +14,7 @@ import {
 import {
   INCIDENT_CATEGORY_LABELS,
 } from '@/features/incidents/schemas/incident.schema'
-import type { Incident } from '@/features/incidents/services/incident.service'
+import type { Incident, IncidentAppeal } from '@/features/incidents/services/incident.service'
 import type { TenantMemberWithUser } from '@/features/tenant/services/tenant.service'
 
 // Badge variant per category
@@ -29,6 +30,9 @@ interface IncidentListProps {
   isLoading: boolean
   members: TenantMemberWithUser[]
   userTimezone: string | null
+  appeals: IncidentAppeal[]
+  canAppeal: boolean                         // true = member; false = manager/owner
+  onAppeal: (incidentId: string) => void     // callback mở AppealDialog
 }
 
 function getMemberName(members: TenantMemberWithUser[], userId: string): string {
@@ -40,6 +44,9 @@ export function IncidentList({
   isLoading,
   members,
   userTimezone,
+  appeals,
+  canAppeal,
+  onAppeal,
 }: IncidentListProps) {
   if (isLoading) {
     return (
@@ -76,6 +83,9 @@ export function IncidentList({
         const categoryLabel = INCIDENT_CATEGORY_LABELS[incident.category] ?? incident.category
         const badgeVariant = CATEGORY_BADGE_VARIANT[incident.category] ?? 'outline'
 
+        // Tìm appeal cho incident này
+        const appeal = appeals.find((a) => a.incident_id === incident.id)
+
         // Truncate note nếu dài
         const NOTE_LIMIT = 120
         const isLong = incident.note.length > NOTE_LIMIT
@@ -98,6 +108,12 @@ export function IncidentList({
                 <span className='text-xs text-muted-foreground'>
                   — ghi nhận bởi {managerName}
                 </span>
+                {/* Badge appeal status — cả member lẫn manager đều thấy (AC1) */}
+                <Badge variant={appeal ? 'secondary' : 'outline'} className='text-xs'>
+                  {appeal
+                    ? (canAppeal ? 'Đã gửi appeal' : 'Đã appeal')
+                    : 'Chưa appeal'}
+                </Badge>
               </div>
               <time
                 dateTime={incident.created_at}
@@ -126,6 +142,37 @@ export function IncidentList({
               </TooltipProvider>
             ) : (
               <p className='text-sm text-muted-foreground'>{incident.note}</p>
+            )}
+
+            {/* Appeal section — member view */}
+            {canAppeal && (
+              appeal ? (
+                // Đã có appeal — hiển thị response
+                <div className='rounded-md bg-muted/50 border px-3 py-2 space-y-1'>
+                  <p className='text-xs font-medium text-muted-foreground'>Appeal của bạn:</p>
+                  <p className='text-sm'>{appeal.response || '—'}</p>
+                </div>
+              ) : (
+                // Chưa appeal — hiển thị button
+                <Button
+                  size='sm'
+                  variant='outline'
+                  className='h-7 text-xs'
+                  onClick={() => onAppeal(incident.id)}
+                >
+                  Gửi Appeal
+                </Button>
+              )
+            )}
+
+            {/* Appeal section — manager/owner view (chỉ khi có appeal) */}
+            {!canAppeal && appeal && (
+              <div className='rounded-md bg-muted/50 border px-3 py-2 space-y-1'>
+                <p className='text-xs font-medium text-muted-foreground'>
+                  Appeal từ {getMemberName(members, appeal.member_id)}:
+                </p>
+                <p className='text-sm'>{appeal.response || '—'}</p>
+              </div>
             )}
           </div>
         )

@@ -44,6 +44,7 @@ export type Database = {
           submitted_at: string
           tasks: Json
           tenant_id: string
+          updated_at: string | null
           user_id: string
         }
         Insert: {
@@ -55,6 +56,7 @@ export type Database = {
           submitted_at?: string
           tasks?: Json
           tenant_id: string
+          updated_at?: string | null
           user_id: string
         }
         Update: {
@@ -66,6 +68,7 @@ export type Database = {
           submitted_at?: string
           tasks?: Json
           tenant_id?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
@@ -609,8 +612,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auto_create_missing_schedules: {
+        Args: { p_week_of: string }
+        Returns: Json
+      }
       current_tenant_id: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      delete_slot_with_reason: {
+        Args: {
+          p_is_emergency_override?: boolean
+          p_reason: string
+          p_slot_id: string
+        }
+        Returns: undefined
+      }
       get_or_create_schedule_week: {
         Args: { p_week_of: string }
         Returns: string
@@ -621,8 +636,18 @@ export type Database = {
       }
       is_tenant_manager: { Args: never; Returns: boolean }
       is_valid_timezone: { Args: { tz: string }; Returns: boolean }
+      update_slot_with_reason: {
+        Args: {
+          p_is_emergency_override?: boolean
+          p_new_duration_minutes: number
+          p_new_start_time: string
+          p_reason: string
+          p_slot_id: string
+        }
+        Returns: undefined
+      }
       upsert_week_slots: {
-        Args: { p_week_id: string; p_slots: Json }
+        Args: { p_slots: Json; p_week_id: string }
         Returns: undefined
       }
     }

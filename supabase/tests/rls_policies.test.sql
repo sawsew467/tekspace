@@ -14,7 +14,7 @@
 
 BEGIN;
 
-SELECT plan(24);
+SELECT plan(29);
 
 -- =============================================================
 -- FIXTURES (chạy với quyền postgres superuser — bypass RLS)
@@ -73,6 +73,50 @@ VALUES (
   'pending',
   now() + interval '7 days'
 ) ON CONFLICT (id) DO NOTHING;
+
+-- Incidents + incident_appeals (Story 7-2: RLS tests)
+-- Incidents: f11 (victim=member), f12 (victim=owner), f13 (victim=member, dùng cho INSERT test)
+INSERT INTO public.incidents (id, tenant_id, member_id, manager_id, category, note) VALUES
+  (
+    'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f11',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',  -- member là victim
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',  -- manager log
+    'missed_report', 'RLS test — member incident (có appeal pre-existing)'
+  ),
+  (
+    'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f12',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',  -- owner là victim
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+    'missed_report', 'RLS test — owner incident (appeal cross-visibility test)'
+  ),
+  (
+    'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f13',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',  -- member là victim
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+    'missed_report', 'RLS test — member incident 2 (dùng cho INSERT test T27)'
+  )
+ON CONFLICT (id) DO NOTHING;
+
+-- Pre-existing appeals: f21 (member's appeal), f22 (owner's appeal)
+INSERT INTO public.incident_appeals (id, tenant_id, incident_id, member_id, response) VALUES
+  (
+    'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f21',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+    'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f11',
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',  -- member's appeal
+    'Đây là phản hồi của member'
+  ),
+  (
+    'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f22',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+    'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f12',
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',  -- owner's appeal
+    'Đây là phản hồi của owner'
+  )
+ON CONFLICT (id) DO NOTHING;
 
 -- Daily reports (Story 4.6: UPDATE RLS tests)
 -- Dùng bypass mode (postgres superuser) để insert fixture
@@ -567,6 +611,110 @@ SELECT is(
   ),
   1,
   '24. Manager CÓ THỂ UPDATE committed_hours = NULL (reset về mặc định nhóm)'
+);
+
+RESET ROLE;
+
+-- =============================================================
+-- TEST SECTION 9: incident_appeals — SELECT & INSERT policy (Story 7-2)
+-- =============================================================
+
+-- Test 25: Member chỉ thấy appeal của chính mình (không thấy appeal của owner)
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  (SELECT count(*)::int FROM public.incident_appeals
+   WHERE tenant_id = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'),
+  1,  -- chỉ thấy f21 (của mình), không thấy f22 (của owner)
+  '25. Member chỉ thấy appeal của chính mình (cross-member isolation)'
+);
+
+RESET ROLE;
+
+-- Test 26: Manager thấy tất cả appeals trong tenant
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'::uuid,  -- manager
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  (SELECT count(*)::int FROM public.incident_appeals
+   WHERE tenant_id = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'),
+  2,  -- thấy cả f21 (member) lẫn f22 (owner)
+  '26. Manager thấy tất cả appeals trong tenant'
+);
+
+RESET ROLE;
+
+-- Test 27: Member CÓ THỂ INSERT appeal cho incident của chính mình
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT lives_ok(
+  $sql$
+    INSERT INTO public.incident_appeals (incident_id, tenant_id, member_id, response)
+    VALUES (
+      'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f13',  -- incident f13: victim = member (chưa có appeal)
+      'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+      'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',
+      'Test appeal response'
+    )
+  $sql$,
+  '27. Member CÓ THỂ INSERT appeal cho incident của chính mình (RLS victim check pass)'
+);
+
+RESET ROLE;
+
+-- Test 28: Member KHÔNG THỂ INSERT appeal cho incident của member khác (victim check fail)
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT throws_ok(
+  $sql$
+    INSERT INTO public.incident_appeals (incident_id, tenant_id, member_id, response)
+    VALUES (
+      'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f12',  -- incident f12: victim = owner (không phải member)
+      'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+      'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',
+      'Trying to appeal another member incident'
+    )
+  $sql$,
+  '42501', NULL,
+  '28. Member KHÔNG THỂ INSERT appeal cho incident của member khác (42501)'
+);
+
+RESET ROLE;
+
+-- Test 29: Manager KHÔNG THỂ INSERT appeal (không phải victim của incident)
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'::uuid,  -- manager
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT throws_ok(
+  $sql$
+    INSERT INTO public.incident_appeals (incident_id, tenant_id, member_id, response)
+    VALUES (
+      'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f11',  -- incident f11: victim = member (không phải manager)
+      'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+      'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+      'Manager trying to submit appeal'
+    )
+  $sql$,
+  '42501', NULL,
+  '29. Manager KHÔNG THỂ INSERT appeal (không phải victim của incident — 42501)'
 );
 
 RESET ROLE;
