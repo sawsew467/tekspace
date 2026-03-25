@@ -1,6 +1,6 @@
 # Story 2.3: Schedule Change & Deadline Lock
 
-**Status:** review
+**Status:** done
 **Epic:** 2 — Schedule Registration
 **Story ID:** 2.3
 **Story Key:** 2-3-schedule-change-deadline-lock

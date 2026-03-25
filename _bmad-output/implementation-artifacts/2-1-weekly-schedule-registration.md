@@ -1,6 +1,6 @@
 # Story 2.1: Weekly Schedule Registration
 
-Status: review
+Status: done
 
 ## Story
 

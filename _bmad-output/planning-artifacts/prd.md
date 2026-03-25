@@ -804,6 +804,8 @@ trước khi bắt đầu coding.*
 - FR51: User đã đăng nhập có thể đổi password bằng
   cách xác nhận password hiện tại trước khi đặt
   password mới
+- FR53: User có thể upload avatar cá nhân; avatar hiển
+  thị trong sidebar và danh sách thành viên
 
 ---
 
@@ -813,6 +815,8 @@ trước khi bắt đầu coding.*
 - FR7: Owner có thể cấu hình team settings (schedule
   deadline, daily report deadline, default committed
   hours, team timezone)
+- FR54: Owner có thể upload logo/avatar cho tenant;
+  logo hiển thị trong sidebar tenant switcher
 - FR8: Owner và Manager có thể invite member vào tenant
   qua email
 - FR9: Owner và Manager có thể remove member khỏi tenant
@@ -896,6 +900,10 @@ trước khi bắt đầu coding.*
 
 - FR33: Owner và Manager có thể set committed hours
   target cho từng member
+- FR33b: Mỗi lần committed hours được thay đổi, system
+  lưu lịch sử thay đổi (effective_from, effective_to) —
+  không ghi đè giá trị cũ. Analytics sử dụng đúng giá
+  trị committed hours của từng kỳ tương ứng.
 - FR34: System theo dõi actual hours của mỗi member
   so với committed hours target
 - FR35: Manager và Owner có thể xem hours analytics
@@ -918,7 +926,9 @@ trước khi bắt đầu coding.*
 - FR42: System notify member bị remove với thông báo
   thân thiện khi session bị invalidate
 - FR43: Tất cả notifications được deliver qua cả
-  in-app và email (Resend)
+  in-app và email (Resend); khi user đang ở tab khác,
+  system có thể gửi browser push notification (opt-in)
+  và hiển thị unread count trên browser tab title
 
 ---
 

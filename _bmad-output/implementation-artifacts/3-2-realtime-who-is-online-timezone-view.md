@@ -1,6 +1,6 @@
 # Story 3.2: Real-time "Who is Online" & Timezone View
 
-**Status:** review
+**Status:** done
 **Epic:** 3 — Team Visibility & Self-Dashboard
 **Story ID:** 3.2
 **Story Key:** 3-2-realtime-who-is-online-timezone-view

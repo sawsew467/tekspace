@@ -14,7 +14,7 @@
 
 BEGIN;
 
-SELECT plan(29);
+SELECT plan(34);
 
 -- =============================================================
 -- FIXTURES (chạy với quyền postgres superuser — bypass RLS)
@@ -115,6 +115,26 @@ INSERT INTO public.incident_appeals (id, tenant_id, incident_id, member_id, resp
     'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f12',
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',  -- owner's appeal
     'Đây là phản hồi của owner'
+  )
+ON CONFLICT (id) DO NOTHING;
+
+-- Outcome notes (Story 7-3: RLS tests)
+-- e31 = note cho incident f11 (victim = member a13), manager = a12
+-- e32 = note cho incident f12 (victim = owner a11), manager = a12
+INSERT INTO public.incident_outcome_notes (id, tenant_id, incident_id, manager_id, note) VALUES
+  (
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e31',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+    'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f11',  -- incident f11: victim = member (a13)
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',  -- manager ghi chú
+    'RLS test — outcome note cho member incident'
+  ),
+  (
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e32',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+    'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f12',  -- incident f12: victim = owner (a11)
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+    'RLS test — outcome note cho owner incident'
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -715,6 +735,105 @@ SELECT throws_ok(
   $sql$,
   '42501', NULL,
   '29. Manager KHÔNG THỂ INSERT appeal (không phải victim của incident — 42501)'
+);
+
+RESET ROLE;
+
+-- =============================================================
+-- Tests 30-34: incident_outcome_notes RLS (Story 7-3)
+-- Bảng mới: tenant isolation + manager/victim access control
+-- Test IDs: e31 (note for f11, victim=member), e32 (note for f12, victim=owner)
+-- =============================================================
+
+-- Test 30: Manager THẤY tất cả outcome notes trong tenant
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'::uuid,  -- manager
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  (SELECT count(*)::int FROM public.incident_outcome_notes
+   WHERE tenant_id = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'),
+  2,  -- thấy cả e31 (note cho member's incident) lẫn e32 (note cho owner's incident)
+  '30. Manager thấy tất cả outcome notes trong tenant'
+);
+
+RESET ROLE;
+
+-- Test 31: Member THẤY outcome notes của incident mình là victim
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  (SELECT count(*)::int FROM public.incident_outcome_notes
+   WHERE incident_id = 'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f11'),  -- f11: victim = member
+  1,  -- thấy e31
+  '31. Member thấy outcome notes của incident mình là victim'
+);
+
+RESET ROLE;
+
+-- Test 32: Member KHÔNG THẤY outcome notes của incident mình KHÔNG là victim
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  (SELECT count(*)::int FROM public.incident_outcome_notes
+   WHERE incident_id = 'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f12'),  -- f12: victim = owner (không phải member)
+  0,  -- không thấy e32
+  '32. Member KHÔNG thấy outcome notes của incident người khác (tenant isolation)'
+);
+
+RESET ROLE;
+
+-- Test 33: Manager CÓ THỂ INSERT outcome note
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'::uuid,  -- manager
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT lives_ok(
+  $sql$
+    INSERT INTO public.incident_outcome_notes (incident_id, tenant_id, manager_id, note)
+    VALUES (
+      'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f13',  -- incident f13 (chưa có note)
+      'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+      'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+      'Test outcome note từ manager'
+    )
+  $sql$,
+  '33. Manager CÓ THỂ INSERT outcome note (manager_id = auth.uid() pass)'
+);
+
+RESET ROLE;
+
+-- Test 34: Member KHÔNG THỂ INSERT outcome note (chỉ manager/owner được INSERT)
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT throws_ok(
+  $sql$
+    INSERT INTO public.incident_outcome_notes (incident_id, tenant_id, manager_id, note)
+    VALUES (
+      'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f11',  -- incident f11: member là victim
+      'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+      'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',
+      'Member cố gắng INSERT outcome note'
+    )
+  $sql$,
+  '42501', NULL,
+  '34. Member KHÔNG THỂ INSERT outcome note (is_tenant_manager() fail — 42501)'
 );
 
 RESET ROLE;

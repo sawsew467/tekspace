@@ -1,6 +1,6 @@
 # Story 3.3: Member Self-Dashboard
 
-**Status:** review
+**Status:** done
 **Epic:** 3 — Team Visibility & Self-Dashboard
 **Story ID:** 3.3
 **Story Key:** 3-3-member-self-dashboard

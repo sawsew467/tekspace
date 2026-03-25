@@ -1,6 +1,6 @@
 # Story 2.4: Missed Deadline Auto-Handling
 
-**Status:** review
+**Status:** done
 **Epic:** 2 — Schedule Registration
 **Story ID:** 2.4
 **Story Key:** 2-4-missed-deadline-auto-handling

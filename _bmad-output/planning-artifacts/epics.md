@@ -217,6 +217,40 @@ Manager có thể ghi nhận sự cố một cách chính thức, member có quy
 **FRs covered:** FR44, FR45, FR46, FR47, FR48
 **Technical notes:** Incidents và appeals là append-only inserts — không UPDATE, không DELETE bất cứ thứ gì. 4 loại incident category (từ PRD). Appeal outcome được log với timestamp. Manager chỉ log thủ công, system không tự động log.
 
+### Epic 8: UX Polish & Feature Completeness
+App hoạt động đúng và đủ cho việc dùng thực tế — bug được fix, UI nhất quán, các tính năng còn thiếu được bổ sung, và data analytics đảm bảo chính xác cho performance review.
+**Source:** sprint-change-proposal-2026-03-25.md
+**Technical notes:** Được thiết kế để chạy song song tối đa qua 5 waves. Wave 1 (5 agents độc lập) → Wave 2 (3 agents, route/layout/sidebar) → Wave 3 (3 agents, feature medium) → Wave 4 (4 agents, UI enhancement) → Wave 5 (1 agent, schedule overhaul). Migration `committed_hours_history` cần `npx supabase test db` PASS trước khi done.
+
+**Wave 1 — Fully parallel (8 agents):**
+- **8-1** `bug-remove-member-role-fix`: Fix Edge Function `remove-member` + RLS `tenant_members` UPDATE + JWT refresh sau role change
+- **8-2** `page-title-fix`: Thêm `<Meta />` vào `__root.tsx` + default title fallback
+- **8-3** `copy-invite-link`: Nút copy icon cạnh Resend trong `InviteListSection`
+- **8-4** `notification-message-review`: Review + rewrite 7 notification message types cho self-descriptive
+- **8-5** `committed-hours-history`: Migration `committed_hours_history` + update `SetCommittedHoursDialog` + analytics trend queries
+- **8-17** `route-protection`: `beforeLoad` role guard cho `/team/settings` (Owner) + `/team/invites` (Owner+Manager) → redirect `/dashboard` nếu không đủ quyền
+- **8-18** `auth-hardening`: `getUser()` thay `getSession()` trong beforeLoad; redirect-back URL sau login
+- **8-19** `error-pages`: `defaultNotFoundComponent` (404) + `defaultErrorComponent` (ErrorBoundary) + redirect từ URL cũ sau khi 8-6 đổi routes
+
+**Wave 2 — Sau Wave 1 (3 agents, không conflict nhau):**
+- **8-6** `url-restructure-and-nav-roles`: `/schedule`→`/my-schedule`, `/dashboard`→`/team-schedule`, `/my-dashboard`→`/dashboard`; thêm `roles` field vào NavItem; filter sidebar theo role; redirect `team/settings` nếu không phải Owner
+- **8-7** `layout-page-container`: Tạo `PageContainer` (default + wide variant); apply vào tất cả pages
+- **8-8** `sidebar-collapse-fix`: Fix sidebar layout khi thu gọn + notification badge visible
+
+**Wave 3 — Sau Wave 2 (3 agents):**
+- **8-9** `highlight-current-timeslot`: Highlight cột giờ hiện tại trong team schedule grid
+- **8-10** `user-avatar-upload`: Migration `users.avatar_url` + Storage bucket + upload UI tại `/account/profile`
+- **8-11** `infinite-scroll`: `useInfiniteQuery` + IntersectionObserver cho notifications, incidents, report history
+
+**Wave 4 — Sau Wave 3 (4 agents):**
+- **8-12** `my-dashboard-ui`: Sparkline 4 tuần + streak counter + quick action trong `SelfDashboard`
+- **8-13** `my-analytics-ui`: Toggle tuần/tháng + summary card trong `SelfAnalyticsHistory`
+- **8-14** `tenant-avatar-logo`: Migration `tenants.logo_url` + Storage + upload tại `/team/settings`
+- **8-15** `browser-notification-badge`: Web Push API (opt-in) + tab title prefix `(N) TekSpace`
+
+**Wave 5 — Sau Wave 4 (1 agent, high effort):**
+- **8-16** `schedule-week-picker-drag`: Week picker Popover + Calendar; time-grid visual; drag-to-create slot; fallback button giữ nguyên
+
 ---
 
 ## Epic 1: Foundation & Team Onboarding
