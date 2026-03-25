@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useForm, useFieldArray, useWatch, type Control } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Trash2, Loader2, TriangleAlert } from 'lucide-react'
@@ -164,12 +164,15 @@ function TaskRow({ index, control, canRemove, onRemove }: TaskRowProps) {
 type Props = {
   onSubmit: (values: DailyReportFormValues) => void
   isPending: boolean
+  defaultValues?: DailyReportFormValues  // Story 4.6: pre-fill từ report cũ khi edit
+  submitLabel?: string                   // Story 4.6: override nút submit (default: "Nộp Daily Report")
+  onCancel?: () => void                  // Story 4.6: hiện nút "Huỷ" khi có
 }
 
-export function DailyReportForm({ onSubmit, isPending }: Props) {
+export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabel, onCancel }: Props) {
   const form = useForm<DailyReportFormValues>({
     resolver: zodResolver(dailyReportFormSchema),
-    defaultValues: {
+    defaultValues: defaultValues ?? {
       tasks: [{ description: '', output_type: 'other', output_link: '', hours: undefined }],
       hours_logged: 0,
     },
@@ -185,16 +188,20 @@ export function DailyReportForm({ onSubmit, isPending }: Props) {
   const tasksWatched = useWatch({ control: form.control, name: 'tasks' })
 
   // Auto-compute hours_logged từ sum(task.hours) khi TẤT CẢ tasks đều có hours > 0.
-  // Reset về 0 khi không allFilled để tránh stale sum.
+  // didMountRef: skip reset về 0 trong lần render đầu tiên để bảo toàn defaultValues.hours_logged
+  // (quan trọng khi edit mode: report cũ có hours_logged > 0 nhưng tasks không có per-task hours)
+  const didMountRef = useRef(false)
   useEffect(() => {
     const tasks = tasksWatched ?? []
     const allFilled = tasks.length > 0 && tasks.every(t => t.hours !== undefined && t.hours > 0)
     if (allFilled) {
       const sum = tasks.reduce((acc, t) => acc + (t.hours ?? 0), 0)
       form.setValue('hours_logged', sum, { shouldDirty: false, shouldValidate: false })
-    } else {
+    } else if (didMountRef.current) {
+      // Chỉ reset về 0 sau lần mount đầu tiên — không override defaultValues.hours_logged
       form.setValue('hours_logged', 0, { shouldDirty: false, shouldValidate: false })
     }
+    didMountRef.current = true
   }, [tasksWatched, form])
 
   // Computed — tự update khi field thay đổi, không cần useState
@@ -278,8 +285,19 @@ export function DailyReportForm({ onSubmit, isPending }: Props) {
 
           <Button type='submit' className='w-full'>
             {isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-            Nộp Daily Report
+            {submitLabel ?? 'Nộp Daily Report'}
           </Button>
+          {onCancel && (
+            <Button
+              type='button'
+              variant='ghost'
+              className='w-full'
+              onClick={onCancel}
+              disabled={isPending}
+            >
+              Huỷ
+            </Button>
+          )}
         </fieldset>
       </form>
     </Form>

@@ -8,6 +8,7 @@ import {
   OUTPUT_TYPE_PLACEHOLDERS,
   hasDiscrepancy,
   computeStreak,
+  isWithinEditWindow,
   type TaskItem,
 } from '../schemas/daily-report.schema'
 
@@ -447,5 +448,71 @@ describe('computeStreak', () => {
     const dates = ['2026-03-24', 'invalid-date', '2026-03-23']
     // 'invalid-date' không làm crash, streak vẫn tính được từ valid dates
     expect(() => computeStreak(dates, today)).not.toThrow()
+  })
+})
+
+// ── isWithinEditWindow ────────────────────────────────────────────────────────
+
+describe('isWithinEditWindow', () => {
+  const TZ = 'Asia/Ho_Chi_Minh'  // UTC+7
+
+  // ── Regression tests (dùng far-future/past date) ──────────────────────────
+
+  it('còn trong window: deadline 3am hôm sau, now = 11pm hôm nay → true', () => {
+    // reportDate cực xa trong tương lai → deadline chưa qua → true
+    expect(isWithinEditWindow('2099-12-30', 3, TZ)).toBe(true)
+  })
+
+  it('đã qua window: deadline đã qua → false', () => {
+    // reportDate rất xa trong quá khứ → deadline chắc chắn đã qua
+    expect(isWithinEditWindow('2020-01-01', 3, TZ)).toBe(false)
+  })
+
+  it('report ngày hôm qua thông thường → false (window đã đóng sau 3am)', () => {
+    expect(isWithinEditWindow('2019-06-15', 0, TZ)).toBe(false)
+  })
+
+  it('timezone không hợp lệ → false (safe default)', () => {
+    expect(isWithinEditWindow('2099-12-30', 3, 'Invalid/Timezone')).toBe(false)
+  })
+
+  it('timezone empty string → false (safe default)', () => {
+    expect(isWithinEditWindow('2099-12-30', 3, '')).toBe(false)
+  })
+
+  it('reportDate không hợp lệ → false (safe default từ try/catch)', () => {
+    expect(isWithinEditWindow('not-a-date', 3, TZ)).toBe(false)
+  })
+
+  it('deadline hour = 0 (midnight) với UTC → vẫn tính đúng', () => {
+    expect(isWithinEditWindow('2099-12-30', 0, 'UTC')).toBe(true)
+  })
+
+  it('deadline hour = 23 với UTC → vẫn tính đúng', () => {
+    expect(isWithinEditWindow('2099-12-30', 23, 'UTC')).toBe(true)
+  })
+
+  // ── Deterministic boundary tests (now injection) ──────────────────────────
+  // report_date = '2026-03-25', deadlineHour = 3, TZ = Asia/Ho_Chi_Minh (UTC+7)
+  // → deadline = 2026-03-26T03:00:00 ICT = 2026-03-25T20:00:00 UTC
+
+  it('1am ICT (18:00 UTC) < deadline 3am ICT (20:00 UTC) → còn trong window', () => {
+    const beforeDeadline = new Date('2026-03-25T18:00:00Z')  // 1am ICT ngày 26
+    expect(isWithinEditWindow('2026-03-25', 3, TZ, beforeDeadline)).toBe(true)
+  })
+
+  it('5am ICT (22:00 UTC) > deadline 3am ICT (20:00 UTC) → đã qua window', () => {
+    const afterDeadline = new Date('2026-03-25T22:00:00Z')  // 5am ICT ngày 26
+    expect(isWithinEditWindow('2026-03-25', 3, TZ, afterDeadline)).toBe(false)
+  })
+
+  it('đúng thời điểm deadline (20:00 UTC) → false (isBefore là strict <)', () => {
+    const atDeadline = new Date('2026-03-25T20:00:00Z')  // 3am ICT ngày 26 — đúng deadline
+    expect(isWithinEditWindow('2026-03-25', 3, TZ, atDeadline)).toBe(false)
+  })
+
+  it('1 giây trước deadline → true', () => {
+    const justBefore = new Date('2026-03-25T19:59:59Z')  // 02:59:59 ICT
+    expect(isWithinEditWindow('2026-03-25', 3, TZ, justBefore)).toBe(true)
   })
 })

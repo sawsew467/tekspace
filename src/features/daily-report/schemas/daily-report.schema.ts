@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { fromZonedTime } from 'date-fns-tz'
+import { isBefore } from 'date-fns'
 
 // ── Output Type ──────────────────────────────────────────────────────────────
 
@@ -84,6 +86,51 @@ export function hasDiscrepancy(hoursLogged: number, tasks: TaskItem[]): boolean 
   // Fallback: dùng hoursLogged khi không có per-task hours
   const hasAnyOutputLink = tasks.some(t => t.output_link && t.output_link.trim() !== '')
   return hoursLogged > 4 && tasks.length <= 1 && !hasAnyOutputLink
+}
+
+// ── Edit Window ───────────────────────────────────────────────────────────────
+
+/**
+ * Kiểm tra xem report có còn trong edit window không.
+ * Window = reportDate ngày tiếp theo, giờ deadlineHour, theo tenantTimezone.
+ *
+ * Ví dụ: report_date = '2026-03-25', deadlineHour = 3, TZ = 'Asia/Ho_Chi_Minh'
+ * → deadline = 2026-03-26 03:00:00 ICT = 2026-03-25 20:00:00 UTC
+ * → nếu now < deadline → còn window → true
+ *
+ * @param reportDate - ISO date string 'yyyy-MM-dd' của report
+ * @param deadlineHour - giờ deadline (0-23) theo tenant timezone
+ * @param tenantTimezone - IANA timezone string (VD: 'Asia/Ho_Chi_Minh')
+ * @param now - thời điểm so sánh (mặc định = new Date()); injectable để test và real-time check
+ * @returns true nếu now < deadline; false nếu hết window hoặc timezone invalid
+ */
+export function isWithinEditWindow(
+  reportDate: string,
+  deadlineHour: number,
+  tenantTimezone: string,
+  now: Date = new Date(),
+): boolean {
+  // Guard empty timezone — fromZonedTime fallback về UTC với empty string, không throw
+  if (!tenantTimezone || tenantTimezone.trim() === '') return false
+  try {
+    // Parse components trực tiếp từ 'yyyy-MM-dd' để tránh parseISO local-timezone behavior.
+    // parseISO('yyyy-MM-dd') trả về local midnight (không phải UTC midnight), gây sai ngày
+    // khi server/browser ở timezone khác tenant. Dùng Date.UTC để luôn tính theo UTC.
+    const parts = reportDate.split('-').map(Number)
+    if (parts.length !== 3 || parts.some(v => isNaN(v))) return false
+    const [y, m, d] = parts
+    // Date.UTC tự xử lý rollover (ví dụ: d=31 + 1 → tháng tiếp theo)
+    const nextDayStr = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10)
+    // Construct deadline trong tenant timezone rồi convert về UTC để so sánh với now
+    const deadlineUTC = fromZonedTime(
+      `${nextDayStr}T${String(deadlineHour).padStart(2, '0')}:00:00`,
+      tenantTimezone,
+    )
+    return isBefore(now, deadlineUTC)
+  } catch {
+    // Timezone invalid hoặc date parse error → không cho edit (safe default)
+    return false
+  }
 }
 
 // ── Streak Computation ────────────────────────────────────────────────────────
