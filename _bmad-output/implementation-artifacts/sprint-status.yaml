@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-23
-last_updated: 2026-03-25 (story-6-2 → review)
+last_updated: 2026-03-25 (story-6-2 → done)
 project: TekSpace
 project_key: NOKEY
 tracking_system: file-system
@@ -71,20 +71,20 @@ development_status:
   # ─────────────────────────────────────────────
   epic-3: in-progress
   3-1-team-overview-dashboard: done
-  3-2-realtime-who-is-online-timezone-view: backlog
+  3-2-realtime-who-is-online-timezone-view: review
   3-3-member-self-dashboard: backlog
   epic-3-retrospective: optional
 
   # ─────────────────────────────────────────────
   # Epic 4: Daily Report
   # ─────────────────────────────────────────────
-  epic-4: in-progress
+  epic-4: done
   4-1-submit-daily-report: done
   4-2-cross-validation-discrepancy-detection: done
   4-3-manager-report-view: done
   4-4-ux-restructure-tabs-history-form-polish: done
   4-5-per-task-hours: done
-  4-6-edit-report-window: review
+  4-6-edit-report-window: done
   epic-4-retrospective: done
 
   # ─────────────────────────────────────────────
@@ -101,7 +101,7 @@ development_status:
   # ─────────────────────────────────────────────
   epic-6: in-progress
   6-1-in-app-notification-center: done
-  6-2-schedule-deadline-notifications: review
+  6-2-schedule-deadline-notifications: done
   6-3-daily-report-reminder: backlog
   6-4-event-based-notifications: backlog
   epic-6-retrospective: optional
