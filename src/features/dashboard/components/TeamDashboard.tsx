@@ -7,9 +7,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/stores/auth-store'
 import { useTenantMembers } from '@/features/tenant/hooks/use-tenant-members'
 import { getUserProfile } from '@/features/settings/services/settings.service'
+import { TimezoneSelector } from '@/features/settings/components/TimezoneSelector'
 import { QUERY_KEYS } from '@/lib/query-keys'
+import type { TenantMemberWithUser } from '@/features/tenant/services/tenant.service'
 import { useTeamWeekSlots } from '../hooks/use-team-week-slots'
 import { TeamScheduleHeatmap } from './TeamScheduleHeatmap'
+import { getOnlineMemberIds, getInitials } from '../utils/dashboard.utils'
 
 function getCurrentWeekOf(): string {
   return format(startOfISOWeek(new Date()), 'yyyy-MM-dd')
@@ -20,14 +23,16 @@ export function TeamDashboard() {
 
   // ── Week navigation state ─────────────────────────────────────────────────
   const [currentWeekOf, setCurrentWeekOf] = useState(getCurrentWeekOf)
-  const todayWeekOf = format(startOfISOWeek(new Date()), 'yyyy-MM-dd')
-  const isViewingCurrentWeek = currentWeekOf === todayWeekOf
+  const isViewingCurrentWeek = currentWeekOf === getCurrentWeekOf()
 
   const handlePrevWeek = () =>
     setCurrentWeekOf(prev => format(addDays(parseISO(prev), -7), 'yyyy-MM-dd'))
   const handleNextWeek = () =>
     setCurrentWeekOf(prev => format(addDays(parseISO(prev), 7), 'yyyy-MM-dd'))
   const handleGoToCurrentWeek = () => setCurrentWeekOf(getCurrentWeekOf())
+
+  // ── Timezone state — local override (không lưu vào profile) ──────────────
+  const [viewTimezone, setViewTimezone] = useState<string | null>(null)
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -40,59 +45,88 @@ export function TeamDashboard() {
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
   })
-  const displayTimezone = userProfile?.timezone ?? 'UTC'
 
-  const { data: members = [], isLoading: isMembersLoading } = useTenantMembers()
-  const { data: slots = [], isLoading: isSlotsLoading } = useTeamWeekSlots(currentWeekOf)
+  // displayTimezone: user manual override → profile timezone → UTC fallback
+  const displayTimezone = viewTimezone ?? userProfile?.timezone ?? 'UTC'
+
+  const { data: members = [], isLoading: isMembersLoading, isError: isMembersError } = useTenantMembers()
+
+  // refetchInterval: 60s khi xem tuần hiện tại để "who is online" tự refresh
+  const { data: slots = [], isLoading: isSlotsLoading } = useTeamWeekSlots(
+    currentWeekOf,
+    { refetchInterval: isViewingCurrentWeek ? 60_000 : undefined },
+  )
 
   const isLoading = isMembersLoading || isSlotsLoading
+
+  // ── Online members — client-side, pure UTC computation ────────────────────
+  const onlineMemberIds = isViewingCurrentWeek ? getOnlineMemberIds(slots) : []
+  const onlineMembers = members
+    .filter(m => onlineMemberIds.includes(m.user_id))
+    .sort((a, b) => a.users.full_name.localeCompare(b.users.full_name))
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
-      {/* Title row */}
+      {/* Header: title + week nav + timezone selector — 1 dòng */}
       <div className="flex items-center gap-2">
-        <CalendarDays className="h-6 w-6 text-muted-foreground" />
-        <h1 className="text-xl font-semibold">Team Dashboard</h1>
-      </div>
+        <CalendarDays className="h-5 w-5 text-muted-foreground shrink-0" />
+        <h1 className="text-xl font-semibold shrink-0">Team Dashboard</h1>
 
-      {/* Week navigation */}
-      <div className="flex items-center justify-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={handlePrevWeek}
-          aria-label="Tuần trước"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <span className="text-sm text-muted-foreground tabular-nums px-2">
-          {format(parseISO(currentWeekOf), 'dd/MM')}
-          {' – '}
-          {format(addDays(parseISO(currentWeekOf), 6), 'dd/MM/yyyy')}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={handleNextWeek}
-          aria-label="Tuần sau"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        {!isViewingCurrentWeek && (
+        {/* Week navigation — căn giữa */}
+        <div className="flex items-center gap-1 mx-auto">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-6 text-xs px-2 text-blue-600 hover:text-blue-700"
-            onClick={handleGoToCurrentWeek}
+            size="icon"
+            className="h-7 w-7"
+            onClick={handlePrevWeek}
+            aria-label="Tuần trước"
           >
-            Tuần này
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-        )}
+          <span className="text-sm text-muted-foreground tabular-nums px-2">
+            {format(parseISO(currentWeekOf), 'dd/MM')}
+            {' – '}
+            {format(addDays(parseISO(currentWeekOf), 6), 'dd/MM/yyyy')}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={handleNextWeek}
+            aria-label="Tuần sau"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          {!isViewingCurrentWeek && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs px-2 text-blue-600 hover:text-blue-700"
+              onClick={handleGoToCurrentWeek}
+            >
+              Tuần này
+            </Button>
+          )}
+        </div>
+
+        {/* Timezone selector — bên phải */}
+        <div className="w-48 shrink-0">
+          <TimezoneSelector
+            value={displayTimezone}
+            onChange={(tz) => {
+              if (tz === userProfile?.timezone) setViewTimezone(null)
+              else setViewTimezone(tz)
+            }}
+          />
+        </div>
       </div>
+
+      {/* Online Now Panel — chỉ hiển thị khi xem tuần hiện tại */}
+      {isViewingCurrentWeek && !isLoading && !isMembersError && (
+        <OnlineNowPanel onlineMembers={onlineMembers} />
+      )}
 
       {/* Legend */}
       {!isLoading && members.length > 0 && (
@@ -126,6 +160,44 @@ export function TeamDashboard() {
           weekOf={currentWeekOf}
           displayTimezone={displayTimezone}
         />
+      )}
+    </div>
+  )
+}
+
+// ── Online Now Panel ──────────────────────────────────────────────────────────
+
+function OnlineNowPanel({ onlineMembers }: { onlineMembers: TenantMemberWithUser[] }) {
+  const isAnyoneOnline = onlineMembers.length > 0
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <div className="flex items-center gap-2 mb-2">
+        {/* P6: pulsing dot only when someone is online */}
+        {isAnyoneOnline ? (
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+          </span>
+        ) : (
+          <span className="relative flex h-2 w-2">
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-muted-foreground/40" />
+          </span>
+        )}
+        <span className="text-sm font-medium">Đang online ({onlineMembers.length})</span>
+      </div>
+      {onlineMembers.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Không có ai đang trong giờ làm việc.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {onlineMembers.map((m) => (
+            <div key={m.user_id} className="flex items-center gap-1.5 text-sm">
+              <span className="inline-flex size-6 rounded-full bg-muted items-center justify-center text-xs font-medium">
+                {getInitials(m.users.full_name)}
+              </span>
+              <span>{m.users.full_name}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

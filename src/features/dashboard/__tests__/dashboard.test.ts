@@ -9,6 +9,7 @@ import {
   computeDisplayRange,
   getHeatmapBgClass,
   getInitials,
+  getOnlineMemberIds,
 } from '../utils/dashboard.utils'
 import type { ScheduleSlot } from '@/features/schedule/services/schedule.service'
 
@@ -410,5 +411,130 @@ describe('getInitials', () => {
   })
   it('tên có nhiều khoảng trắng giữa các từ → filter đúng', () => {
     expect(getInitials('Nguyen  Thang')).toBe('NT')
+  })
+})
+
+// ── getOnlineMemberIds ────────────────────────────────────────────────────────
+
+describe('getOnlineMemberIds', () => {
+  // Base timestamp: 2026-03-25T10:00:00Z
+  const NOW = new Date('2026-03-25T10:00:00Z')
+
+  it('slots = [] → trả về []', () => {
+    expect(getOnlineMemberIds([], NOW)).toEqual([])
+  })
+
+  it('slot đang active (now nằm trong range) → member xuất hiện', () => {
+    // Slot: 09:00–11:00 UTC — now 10:00 → active
+    const slot = makeSlot({
+      id: 's1', user_id: 'u1', slot_date: '2026-03-25',
+      start_time: '2026-03-25T09:00:00Z', duration_minutes: 120,
+    })
+    expect(getOnlineMemberIds([slot], NOW)).toEqual(['u1'])
+  })
+
+  it('boundary: now === end_time → không online (exclusive end) — slot kết thúc đúng now', () => {
+    // Slot: 08:00–10:00 UTC, end = 10:00:00.000 → now = 10:00:00.000 → exclusive end
+    const nowExact = new Date('2026-03-25T10:00:00.000Z')
+    const slot = makeSlot({
+      id: 's1', user_id: 'u1', slot_date: '2026-03-25',
+      start_time: '2026-03-25T08:00:00Z', duration_minutes: 120,  // end = 10:00:00Z
+    })
+    expect(getOnlineMemberIds([slot], nowExact)).toEqual([])
+  })
+
+  it('slot bắt đầu sau now 1ms → không online', () => {
+    // Slot: 10:01–12:01 UTC, now = 10:00 → not yet started
+    const slot = makeSlot({
+      id: 's1', user_id: 'u1', slot_date: '2026-03-25',
+      start_time: '2026-03-25T10:01:00Z', duration_minutes: 120,
+    })
+    expect(getOnlineMemberIds([slot], NOW)).toEqual([])
+  })
+
+  it('boundary: now === start_time → online (inclusive start)', () => {
+    const startExact = new Date('2026-03-25T10:00:00.000Z')
+    const slot = makeSlot({
+      id: 's1', user_id: 'u1', slot_date: '2026-03-25',
+      start_time: '2026-03-25T10:00:00Z', duration_minutes: 60,
+    })
+    expect(getOnlineMemberIds([slot], startExact)).toEqual(['u1'])
+  })
+
+  it('boundary: now === end_time → không online (exclusive end)', () => {
+    // Slot: 09:00 + 60 min = end 10:00:00Z
+    const endExact = new Date('2026-03-25T10:00:00.000Z')
+    const slot = makeSlot({
+      id: 's1', user_id: 'u1', slot_date: '2026-03-25',
+      start_time: '2026-03-25T09:00:00Z', duration_minutes: 60,
+    })
+    expect(getOnlineMemberIds([slot], endExact)).toEqual([])
+  })
+
+  it('member có 2 slots cùng active → chỉ xuất hiện 1 lần (dedup)', () => {
+    const slot1 = makeSlot({
+      id: 's1', user_id: 'u1', slot_date: '2026-03-25',
+      start_time: '2026-03-25T09:00:00Z', duration_minutes: 180,  // 09:00–12:00
+    })
+    const slot2 = makeSlot({
+      id: 's2', user_id: 'u1', slot_date: '2026-03-25',
+      start_time: '2026-03-25T08:00:00Z', duration_minutes: 240,  // 08:00–12:00
+    })
+    const result = getOnlineMemberIds([slot1, slot2], NOW)
+    expect(result).toEqual(['u1'])
+    expect(result).toHaveLength(1)
+  })
+
+  it('nhiều members online → tất cả xuất hiện', () => {
+    const slot1 = makeSlot({
+      id: 's1', user_id: 'u1', slot_date: '2026-03-25',
+      start_time: '2026-03-25T09:00:00Z', duration_minutes: 120,
+    })
+    const slot2 = makeSlot({
+      id: 's2', user_id: 'u2', slot_date: '2026-03-25',
+      start_time: '2026-03-25T09:30:00Z', duration_minutes: 120,
+    })
+    const slot3 = makeSlot({
+      id: 's3', user_id: 'u3', slot_date: '2026-03-25',
+      start_time: '2026-03-25T08:00:00Z', duration_minutes: 60,   // kết thúc 09:00 — không online
+    })
+    const result = getOnlineMemberIds([slot1, slot2, slot3], NOW)
+    expect(result).toHaveLength(2)
+    expect(result).toContain('u1')
+    expect(result).toContain('u2')
+    expect(result).not.toContain('u3')
+  })
+
+  it('slot kết thúc trước now 1ms (now = endMs - 1) → vẫn online', () => {
+    const slotEnd = new Date('2026-03-25T10:00:00.000Z')
+    const oneBeforeEnd = new Date(slotEnd.getTime() - 1)
+    const slot = makeSlot({
+      id: 's1', user_id: 'u1', slot_date: '2026-03-25',
+      start_time: '2026-03-25T08:00:00Z', duration_minutes: 120,  // end = 10:00:00Z
+    })
+    expect(getOnlineMemberIds([slot], oneBeforeEnd)).toEqual(['u1'])
+  })
+
+  it('slot spanning midnight UTC → online khi now nằm trong range qua đêm', () => {
+    // Slot: 23:30Z → 01:00Z next day (90 min)
+    const duringSlot = new Date('2026-03-26T00:30:00Z')  // midnight + 30min → still active
+    const afterSlot = new Date('2026-03-26T01:00:00Z')    // exactly end → not active
+    const slot = makeSlot({
+      id: 's1', user_id: 'u1', slot_date: '2026-03-25',
+      start_time: '2026-03-25T23:30:00Z', duration_minutes: 90,
+    })
+    expect(getOnlineMemberIds([slot], duringSlot)).toEqual(['u1'])
+    expect(getOnlineMemberIds([slot], afterSlot)).toEqual([])
+  })
+
+  it('nowUTC injectable → deterministic (không phụ thuộc new Date())', () => {
+    // Slot active tại 2026-01-01T00:00:00Z nhưng không active tại now
+    const pastNow = new Date('2026-01-01T00:30:00Z')
+    const slot = makeSlot({
+      id: 's1', user_id: 'u1', slot_date: '2026-01-01',
+      start_time: '2026-01-01T00:00:00Z', duration_minutes: 60,
+    })
+    expect(getOnlineMemberIds([slot], pastNow)).toEqual(['u1'])
+    expect(getOnlineMemberIds([slot], NOW)).toEqual([])  // NOW = 2026-03-25T10:00Z → không active
   })
 })

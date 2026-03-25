@@ -1,5 +1,6 @@
 import { addDays, format, isValid, parseISO } from 'date-fns'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import type { TenantMemberWithUser } from '@/features/tenant/services/tenant.service'
 import type { ScheduleSlot } from '@/features/schedule/services/schedule.service'
 import {
@@ -27,14 +28,19 @@ function formatTimeLabel(h: number): string {
 
 function MemberAvatar({ member }: { member: TenantMemberWithUser }) {
   return (
-    <Avatar className="size-5 ring-1 ring-background shrink-0" title={member.users.full_name}>
-      {member.users.avatar_url && (
-        <AvatarImage src={member.users.avatar_url} alt={member.users.full_name} />
-      )}
-      <AvatarFallback className="text-[9px] font-medium">
-        {getInitials(member.users.full_name)}
-      </AvatarFallback>
-    </Avatar>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Avatar className="size-5 ring-1 ring-background shrink-0 cursor-default">
+          {member.users.avatar_url && (
+            <AvatarImage src={member.users.avatar_url} alt={member.users.full_name} />
+          )}
+          <AvatarFallback className="text-[9px] font-medium">
+            {getInitials(member.users.full_name)}
+          </AvatarFallback>
+        </Avatar>
+      </TooltipTrigger>
+      <TooltipContent>{member.users.full_name}</TooltipContent>
+    </Tooltip>
   )
 }
 

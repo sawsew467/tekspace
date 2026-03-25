@@ -200,3 +200,28 @@ export function getInitials(name: string): string {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return '?'
 }
+
+// ── Online status utilities ───────────────────────────────────────────────────
+
+/**
+ * getOnlineMemberIds — tính user_ids đang có slot active tại nowUTC.
+ *
+ * "Online" = now >= slot.start_time AND now < slot.start_time + duration_minutes
+ * Pure UTC comparison — không cần timezone.
+ * nowUTC injectable để test deterministic.
+ *
+ * Dedup: member có nhiều slots active cùng lúc → chỉ xuất hiện 1 lần.
+ */
+export function getOnlineMemberIds(slots: ScheduleSlot[], nowUTC?: Date): string[] {
+  const nowMs = (nowUTC ?? new Date()).getTime()
+  const onlineSet = new Set<string>()
+  for (const slot of slots) {
+    const startMs = new Date(slot.start_time).getTime()
+    if (isNaN(startMs)) continue
+    const endMs = startMs + slot.duration_minutes * 60_000
+    if (nowMs >= startMs && nowMs < endMs) {
+      onlineSet.add(slot.user_id)
+    }
+  }
+  return Array.from(onlineSet)
+}
