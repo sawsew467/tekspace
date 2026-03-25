@@ -33,4 +33,18 @@ export const DashboardService = {
     if (error) throw error
     return data ?? []
   },
+
+  /**
+   * Lấy default_committed_hours từ tenant.
+   * Dùng làm fallback khi tenant_members.committed_hours = NULL (Story 3.3).
+   */
+  getDefaultCommittedHours: async (tenantId: string): Promise<number> => {
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('default_committed_hours')
+      .eq('id', tenantId)
+      .single()
+    if (error) throw error
+    return data?.default_committed_hours ?? 40
+  },
 }

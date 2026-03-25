@@ -6,6 +6,7 @@ export const ROUTES = {
   app: {
     createTenant: '/create-tenant',
     dashboard: '/dashboard',
+    myDashboard: '/my-dashboard',
     schedule: '/schedule',
     scheduleManage: '/schedule/manage',
     dailyReport: '/daily-report',

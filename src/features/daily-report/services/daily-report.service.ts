@@ -88,13 +88,39 @@ export const DailyReportService = {
   ): Promise<DailyReport[]> => {
     const { data, error } = await supabase
       .from('daily_reports')
-      .select('id, tenant_id, user_id, report_date, tasks, hours_logged, is_late, submitted_at, created_at')
+      .select('id, tenant_id, user_id, report_date, tasks, hours_logged, is_late, submitted_at, updated_at, created_at')
       .eq('tenant_id', tenantId)
       .eq('user_id', userId)
       .order('report_date', { ascending: false })
       .limit(365)
     if (error) throw error
     return (data ?? []) as DailyReport[]
+  },
+
+  /**
+   * Cập nhật report đã submit (trong deadline window).
+   * Chỉ update: tasks, hours_logged, updated_at.
+   * KHÔNG update: is_late (immutable), report_date, submitted_at, tenant_id, user_id.
+   * RLS UPDATE policy đảm bảo chỉ owner trong cùng tenant mới được update.
+   */
+  updateReport: async (
+    reportId: string,
+    tasks: TaskPayload[],
+    hoursLogged: number,
+  ): Promise<DailyReport> => {
+    const { data, error } = await supabase
+      .from('daily_reports')
+      .update({
+        tasks,
+        hours_logged: hoursLogged,
+        // updated_at được set tự động bởi DB trigger (BEFORE UPDATE)
+        // KHÔNG update: is_late, report_date, submitted_at, tenant_id, user_id
+      })
+      .eq('id', reportId)
+      .select('id, tenant_id, user_id, report_date, tasks, hours_logged, is_late, submitted_at, updated_at, created_at')
+      .single()
+    if (error) throw error
+    return data as DailyReport
   },
 
   /**
@@ -121,6 +147,28 @@ export const DailyReportService = {
    * RLS policy cho phép manager/owner xem tất cả reports trong tenant.
    * Explicit fields bắt buộc khi có JOIN (architecture rule).
    */
+  /**
+   * Tính tổng hours_logged của một user trong một tuần.
+   * Dùng cho Self-Dashboard (Story 3.3) — member chỉ đọc data của chính mình.
+   * RLS: member chỉ thấy user_id = auth.uid() → tự nhiên chỉ lấy data đúng người.
+   */
+  getSelfWeekHours: async (
+    tenantId: string,
+    userId: string,
+    weekStart: string,  // 'yyyy-MM-dd' (Monday)
+    weekEnd: string,    // 'yyyy-MM-dd' (Sunday)
+  ): Promise<number> => {
+    const { data, error } = await supabase
+      .from('daily_reports')
+      .select('hours_logged')
+      .eq('tenant_id', tenantId)
+      .eq('user_id', userId)
+      .gte('report_date', weekStart)
+      .lte('report_date', weekEnd)
+    if (error) throw error
+    return (data ?? []).reduce((sum, r) => sum + (Number(r.hours_logged) || 0), 0)
+  },
+
   getTeamReportsForDate: async (
     tenantId: string,
     reportDate: string,

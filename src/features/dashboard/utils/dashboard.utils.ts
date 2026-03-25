@@ -225,3 +225,29 @@ export function getOnlineMemberIds(slots: ScheduleSlot[], nowUTC?: Date): string
   }
   return Array.from(onlineSet)
 }
+
+// ── Self-Dashboard utilities (Story 3.3) ─────────────────────────────────────
+
+/**
+ * calcCommitmentRate — tính tỷ lệ actual / committed.
+ * Trả về null nếu committedHours <= 0 (tránh chia 0).
+ * Không giới hạn trên: member có thể vượt 100%.
+ */
+export function calcCommitmentRate(actualHours: number, committedHours: number): number | null {
+  if (committedHours <= 0) return null
+  return actualHours / committedHours
+}
+
+/**
+ * formatCommitmentRate — format dạng "22h / 35h = 63%".
+ * - actual được làm tròn và clamp >= 0 (guard data lỗi + hiển thị số nguyên).
+ * - committed đã là số nguyên (smallint từ DB).
+ * - Nếu committed = 0 → chỉ hiển thị "22h" (không negative framing).
+ * - Math.round để tránh số lẻ (63.857... → 64%).
+ */
+export function formatCommitmentRate(actual: number, committed: number): string {
+  const safeActual = Math.round(Math.max(0, actual)) // clamp + round (F8+F9)
+  const rate = calcCommitmentRate(safeActual, committed)
+  if (rate === null) return `${safeActual}h`
+  return `${safeActual}h / ${committed}h = ${Math.round(rate * 100)}%`
+}

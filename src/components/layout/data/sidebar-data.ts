@@ -8,6 +8,7 @@ import {
   Settings,
   Users,
   Mail,
+  User,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -34,6 +35,11 @@ export const sidebarData: SidebarData = {
           title: 'Dashboard',
           url: '/dashboard',
           icon: LayoutDashboard,
+        },
+        {
+          title: 'My Dashboard',
+          url: '/my-dashboard',
+          icon: User,
         },
         {
           title: 'Analytics',

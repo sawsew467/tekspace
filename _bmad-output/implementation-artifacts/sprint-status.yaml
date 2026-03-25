@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-23
-last_updated: 2026-03-25 (story-5-1 → done, code review fixes applied)
+last_updated: 2026-03-25 (story-3-3 → done, code review fixes applied)
 project: TekSpace
 project_key: NOKEY
 tracking_system: file-system
@@ -72,7 +72,7 @@ development_status:
   epic-3: in-progress
   3-1-team-overview-dashboard: done
   3-2-realtime-who-is-online-timezone-view: done
-  3-3-member-self-dashboard: review
+  3-3-member-self-dashboard: done
   epic-3-retrospective: optional
 
   # ─────────────────────────────────────────────
@@ -92,7 +92,7 @@ development_status:
   # ─────────────────────────────────────────────
   epic-5: in-progress
   5-1-committed-hours-configuration: done
-  5-2-team-hours-analytics-dashboard: backlog
+  5-2-team-hours-analytics-dashboard: review
   5-3-member-self-analytics-history: backlog
   epic-5-retrospective: optional
 
