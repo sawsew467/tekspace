@@ -5,6 +5,8 @@ import {
   formatRate,
   getTimeRange,
   getCommitmentRateColorClass,
+  getMonthTimeRange,
+  buildMonthlyChartData,
 } from '../utils/analytics.utils'
 
 describe('SelfAnalytics — highlight logic', () => {
@@ -87,5 +89,86 @@ describe('SelfAnalytics — highlight logic', () => {
     const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
     // 4 tuần = 27 ngày (Mon→Sun, 4 ISO weeks)
     expect(diffDays).toBe(27)
+  })
+})
+
+// ── Monthly utilities tests ────────────────────────────────────────────────────
+
+describe('getMonthTimeRange', () => {
+  it('monthsBack=1 trả về đầu-cuối tháng hiện tại', () => {
+    const { startDate, endDate } = getMonthTimeRange(1)
+    // startDate là đầu tháng
+    expect(startDate).toMatch(/^\d{4}-\d{2}-01$/)
+    // endDate là cuối tháng (28-31)
+    const end = new Date(endDate + 'T00:00:00')
+    expect(end.getDate()).toBeGreaterThanOrEqual(28)
+  })
+
+  it('monthsBack=3 trả về range 3 tháng', () => {
+    const { startDate, endDate } = getMonthTimeRange(3)
+    const start = new Date(startDate + 'T00:00:00')
+    const end = new Date(endDate + 'T00:00:00')
+    // Khoảng cách >= 60 ngày
+    expect(end.getTime() - start.getTime()).toBeGreaterThan(60 * 24 * 3600 * 1000)
+  })
+
+  it('throw khi monthsBack < 1', () => {
+    expect(() => getMonthTimeRange(0)).toThrow()
+  })
+})
+
+describe('buildMonthlyChartData', () => {
+  it('tạo đủ data points cho mọi tháng trong range', () => {
+    const result = buildMonthlyChartData([], '2026-01-01', '2026-03-31', 40)
+    expect(result).toHaveLength(3)
+    expect(result[0].monthLabel).toBe('01/2026')
+    expect(result[2].monthLabel).toBe('03/2026')
+  })
+
+  it('tháng không có data → actual = 0', () => {
+    const result = buildMonthlyChartData([], '2026-03-01', '2026-03-31', 40)
+    expect(result[0].actual).toBe(0)
+  })
+
+  it('group weekly hours đúng theo tháng', () => {
+    const weeklyHours = [
+      { weekOf: '2026-03-02', actualHours: 30 },  // tháng 3
+      { weekOf: '2026-03-09', actualHours: 35 },  // tháng 3
+      { weekOf: '2026-04-06', actualHours: 20 },  // tháng 4
+    ]
+    const result = buildMonthlyChartData(weeklyHours, '2026-03-01', '2026-04-30', 40)
+    expect(result).toHaveLength(2)
+    expect(result[0].actual).toBe(65)  // 30 + 35
+    expect(result[1].actual).toBe(20)
+  })
+
+  it('committed/tháng = số Mondays × fallback', () => {
+    // Tháng 3/2026 có 5 Mondays (02, 09, 16, 23, 30)
+    const result = buildMonthlyChartData([], '2026-03-01', '2026-03-31', 40)
+    expect(result[0].committed).toBe(5 * 40)  // = 200
+  })
+})
+
+describe('SummaryStats logic', () => {
+  it('tổng giờ đúng', () => {
+    const data = [
+      { actual: 30, committed: 40 },
+      { actual: 38, committed: 40 },
+    ]
+    const totalActual = data.reduce((sum, d) => sum + d.actual, 0)
+    expect(totalActual).toBe(68)
+  })
+
+  it('periodsBelow tính đúng kỳ < 70%', () => {
+    const data = [
+      { actual: 20, committed: 40 },  // 50% → dưới 70%
+      { actual: 35, committed: 40 },  // 87.5% → ok
+      { actual: 10, committed: 40 },  // 25% → dưới 70%
+    ]
+    const below = data.filter(d => {
+      const rate = d.committed > 0 ? d.actual / d.committed : null
+      return rate !== null && rate < 0.7
+    }).length
+    expect(below).toBe(2)
   })
 })

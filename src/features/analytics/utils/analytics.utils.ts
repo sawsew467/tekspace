@@ -1,4 +1,4 @@
-import { format, startOfISOWeek, endOfISOWeek, subWeeks, addDays } from 'date-fns'
+import { format, startOfISOWeek, endOfISOWeek, subWeeks, addDays, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns'
 import type { WeeklyHoursRow, CommittedHoursHistoryRow } from '@/features/analytics/services/analytics.service'
 
 // ── Date range helpers ─────────────────────────────────────────────────────────
@@ -159,4 +159,70 @@ export function getCommitmentRateColorClass(rate: number | null): string {
   if (rate < 0.7) return 'text-destructive font-semibold'
   if (rate < 0.85) return 'text-amber-600 dark:text-amber-400 font-semibold'
   return 'text-foreground'
+}
+
+// ── Monthly types & helpers ────────────────────────────────────────────────────
+
+/**
+ * getMonthTimeRange — tính startDate và endDate cho N tháng gần nhất (kể cả tháng hiện tại).
+ * startDate = đầu tháng (N-1) tháng trước; endDate = cuối tháng hiện tại.
+ */
+export function getMonthTimeRange(monthsBack: number): { startDate: string; endDate: string } {
+  if (monthsBack < 1) throw new Error('getMonthTimeRange: monthsBack phải >= 1')
+  const now = new Date()
+  return {
+    startDate: format(startOfMonth(subMonths(now, monthsBack - 1)), 'yyyy-MM-dd'),
+    endDate: format(endOfMonth(now), 'yyyy-MM-dd'),
+  }
+}
+
+/**
+ * buildMonthlyChartData — tổng hợp weeklyHours theo calendar month.
+ * Group theo month của weekOf (yyyy-MM = 7 ký tự đầu của weekOf).
+ * Committed/tháng = số ISO weeks bắt đầu trong tháng × fallbackCommittedHours.
+ * Tạo đủ data point cho mọi tháng trong range (kể cả tháng không có data = 0h).
+ * Label hiển thị dạng 'MM/yyyy' (ví dụ '03/2026').
+ */
+export function buildMonthlyChartData(
+  weeklyHours: { weekOf: string; actualHours: number }[],
+  startDate: string,
+  endDate: string,
+  fallbackCommittedHours: number,
+): { monthLabel: string; actual: number; committed: number }[] {
+  // Group actual hours by month (weekOf 'yyyy-MM-dd' → substring(0,7) = 'yyyy-MM')
+  const actualByMonth = new Map<string, number>()
+  for (const w of weeklyHours) {
+    const monthKey = w.weekOf.substring(0, 7)
+    actualByMonth.set(monthKey, (actualByMonth.get(monthKey) ?? 0) + w.actualHours)
+  }
+
+  const result: { monthLabel: string; actual: number; committed: number }[] = []
+  let currentMonth = startOfMonth(new Date(startDate + 'T00:00:00'))
+  const endMonth = startOfMonth(new Date(endDate + 'T00:00:00'))
+
+  while (currentMonth <= endMonth) {
+    const monthKey = format(currentMonth, 'yyyy-MM')
+    const monthLabel = format(currentMonth, 'MM/yyyy')
+    const monthEnd = endOfMonth(currentMonth)
+
+    // Count ISO weeks (Mondays) starting in this calendar month
+    let weekCount = 0
+    let d = startOfISOWeek(currentMonth)
+    // Đảm bảo d là Monday >= đầu tháng
+    if (d < currentMonth) d = addDays(d, 7)
+    while (d <= monthEnd) {
+      weekCount++
+      d = addDays(d, 7)
+    }
+
+    result.push({
+      monthLabel,
+      actual: actualByMonth.get(monthKey) ?? 0,
+      committed: weekCount * fallbackCommittedHours,
+    })
+
+    currentMonth = addMonths(currentMonth, 1)
+  }
+
+  return result
 }
