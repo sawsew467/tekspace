@@ -10,6 +10,35 @@ export function sleep(ms: number = 1000) {
 }
 
 /**
+ * Validate URL chỉ chấp nhận internal relative paths.
+ * Chống open redirect attack: từ chối external URL, double-slash, protocol-relative,
+ * và các encoded bypass như /%2F%2Fevil.com hay /\evil.com.
+ *
+ * @example
+ * isInternalUrl('/daily-report')        // true ✓
+ * isInternalUrl('/dashboard?tab=hours') // true ✓
+ * isInternalUrl('https://evil.com')     // false ✗
+ * isInternalUrl('//evil.com')           // false ✗
+ * isInternalUrl('/%2F%2Fevil.com')      // false ✗ (decoded → //evil.com)
+ * isInternalUrl('/\\evil.com')          // false ✗ (backslash bypass)
+ * isInternalUrl(undefined)              // false ✗
+ */
+export function isInternalUrl(url: string | undefined): url is string {
+  if (!url) return false
+  // Decode trước để catch percent-encoded bypass (/%2F%2Fevil.com → //evil.com)
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(url)
+  } catch {
+    // Invalid percent-encoding → reject
+    return false
+  }
+  // Chỉ chấp nhận paths bắt đầu bằng /
+  // Từ chối: //evil.com (protocol-relative), /\evil.com (backslash, một số browser parse thành //)
+  return decoded.startsWith('/') && !decoded.startsWith('//') && !decoded.startsWith('/\\')
+}
+
+/**
  * Generates page numbers for pagination with ellipsis
  * @param currentPage - Current page number (1-based)
  * @param totalPages - Total number of pages

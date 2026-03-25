@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import { z } from 'zod'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ROUTES } from '@/lib/routes'
@@ -7,6 +8,11 @@ import { SignInForm } from '@/features/auth/components/SignInForm'
 import { RegisterForm } from '@/features/auth/components/RegisterForm'
 
 export const Route = createFileRoute('/sign-in')({
+  // FIX 8-18: validate redirect search param để TypeScript biết kiểu
+  validateSearch: z.object({
+    // max 2000 chars để tránh URL overflow / log-spam attack
+    redirect: z.string().max(2000).optional(),
+  }),
   head: () => ({
     meta: [{ title: 'Đăng nhập — TekSpace' }],
   }),

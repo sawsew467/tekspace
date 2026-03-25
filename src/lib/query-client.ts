@@ -24,8 +24,17 @@ export const queryClient = new QueryClient({
       if (isSessionError(error)) {
         toast.error('Phiên đăng nhập của bạn đã bị thu hồi. Vui lòng đăng nhập lại.')
         // Small delay để user thấy toast trước khi redirect
+        // Lưu lại current URL (pathname + search) để redirect-back sau khi login
         setTimeout(() => {
-          window.location.href = ROUTES.signIn
+          const currentPath = window.location.pathname + window.location.search
+          const isAuthPage = [ROUTES.signIn, ROUTES.forgotPassword, ROUTES.resetPassword].some(
+            (p) => window.location.pathname === p
+          )
+          if (isAuthPage) {
+            window.location.href = ROUTES.signIn
+          } else {
+            window.location.href = `${ROUTES.signIn}?redirect=${encodeURIComponent(currentPath)}`
+          }
         }, 1500)
         return
       }

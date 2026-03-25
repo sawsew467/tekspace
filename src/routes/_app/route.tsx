@@ -12,13 +12,45 @@ import { AuthenticatedLayout } from '@/components/layout/authenticated-layout'
 
 export const Route = createFileRoute('/_app')({
   beforeLoad: async ({ context, location }) => {
+    // getUser() verify với server thay vì chỉ đọc cache local
+    // getSession() chỉ đọc localStorage → không detect token revocation server-side
+    // getUser() gọi GET /auth/v1/user → server verify → detect revocation ngay lập tức
+    const {
+      data: { user },
+      error: userError,
+    } = await context.supabase.auth.getUser()
+
+    if (userError) {
+      // Chỉ redirect khi xác định là auth failure (HTTP 401)
+      // Network error / server error (status 0 hoặc 5xx) → throw để error boundary xử lý,
+      // tránh hiện tượng mạng chập chờn silently đẩy user đang login ra sign-in
+      if (userError.status === 401) {
+        throw redirect({
+          to: ROUTES.signIn,
+          search: { redirect: location.pathname + location.search },
+        })
+      }
+      throw userError
+    }
+
+    if (!user) {
+      throw redirect({
+        to: ROUTES.signIn,
+        search: { redirect: location.pathname + location.search },
+      })
+    }
+
+    // Vẫn cần getSession() để lấy access_token cho JWT claims
+    // (getUser() không trả về session/access_token)
     const {
       data: { session },
-      error,
     } = await context.supabase.auth.getSession()
 
-    if (error || !session) {
-      throw redirect({ to: ROUTES.signIn })
+    if (!session) {
+      throw redirect({
+        to: ROUTES.signIn,
+        search: { redirect: location.pathname + location.search },
+      })
     }
 
     // Sync session vào auth-store để components có thể đọc synchronously

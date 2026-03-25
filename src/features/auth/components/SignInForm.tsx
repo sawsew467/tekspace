@@ -17,11 +17,30 @@ import {
 import { Input } from '@/components/ui/input'
 import { signIn, initTenantAndGetRoute } from '../services/auth.service'
 import { signInSchema, type SignInInput } from '../schemas/auth.schema'
+import { isInternalUrl } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
+import { Route } from '@/routes/sign-in'
+
+// Routes không được dùng làm redirect target sau login (tránh loop)
+const AUTH_PATHS = new Set<string>([
+  ROUTES.signIn,
+  ROUTES.forgotPassword,
+  ROUTES.resetPassword,
+  ROUTES.acceptInvite,
+])
+
+/** Kiểm tra URL hợp lệ để redirect-back: internal + không phải auth route */
+function isValidRedirectPath(url: string | undefined): url is string {
+  if (!isInternalUrl(url)) return false
+  const pathname = url.split('?')[0]
+  return !AUTH_PATHS.has(pathname)
+}
 
 export function SignInForm() {
   const [isPending, setIsPending] = useState(false)
   const navigate = useNavigate()
+  // FIX 8-18: đọc redirect param (typed từ validateSearch trong sign-in route)
+  const { redirect: redirectParam } = Route.useSearch()
 
   const form = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
@@ -34,8 +53,24 @@ export function SignInForm() {
       const { session } = await signIn(data.email, data.password)
       if (!session) throw new Error('Không thể tạo session')
 
-      const redirectTo = initTenantAndGetRoute(session)
-      await navigate({ to: redirectTo })
+      const defaultRoute = initTenantAndGetRoute(session)
+
+      // Navigate về URL cũ nếu redirect param hợp lệ (internal + không phải auth route)
+      // isValidRedirectPath() chống: external URL, double-slash, loop về sign-in
+      if (isValidRedirectPath(redirectParam)) {
+        // Tách path và search string để TanStack Router xử lý đúng
+        const qIdx = redirectParam.indexOf('?')
+        if (qIdx >= 0) {
+          const to = redirectParam.slice(0, qIdx)
+          const search = Object.fromEntries(new URLSearchParams(redirectParam.slice(qIdx + 1)))
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await navigate({ to, search } as any)
+        } else {
+          await navigate({ to: redirectParam })
+        }
+      } else {
+        await navigate({ to: defaultRoute })
+      }
     } catch (err: unknown) {
       const authErr = err as AuthError
       if (authErr?.code === 'invalid_credentials') {
