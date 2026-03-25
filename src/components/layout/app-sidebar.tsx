@@ -18,7 +18,7 @@ import { TeamSwitcher } from './team-switcher'
 import { useTenantStore } from '@/stores/tenant-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { supabase } from '@/lib/supabase-browser'
-import { updateActiveTenant } from '@/features/settings/services/settings.service'
+import { updateActiveTenant, getUserProfile } from '@/features/settings/services/settings.service'
 import { QUERY_KEYS } from '@/lib/query-keys'
 import { ROUTES } from '@/lib/routes'
 import { useUnreadCount } from '@/features/notifications/hooks/use-unread-count'
@@ -68,6 +68,15 @@ export function AppSidebar() {
     staleTime: 5 * 60 * 1000, // Cache 5 phút — team names ít thay đổi
   })
 
+  // Query user profile để lấy avatar_url thật (Story 8-10)
+  // Dùng cùng queryKey với profile page → invalidate ở 1 chỗ cập nhật cả hai
+  const { data: profileData } = useQuery({
+    queryKey: [QUERY_KEYS.userProfile, user?.id],
+    queryFn: () => getUserProfile(user!.id),
+    enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000, // Cache 2 phút
+  })
+
   // Build teams array cho TeamSwitcher
   const teams = tenants.map((t) => ({
     id: t.tenantId,
@@ -80,7 +89,7 @@ export function AppSidebar() {
   const navUser = {
     name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User',
     email: user?.email || '',
-    avatar: '',
+    avatar: profileData?.avatar_url ?? undefined,  // P-11: undefined thay vì '' để Radix AvatarFallback hoạt động đúng
   }
 
   const handleSwitch = async (newTenantId: string) => {

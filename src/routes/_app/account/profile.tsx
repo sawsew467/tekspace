@@ -21,6 +21,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { getUserProfile } from '@/features/settings/services/settings.service'
 import { useUpdateTimezone } from '@/features/settings/hooks/use-update-timezone'
 import { TimezoneSelector } from '@/features/settings/components/TimezoneSelector'
+import { AvatarUploadCard } from '@/features/settings/components/AvatarUploadCard'
 import { QUERY_KEYS } from '@/lib/query-keys'
 import { supabase } from '@/lib/supabase-browser'
 
@@ -77,6 +78,12 @@ function AccountProfilePage() {
         <h1 className='text-2xl font-semibold'>Hồ sơ cá nhân</h1>
         <p className='text-muted-foreground mt-1 text-sm'>Thông tin cá nhân của bạn</p>
       </div>
+
+      {/* Ảnh đại diện — Story 8-10 */}
+      <AvatarUploadCard
+        avatarUrl={profile?.avatar_url ?? null}
+        fullName={profile?.full_name ?? ''}
+      />
 
       {/* Thông tin cá nhân */}
       <Card>
