@@ -20,6 +20,7 @@ import { useTeamAnalytics } from '@/features/analytics/hooks/use-team-analytics'
 import { useMemberTrend } from '@/features/analytics/hooks/use-member-trend'
 import { TeamAnalyticsOverview } from '@/features/analytics/components/TeamAnalyticsOverview'
 import { MemberTrendChart } from '@/features/analytics/components/MemberTrendChart'
+import { SelfAnalyticsHistory } from '@/features/analytics/components/SelfAnalyticsHistory'
 import {
   getCurrentWeekRange,
   getTimeRange,
@@ -135,18 +136,10 @@ function AnalyticsPage() {
     )
   }
 
-  // ── Permission gate (AC6) ─────────────────────────────────────────────────
+  // ── Permission gate: member thấy self-analytics thay vì "no access" ─────────
 
   if (!canViewTeamAnalytics) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <BarChart3 className="text-muted-foreground mb-4 h-12 w-12" />
-        <h1 className="text-xl font-semibold">Không có quyền truy cập</h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Chỉ Manager và Owner mới xem được analytics của team.
-        </p>
-      </div>
-    )
+    return <SelfAnalyticsHistory />
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
