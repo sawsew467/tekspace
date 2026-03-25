@@ -10,9 +10,10 @@ import { ScheduleService } from '../services/schedule.service'
  * - Edit unlocked slot (isEmergencyOverride = false)
  * - Emergency Override trên locked slot (isEmergencyOverride = true)
  *
- * Gọi RPC update_slot_with_reason (atomic: update + audit + notify managers)
+ * Gọi RPC update_slot_with_reason (atomic: update + audit + notify managers in-app)
+ * Sau RPC thành công: fire-and-forget email notification tới managers (Story 6.4)
  */
-export function useUpdateSlot(weekId: string | undefined) {
+export function useUpdateSlot(weekId: string | undefined, tenantId?: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -34,7 +35,8 @@ export function useUpdateSlot(weekId: string | undefined) {
         newStartTimeUTC,
         newDurationMinutes,
         reason,
-        isEmergencyOverride ?? false
+        isEmergencyOverride ?? false,
+        tenantId
       ),
     onSuccess: (_data, variables) => {
       toast.success(

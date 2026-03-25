@@ -10,9 +10,10 @@ import { ScheduleService } from '../services/schedule.service'
  * - Delete unlocked slot (isEmergencyOverride = false)
  * - Emergency delete trên locked slot (isEmergencyOverride = true)
  *
- * Gọi RPC delete_slot_with_reason (atomic: notify managers + delete)
+ * Gọi RPC delete_slot_with_reason (atomic: notify managers in-app + delete)
+ * Sau RPC thành công: fire-and-forget email notification tới managers (Story 6.4)
  */
-export function useDeleteSlotWithReason(weekId: string | undefined) {
+export function useDeleteSlotWithReason(weekId: string | undefined, tenantId?: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -25,7 +26,7 @@ export function useDeleteSlotWithReason(weekId: string | undefined) {
       reason: string
       isEmergencyOverride?: boolean
     }) =>
-      ScheduleService.deleteSlotWithReason(slotId, reason, isEmergencyOverride ?? false),
+      ScheduleService.deleteSlotWithReason(slotId, reason, isEmergencyOverride ?? false, tenantId),
     onSuccess: () => {
       toast.success('Đã xóa ca làm việc')
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.scheduleSlots, weekId] })

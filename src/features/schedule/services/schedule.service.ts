@@ -4,6 +4,24 @@ import { type SlotFormValues, calcDurationMinutes } from '../schemas/schedule.sc
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { format } from 'date-fns'
 
+// ── Fire-and-forget helper: gửi email notification cho managers khi lịch thay đổi ──
+// Gọi Edge Function notify-schedule-change với action notify_schedule_change.
+// KHÔNG await — lỗi email không được block UX của member.
+function fireNotifyScheduleChange(
+  tenantId: string,
+  reason: string,
+  isEmergencyOverride: boolean
+): void {
+  supabase.functions
+    .invoke('notify-schedule-change', {
+      body: { action: 'notify_schedule_change', tenantId, reason, isEmergencyOverride },
+    })
+    .catch((err) => {
+      // Log nhưng không rethrow — notification email failure không block UX
+      console.warn('[notify-schedule-change] fire-and-forget error:', err)
+    })
+}
+
 export type ScheduleWeek = Tables<'schedule_weeks'>
 export type ScheduleSlot = Tables<'schedule_slots'>
 
@@ -84,6 +102,19 @@ export const ScheduleService = {
     return data.timezone
   },
 
+  // Lấy daily report deadline hour của tenant (0-23, default 3 = 3am)
+  // Dùng để tính edit window cho Story 4.6
+  getTenantDailyReportDeadline: async (tenantId: string): Promise<number> => {
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('daily_report_deadline_hour')
+      .eq('id', tenantId)
+      .single()
+    if (error) throw error
+    if (!data) throw new Error('Tenant không tồn tại')
+    return data.daily_report_deadline_hour ?? 3  // null-safe: DB column có thể NULL với old tenants
+  },
+
   // Lấy slots của user từ tuần trước (KHÔNG tạo record mới nếu chưa tồn tại)
   // Dùng maybeSingle() — trả về null thay vì throw khi không tìm thấy
   getPreviousWeekSlots: async (previousWeekOf: string): Promise<ScheduleSlot[]> => {
@@ -112,14 +143,16 @@ export const ScheduleService = {
   },
 
   // Cập nhật một slot riêng lẻ với lý do bắt buộc (Story 2.3)
-  // RPC atomic: update slot + audit trail + notify managers
+  // RPC atomic: update slot + audit trail + notify managers (in-app via SECURITY DEFINER)
   // isEmergencyOverride = true cho phép bypass deadline lock
+  // tenantId (optional): nếu có → fire-and-forget email notification tới managers (Story 6.4)
   updateSlotWithReason: async (
     slotId: string,
     newStartTimeUTC: Date,
     newDurationMinutes: number,
     reason: string,
-    isEmergencyOverride: boolean = false
+    isEmergencyOverride: boolean = false,
+    tenantId?: string
   ): Promise<void> => {
     const { error } = await supabase.rpc('update_slot_with_reason', {
       p_slot_id:               slotId,
@@ -129,15 +162,22 @@ export const ScheduleService = {
       p_is_emergency_override: isEmergencyOverride,
     })
     if (error) throw error
+
+    // Fire-and-forget email notification (không block nếu fail)
+    if (tenantId) {
+      fireNotifyScheduleChange(tenantId, reason, isEmergencyOverride)
+    }
   },
 
   // Xóa một slot riêng lẻ với lý do bắt buộc (Story 2.3)
-  // RPC atomic: notify managers + delete slot
+  // RPC atomic: notify managers (in-app via SECURITY DEFINER) + delete slot
   // isEmergencyOverride = true cho phép bypass deadline lock
+  // tenantId (optional): nếu có → fire-and-forget email notification tới managers (Story 6.4)
   deleteSlotWithReason: async (
     slotId: string,
     reason: string,
-    isEmergencyOverride: boolean = false
+    isEmergencyOverride: boolean = false,
+    tenantId?: string
   ): Promise<void> => {
     const { error } = await supabase.rpc('delete_slot_with_reason', {
       p_slot_id:               slotId,
@@ -145,6 +185,11 @@ export const ScheduleService = {
       p_is_emergency_override: isEmergencyOverride,
     })
     if (error) throw error
+
+    // Fire-and-forget email notification (không block nếu fail)
+    if (tenantId) {
+      fireNotifyScheduleChange(tenantId, reason, isEmergencyOverride)
+    }
   },
 
   // Upsert toàn bộ slots cho một week — atomic via RPC upsert_week_slots

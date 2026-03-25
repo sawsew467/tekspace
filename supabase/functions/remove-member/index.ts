@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
     tenant_id: tenantId,
     user_id: userId,
     type: 'member_removed',
-    message: `Bạn đã bị xóa khỏi ${tenant?.name ?? 'team'}.`,
+    message: `Bạn đã được xóa khỏi ${tenant?.name ?? 'team'}. Cảm ơn bạn đã tham gia!`,
     link_to: null,
   })
 

@@ -60,12 +60,19 @@ Deno.serve(async (req) => {
       )
     }
 
-    // 3. Lấy tên tenant cho email
+    // 3. Lấy tên tenant và tên người invite cho email
     const { data: tenant } = await supabaseAdmin
       .from('tenants')
       .select('name')
       .eq('id', tenantId)
       .single()
+
+    const { data: inviterUser } = await supabaseAdmin
+      .from('users')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+    const inviterName = inviterUser?.full_name || 'Quản lý'
 
     // 4. Generate secure token (64 chars hex — > 32 chars required by constraint)
     const tokenBytes = new Uint8Array(32)
@@ -100,15 +107,15 @@ Deno.serve(async (req) => {
       throw insertError
     }
 
-    // 6. Gửi email invite
+    // 6. Gửi email invite với tên người invite (AC3 Story 6.4)
     const appUrl = Deno.env.get('APP_URL') ?? 'http://localhost:3000'
     const teamName = tenant?.name ?? 'team'
 
     await sendEmail({
       to: email,
-      subject: `Bạn được mời vào ${teamName} trên TekSpace`,
+      subject: `${inviterName} mời bạn vào ${teamName} trên TekSpace`,
       html: `
-        <p>Bạn được mời tham gia <strong>${teamName}</strong> trên TekSpace.</p>
+        <p>${inviterName} mời bạn tham gia <strong>${teamName}</strong> trên TekSpace.</p>
         <p>
           <a href="${appUrl}/accept-invite?token=${token}" style="display:inline-block;padding:12px 24px;background:#18181b;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;">
             Chấp nhận lời mời

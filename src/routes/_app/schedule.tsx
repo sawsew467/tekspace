@@ -121,8 +121,9 @@ function SchedulePage() {
   const { mutate: upsertMutate, isPending: isUpsertPending } = upsertSlots
 
   // Tier 2: Update/Delete slot với reason (hôm nay → Chủ nhật tuần này)
-  const updateSlot = useUpdateSlot(scheduleWeek?.id)
-  const deleteSlotWithReason = useDeleteSlotWithReason(scheduleWeek?.id)
+  // activeTenantId truyền để trigger fire-and-forget email notification (Story 6.4)
+  const updateSlot = useUpdateSlot(scheduleWeek?.id, activeTenantId ?? undefined)
+  const deleteSlotWithReason = useDeleteSlotWithReason(scheduleWeek?.id, activeTenantId ?? undefined)
 
   // Tier 3: Direct update/delete không cần reason (tuần sau trở đi)
   const updateSlotDirect = useUpdateSlotDirect(scheduleWeek?.id)
