@@ -64,12 +64,13 @@ function NavBadge({ children }: { children: ReactNode }) {
 
 function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
   const { setOpenMobile } = useSidebar()
+  const tooltipLabel = item.badge ? `${item.title} (${item.badge})` : item.title
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
         asChild
         isActive={checkIsActive(href, item)}
-        tooltip={item.title}
+        tooltip={tooltipLabel}
       >
         <Link to={item.url} onClick={() => setOpenMobile(false)}>
           {item.icon && <item.icon />}
@@ -77,6 +78,10 @@ function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
           {item.badge && <NavBadge>{item.badge}</NavBadge>}
         </Link>
       </SidebarMenuButton>
+      {/* Dot badge — chỉ visible khi sidebar collapsed (icon mode) VÀ có badge */}
+      {item.badge && (
+        <span aria-hidden='true' className='pointer-events-none absolute top-1.5 end-1 z-10 hidden size-2 rounded-full bg-destructive group-data-[collapsible=icon]:flex' />
+      )}
     </SidebarMenuItem>
   )
 }
