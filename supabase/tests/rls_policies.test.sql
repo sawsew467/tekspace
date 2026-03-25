@@ -14,7 +14,7 @@
 
 BEGIN;
 
-SELECT plan(17);
+SELECT plan(24);
 
 -- =============================================================
 -- FIXTURES (chạy với quyền postgres superuser — bypass RLS)
@@ -74,6 +74,47 @@ VALUES (
   now() + interval '7 days'
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Daily reports (Story 4.6: UPDATE RLS tests)
+-- Dùng bypass mode (postgres superuser) để insert fixture
+-- submitted_at = '2026-01-15 10:00:00+00' (10am UTC = trước deadline 03:00 ICT ngày 16)
+-- → trigger compute_is_late sẽ set is_late = false (10:00 UTC < 20:00 UTC = 03:00 ICT)
+INSERT INTO public.daily_reports (id, tenant_id, user_id, report_date, tasks, hours_logged, is_late, submitted_at)
+VALUES
+  -- Member's own report in Tenant A (is_late = false vì submitted trước deadline)
+  (
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e11',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',  -- member
+    '2026-01-15',
+    '[{"description": "Task 1", "output_type": "other"}]'::jsonb,
+    8,
+    false,
+    '2026-01-15 10:00:00+00'  -- 5pm ICT, trước deadline 03:00 ICT ngày 16 (= 20:00 UTC)
+  ),
+  -- Owner's report in Tenant A (member should NOT be able to update this)
+  (
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e12',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',  -- owner
+    '2026-01-15',
+    '[{"description": "Owner task", "output_type": "pr"}]'::jsonb,
+    6,
+    false,
+    '2026-01-15 10:00:00+00'
+  ),
+  -- Report in Tenant B (member của Tenant A không được update)
+  (
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e13',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b12',
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14',  -- outsider in Tenant B
+    '2026-01-15',
+    '[{"description": "Tenant B task", "output_type": "other"}]'::jsonb,
+    4,
+    false,
+    '2026-01-15 10:00:00+00'
+  )
+ON CONFLICT (id) DO NOTHING;
+
 -- =============================================================
 -- HELPERS
 -- =============================================================
@@ -99,6 +140,36 @@ CREATE OR REPLACE FUNCTION public._test_update_tenant(p_name text, p_tenant_id u
 RETURNS int LANGUAGE sql AS $$
   WITH upd AS (
     UPDATE public.tenants SET name = p_name WHERE id = p_tenant_id RETURNING id
+  ) SELECT count(*)::int FROM upd;
+$$;
+
+-- UPDATE committed_hours của tenant_member và trả về số rows bị ảnh hưởng
+-- Không có SECURITY DEFINER → chạy với quyền của caller (authenticated role, RLS áp dụng)
+CREATE OR REPLACE FUNCTION public._test_update_committed_hours(
+  p_user_id uuid,
+  p_tenant_id uuid,
+  p_hours smallint
+)
+RETURNS int LANGUAGE sql AS $$
+  WITH upd AS (
+    UPDATE public.tenant_members
+    SET committed_hours = p_hours
+    WHERE user_id = p_user_id AND tenant_id = p_tenant_id
+    RETURNING id
+  ) SELECT count(*)::int FROM upd;
+$$;
+
+-- UPDATE daily_report và trả về số rows bị ảnh hưởng-- Không có SECURITY DEFINER → chạy với quyền của caller (authenticated role, RLS áp dụng)
+CREATE OR REPLACE FUNCTION public._test_update_daily_report(p_report_id uuid)
+RETURNS int LANGUAGE sql AS $$
+  WITH upd AS (
+    UPDATE public.daily_reports
+    SET
+      tasks = '[{"description": "Updated task", "output_type": "other", "hours": 2}]'::jsonb,
+      hours_logged = 2,
+      updated_at = now()
+    WHERE id = p_report_id
+    RETURNING id
   ) SELECT count(*)::int FROM upd;
 $$;
 
@@ -368,6 +439,134 @@ SELECT throws_ok(
   $sql$,
   '42501', NULL,
   '17. [BUG] User KHÔNG INSERT được notification cho người khác — FAILING vì policy thiếu user_id check'
+);
+
+RESET ROLE;
+
+-- =============================================================
+-- TEST SECTION 7: daily_reports — UPDATE policy (Story 4.6)
+-- =============================================================
+
+-- Test 18: Member CÓ THỂ UPDATE report của chính mình trong cùng tenant
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid   -- Tenant A
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  public._test_update_daily_report('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e11'::uuid),
+  1,
+  '18. Member CÓ THỂ UPDATE report của chính mình (1 row affected)'
+);
+
+RESET ROLE;
+
+-- Test 19: Member KHÔNG THỂ UPDATE report của người khác (owner)
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid   -- Tenant A
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  public._test_update_daily_report('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e12'::uuid),  -- owner's report
+  0,
+  '19. Member KHÔNG UPDATE được report của người khác (0 rows affected)'
+);
+
+RESET ROLE;
+
+-- Test 20: Member Tenant A KHÔNG THỂ UPDATE report của Tenant B
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member in Tenant A
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid   -- active_tenant_id = Tenant A
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  public._test_update_daily_report('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e13'::uuid),  -- Tenant B report
+  0,
+  '20. Member Tenant A KHÔNG UPDATE được report của Tenant B (tenant isolation)'
+);
+
+RESET ROLE;
+
+-- Test 21: is_late KHÔNG bị thay đổi sau khi UPDATE bình thường (immutable)
+-- UPDATE chỉ set tasks/hours_logged/updated_at — is_late phải giữ nguyên false
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid   -- Tenant A
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  (SELECT is_late FROM public.daily_reports WHERE id = 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e11'),
+  false,
+  '21. is_late KHÔNG thay đổi sau khi UPDATE (immutable — chỉ được set bởi INSERT trigger)'
+);
+
+RESET ROLE;
+
+-- =============================================================
+-- TEST SECTION 8: tenant_members — committed_hours UPDATE policy (Story 5.1)
+-- Policy: is_tenant_manager() — chỉ owner/manager được UPDATE
+-- =============================================================
+
+-- Test 22: Manager CÓ THỂ UPDATE committed_hours của member
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'::uuid,  -- manager
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid   -- Tenant A
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  public._test_update_committed_hours(
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- target: member
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid,  -- Tenant A
+    35::smallint
+  ),
+  1,
+  '22. Manager CÓ THỂ UPDATE committed_hours của member (1 row affected)'
+);
+
+RESET ROLE;
+
+-- Test 23: Regular member KHÔNG THỂ UPDATE committed_hours (kể cả của chính mình)
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid   -- Tenant A
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  public._test_update_committed_hours(
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- target: chính mình
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid,  -- Tenant A
+    30::smallint
+  ),
+  0,
+  '23. Regular member KHÔNG UPDATE được committed_hours (0 rows — RLS blocks)'
+);
+
+RESET ROLE;
+
+-- Test 24: Manager CÓ THỂ UPDATE committed_hours = NULL (reset về team default)
+-- Đây là path riêng — NULL là giá trị hợp lệ (smallint nullable), phải test độc lập
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'::uuid,  -- manager
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid   -- Tenant A
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  public._test_update_committed_hours(
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- target: member
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid,  -- Tenant A
+    NULL::smallint                                   -- reset về team default
+  ),
+  1,
+  '24. Manager CÓ THỂ UPDATE committed_hours = NULL (reset về mặc định nhóm)'
 );
 
 RESET ROLE;

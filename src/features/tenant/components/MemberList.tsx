@@ -2,6 +2,7 @@ import { AlertCircle, Users } from 'lucide-react'
 import { useTenantMembers } from '@/features/tenant/hooks/use-tenant-members'
 import { InviteMemberDialog } from '@/features/tenant/components/InviteMemberDialog'
 import { RoleActionDropdown } from '@/features/tenant/components/RoleActionDropdown'
+import { SetCommittedHoursDialog } from '@/features/tenant/components/SetCommittedHoursDialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 
@@ -26,9 +27,11 @@ const ROLE_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
 interface MemberListProps {
   canManage: boolean
   currentUserId: string
+  // P5: undefined khi settings đang load — tránh hiển thị fallback 40h sai
+  defaultCommittedHours: number | undefined
 }
 
-export function MemberList({ canManage, currentUserId }: MemberListProps) {
+export function MemberList({ canManage, currentUserId, defaultCommittedHours }: MemberListProps) {
   // P14: destructure isError để xử lý trường hợp query thất bại
   const { data: members, isLoading, isError } = useTenantMembers()
 
@@ -63,38 +66,61 @@ export function MemberList({ canManage, currentUserId }: MemberListProps) {
         </div>
       ) : (
         <div className='divide-y rounded-md border'>
-          {members.map((member) => (
-            <div key={member.id} className='flex items-center justify-between px-4 py-3'>
-              <div className='flex items-center gap-3'>
-                <Avatar className='h-8 w-8'>
-                  <AvatarFallback className='text-xs'>
-                    {getInitials(member.users.full_name || member.users.email?.split('@')[0] || 'U')}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className='font-medium'>{member.users.full_name || member.users.email?.split('@')[0]}</p>
-                  {/* P5: Hiển thị email (AC2) */}
-                  <p className='text-muted-foreground text-xs'>
-                    {member.users.email ?? member.users.timezone}
-                  </p>
+          {members.map((member) => {
+            const memberName =
+              member.users.full_name || member.users.email?.split('@')[0] || 'Member'
+            return (
+              <div key={member.id} className='flex items-center justify-between px-4 py-3'>
+                <div className='flex items-center gap-3'>
+                  <Avatar className='h-8 w-8'>
+                    <AvatarFallback className='text-xs'>
+                      {getInitials(
+                        member.users.full_name || member.users.email?.split('@')[0] || 'U'
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className='font-medium'>{memberName}</p>
+                    {/* P5: Hiển thị email */}
+                    <p className='text-muted-foreground text-xs'>
+                      {member.users.email ?? member.users.timezone}
+                    </p>
+                    {/* Committed hours — read-only cho tất cả */}
+                    <p className='text-muted-foreground text-xs'>
+                      {member.committed_hours != null
+                        ? `${member.committed_hours}h/tuần (riêng)`
+                        : defaultCommittedHours !== undefined
+                          ? `${defaultCommittedHours}h/tuần (mặc định nhóm)`
+                          : '—h/tuần (mặc định nhóm)'}
+                    </p>
+                  </div>
+                </div>
+                <div className='flex items-center gap-2'>
+                  {/* Chỉ Manager/Owner thấy nút chỉnh sửa giờ cam kết — chờ settings load */}
+                  {canManage && defaultCommittedHours !== undefined && (
+                    <SetCommittedHoursDialog
+                      memberId={member.id}
+                      memberName={memberName}
+                      currentCommittedHours={member.committed_hours}
+                      defaultCommittedHours={defaultCommittedHours}
+                    />
+                  )}
+                  <Badge variant={ROLE_VARIANT[member.role] ?? 'outline'}>
+                    {ROLE_LABEL[member.role] ?? member.role}
+                  </Badge>
+                  {/* Chỉ Owner/Manager thấy role action dropdown */}
+                  {canManage && member.role !== 'owner' && (
+                    <RoleActionDropdown
+                      userId={member.user_id}
+                      memberName={member.users.full_name}
+                      currentRole={member.role}
+                      currentUserId={currentUserId}
+                    />
+                  )}
                 </div>
               </div>
-              <div className='flex items-center gap-2'>
-                <Badge variant={ROLE_VARIANT[member.role] ?? 'outline'}>
-                  {ROLE_LABEL[member.role] ?? member.role}
-                </Badge>
-                {/* Chỉ Owner thấy role action dropdown */}
-                {canManage && member.role !== 'owner' && (
-                  <RoleActionDropdown
-                    userId={member.user_id}
-                    memberName={member.users.full_name}
-                    currentRole={member.role}
-                    currentUserId={currentUserId}
-                  />
-                )}
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

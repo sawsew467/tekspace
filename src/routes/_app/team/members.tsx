@@ -36,7 +36,11 @@ function TeamMembersPage() {
           Quản lý thành viên trong team của bạn
         </p>
       </div>
-      <MemberList canManage={canManageMembers} currentUserId={user?.id ?? ''} />
+      <MemberList
+        canManage={canManageMembers}
+        currentUserId={user?.id ?? ''}
+        defaultCommittedHours={settings?.default_committed_hours}
+      />
     </div>
   )
 }

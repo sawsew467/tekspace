@@ -10,6 +10,7 @@ export type TenantSettings = {
   schedule_deadline_hour: number
   daily_report_deadline_hour: number
   default_committed_hours: number
+  reminder_days: number[] // Story 6.3b: ISO weekday 1=Mon…7=Sun
 }
 
 export type TenantMemberWithUser = {
@@ -64,7 +65,7 @@ export const getTenantSettings = async (tenantId: string): Promise<TenantSetting
   const { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, name, timezone, schedule_deadline_day, schedule_deadline_hour, daily_report_deadline_hour, default_committed_hours'
+      'id, name, timezone, schedule_deadline_day, schedule_deadline_hour, daily_report_deadline_hour, default_committed_hours, reminder_days'
     )
     .eq('id', tenantId)
     .single()
@@ -85,6 +86,7 @@ export const updateTenantSettings = async (
     schedule_deadline_hour,
     daily_report_deadline_hour,
     default_committed_hours,
+    reminder_days,
   } = settings
 
   // P-02: chain .select() để detect silent RLS-blocked updates
@@ -96,12 +98,31 @@ export const updateTenantSettings = async (
       schedule_deadline_hour,
       daily_report_deadline_hour,
       default_committed_hours,
+      reminder_days,
     })
     .eq('id', tenantId)
     .select('id')
     .single()
   if (error) throw error
   if (!data) throw new Error('Update returned no rows — check RLS policies')
+}
+
+export const updateMemberCommittedHours = async (
+  memberId: string,
+  tenantId: string,
+  committedHours: number | null
+): Promise<void> => {
+  // P-02: chain .select('id') để detect silent RLS-blocked update
+  // Defense-in-depth: thêm tenant_id filter để tránh silent fail khi JWT stale
+  const { data, error } = await supabase
+    .from('tenant_members')
+    .update({ committed_hours: committedHours })
+    .eq('id', memberId)
+    .eq('tenant_id', tenantId)
+    .select('id')
+    .single()
+  if (error) throw error
+  if (!data) throw new Error('Update blocked — session may be stale, please refresh')
 }
 
 export const getMembers = async (tenantId: string): Promise<TenantMemberWithUser[]> => {
