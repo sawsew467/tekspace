@@ -1,11 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useTenantStore } from '@/stores/tenant-store'
-import { usePermissions } from '@/hooks/use-permissions'
+import { hasPermission } from '@/lib/permissions'
+import { ROUTES } from '@/lib/routes'
 import { QUERY_KEYS } from '@/lib/query-keys'
 import { COMMON_TIMEZONES } from '@/lib/timezones'
 import {
@@ -36,6 +37,12 @@ import {
 } from '@/components/ui/select'
 
 export const Route = createFileRoute('/_app/team/settings')({
+  beforeLoad: () => {
+    const { activeRole } = useTenantStore.getState()
+    if (!activeRole || !hasPermission(activeRole, 'manageTenant')) {
+      throw redirect({ to: ROUTES.app.dashboard })
+    }
+  },
   head: () => ({
     meta: [{ title: 'Cài đặt nhóm — TekSpace' }],
   }),
@@ -71,7 +78,6 @@ const HOURS = Array.from({ length: 24 }, (_, i) => ({
 function TeamSettingsPage() {
   const { activeTenantId } = useTenantStore()
   const queryClient = useQueryClient()
-  const { canManageTenant } = usePermissions()
 
   const { data: settings, isLoading } = useQuery({
     queryKey: [QUERY_KEYS.tenantSettings, activeTenantId],
@@ -137,215 +143,209 @@ function TeamSettingsPage() {
         <p className='text-muted-foreground mt-1 text-sm'>Cấu hình deadline và timezone cho team</p>
       </div>
 
-      {!canManageTenant ? (
-        <div className='text-muted-foreground py-8 text-center text-sm'>
-          Chỉ Owner mới có thể thay đổi cài đặt nhóm.
-        </div>
-      ) : (
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit((data) => mutation.mutate(data))}
-            className='space-y-6'
-          >
-            {/* Timezone */}
-            <FormField
-              control={form.control}
-              name='timezone'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Timezone</FormLabel>
-                  <Select
-                    name={field.name}
-                    onValueChange={field.onChange}
-                    value={field.value ?? ''}
-                    key={timezoneWatch || 'empty'}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder='Chọn timezone' />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {COMMON_TIMEZONES.map((tz) => (
-                        <SelectItem key={tz.value} value={tz.value}>
-                          {tz.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Schedule Deadline Day */}
-            <FormField
-              control={form.control}
-              name='schedule_deadline_day'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Ngày deadline nộp lịch</FormLabel>
-                  <Select
-                    name={field.name}
-                    onValueChange={(val) => field.onChange(Number(val))}
-                    value={field.value !== undefined ? String(field.value) : ''}
-                    key={timezoneWatch || 'empty'}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder='Chọn ngày' />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {DAYS_OF_WEEK.map((day) => (
-                        <SelectItem key={day.value} value={String(day.value)}>
-                          {day.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Schedule Deadline Hour */}
-            <FormField
-              control={form.control}
-              name='schedule_deadline_hour'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Giờ deadline nộp lịch</FormLabel>
-                  <Select
-                    name={field.name}
-                    onValueChange={(val) => field.onChange(Number(val))}
-                    value={field.value !== undefined ? String(field.value) : ''}
-                    key={timezoneWatch || 'empty'}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder='Chọn giờ' />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {HOURS.map((h) => (
-                        <SelectItem key={h.value} value={String(h.value)}>
-                          {h.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Daily Report Deadline Hour */}
-            <FormField
-              control={form.control}
-              name='daily_report_deadline_hour'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Giờ deadline báo cáo ngày</FormLabel>
-                  <Select
-                    name={field.name}
-                    onValueChange={(val) => field.onChange(Number(val))}
-                    value={field.value !== undefined ? String(field.value) : ''}
-                    key={timezoneWatch || 'empty'}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder='Chọn giờ' />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {HOURS.map((h) => (
-                        <SelectItem key={h.value} value={String(h.value)}>
-                          {h.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Reminder Days — Story 6.3b */}
-            <FormField
-              control={form.control}
-              name='reminder_days'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Ngày gửi nhắc nhở daily report</FormLabel>
-                  <FormDescription>
-                    Chọn các ngày trong tuần sẽ gửi reminder lúc 7PM. Bỏ chọn hết = tắt reminder.
-                  </FormDescription>
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit((data) => mutation.mutate(data))}
+          className='space-y-6'
+        >
+          {/* Timezone */}
+          <FormField
+            control={form.control}
+            name='timezone'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Timezone</FormLabel>
+                <Select
+                  name={field.name}
+                  onValueChange={field.onChange}
+                  value={field.value ?? ''}
+                  key={timezoneWatch || 'empty'}
+                >
                   <FormControl>
-                    <div className='flex flex-wrap gap-2'>
-                      {REMINDER_DAYS.map((day) => {
-                        const active = (field.value ?? []).includes(day.value)
-                        return (
-                          <button
-                            key={day.value}
-                            type='button'
-                            onClick={() => {
-                              const current = field.value ?? []
-                              field.onChange(
-                                active
-                                  ? current.filter((d) => d !== day.value)
-                                  : [...current, day.value].sort((a, b) => a - b)
-                              )
-                            }}
-                            className={cn(
-                              'rounded-md border px-3 py-1.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+                    <SelectTrigger>
+                      <SelectValue placeholder='Chọn timezone' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {COMMON_TIMEZONES.map((tz) => (
+                      <SelectItem key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Schedule Deadline Day */}
+          <FormField
+            control={form.control}
+            name='schedule_deadline_day'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ngày deadline nộp lịch</FormLabel>
+                <Select
+                  name={field.name}
+                  onValueChange={(val) => field.onChange(Number(val))}
+                  value={field.value !== undefined ? String(field.value) : ''}
+                  key={timezoneWatch || 'empty'}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Chọn ngày' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {DAYS_OF_WEEK.map((day) => (
+                      <SelectItem key={day.value} value={String(day.value)}>
+                        {day.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Schedule Deadline Hour */}
+          <FormField
+            control={form.control}
+            name='schedule_deadline_hour'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Giờ deadline nộp lịch</FormLabel>
+                <Select
+                  name={field.name}
+                  onValueChange={(val) => field.onChange(Number(val))}
+                  value={field.value !== undefined ? String(field.value) : ''}
+                  key={timezoneWatch || 'empty'}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Chọn giờ' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {HOURS.map((h) => (
+                      <SelectItem key={h.value} value={String(h.value)}>
+                        {h.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Daily Report Deadline Hour */}
+          <FormField
+            control={form.control}
+            name='daily_report_deadline_hour'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Giờ deadline báo cáo ngày</FormLabel>
+                <Select
+                  name={field.name}
+                  onValueChange={(val) => field.onChange(Number(val))}
+                  value={field.value !== undefined ? String(field.value) : ''}
+                  key={timezoneWatch || 'empty'}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Chọn giờ' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {HOURS.map((h) => (
+                      <SelectItem key={h.value} value={String(h.value)}>
+                        {h.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Reminder Days — Story 6.3b */}
+          <FormField
+            control={form.control}
+            name='reminder_days'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ngày gửi nhắc nhở daily report</FormLabel>
+                <FormDescription>
+                  Chọn các ngày trong tuần sẽ gửi reminder lúc 7PM. Bỏ chọn hết = tắt reminder.
+                </FormDescription>
+                <FormControl>
+                  <div className='flex flex-wrap gap-2'>
+                    {REMINDER_DAYS.map((day) => {
+                      const active = (field.value ?? []).includes(day.value)
+                      return (
+                        <button
+                          key={day.value}
+                          type='button'
+                          onClick={() => {
+                            const current = field.value ?? []
+                            field.onChange(
                               active
-                                ? 'bg-primary text-primary-foreground border-primary'
-                                : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
-                            )}
-                            disabled={mutation.isPending}
-                          >
-                            {day.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                                ? current.filter((d) => d !== day.value)
+                                : [...current, day.value].sort((a, b) => a - b)
+                            )
+                          }}
+                          className={cn(
+                            'rounded-md border px-3 py-1.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+                            active
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
+                          )}
+                          disabled={mutation.isPending}
+                        >
+                          {day.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-            {/* Default Committed Hours — FIX 9: number input */}
-            <FormField
-              control={form.control}
-              name='default_committed_hours'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Giờ cam kết mặc định / tuần</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      min={1}
-                      max={168}
-                      {...field}
-                      onChange={(e) =>
-                        field.onChange(e.target.value === '' ? 0 : parseInt(e.target.value, 10))
-                      }
-                    />
-                  </FormControl>
-                  <FormDescription>Số giờ làm việc cam kết mỗi tuần (1–168)</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          {/* Default Committed Hours — FIX 9: number input */}
+          <FormField
+            control={form.control}
+            name='default_committed_hours'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Giờ cam kết mặc định / tuần</FormLabel>
+                <FormControl>
+                  <Input
+                    type='number'
+                    min={1}
+                    max={168}
+                    {...field}
+                    onChange={(e) =>
+                      field.onChange(e.target.value === '' ? 0 : parseInt(e.target.value, 10))
+                    }
+                  />
+                </FormControl>
+                <FormDescription>Số giờ làm việc cam kết mỗi tuần (1–168)</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-            <Button type='submit' disabled={mutation.isPending}>
-              {mutation.isPending ? 'Đang lưu...' : 'Lưu cài đặt'}
-            </Button>
-          </form>
-        </Form>
-      )}
+          <Button type='submit' disabled={mutation.isPending}>
+            {mutation.isPending ? 'Đang lưu...' : 'Lưu cài đặt'}
+          </Button>
+        </form>
+      </Form>
     </div>
   )
 }

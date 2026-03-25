@@ -1,12 +1,19 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { usePermissions } from '@/hooks/use-permissions'
 import { useTenantStore } from '@/stores/tenant-store'
+import { hasPermission } from '@/lib/permissions'
+import { ROUTES } from '@/lib/routes'
 import { InviteListSection } from '@/features/tenant/components/InviteListSection'
 import { getTenantSettings } from '@/features/tenant/services/tenant.service'
 import { QUERY_KEYS } from '@/lib/query-keys'
 
 export const Route = createFileRoute('/_app/team/invites')({
+  beforeLoad: () => {
+    const { activeRole } = useTenantStore.getState()
+    if (!activeRole || !hasPermission(activeRole, 'manageMembers')) {
+      throw redirect({ to: ROUTES.app.dashboard })
+    }
+  },
   head: () => ({
     meta: [{ title: 'Lời mời — TekSpace' }],
   }),
@@ -14,8 +21,7 @@ export const Route = createFileRoute('/_app/team/invites')({
 })
 
 function TeamInvitesPage() {
-  const { canManageMembers } = usePermissions()
-  const { activeTenantId } = useTenantStore()
+  const { activeTenantId, activeRole } = useTenantStore()
 
   const { data: settings } = useQuery({
     queryKey: [QUERY_KEYS.tenantSettings, activeTenantId],
@@ -34,7 +40,7 @@ function TeamInvitesPage() {
           Quản lý lời mời thành viên cho team
         </p>
       </div>
-      <InviteListSection canManage={canManageMembers} />
+      <InviteListSection canManage={hasPermission(activeRole ?? 'member', 'manageMembers')} />
     </div>
   )
 }
