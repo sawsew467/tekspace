@@ -21,6 +21,7 @@ type Team = {
   id: string // UUID từ tenants table — dùng làm React key (không dùng name vì không unique)
   name: string
   logo: React.ElementType
+  logoUrl?: string | null   // Story 8-14: Tenant logo upload (optional, tương thích ngược)
   plan: string
 }
 
@@ -61,7 +62,11 @@ export function TeamSwitcher({ teams, onSwitch, onCreateTeam }: TeamSwitcherProp
               className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
             >
               <div className='flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg'>
-                <activeTeam.logo className='size-8' />
+                {activeTeam.logoUrl ? (
+                  <img src={activeTeam.logoUrl} className='size-8 object-cover' alt={activeTeam.name} />
+                ) : (
+                  <activeTeam.logo className='size-8' />
+                )}
               </div>
               <div className='grid flex-1 text-start text-sm leading-tight'>
                 <span className='truncate font-semibold'>
@@ -88,8 +93,12 @@ export function TeamSwitcher({ teams, onSwitch, onCreateTeam }: TeamSwitcherProp
                 onClick={() => onSwitch?.(team.id)}
                 className='gap-2 p-2'
               >
-                <div className='flex size-6 items-center justify-center rounded-sm border'>
-                  <team.logo className='size-4 shrink-0' />
+                <div className='flex size-6 items-center justify-center rounded-sm border overflow-hidden'>
+                  {team.logoUrl ? (
+                    <img src={team.logoUrl} className='size-6 object-cover' alt={team.name} />
+                  ) : (
+                    <team.logo className='size-4 shrink-0' />
+                  )}
                 </div>
                 {team.name}
                 <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>

@@ -34,6 +34,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      committed_hours_history: {
+        Row: {
+          committed_hours: number
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          set_by: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          committed_hours: number
+          created_at?: string
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          set_by?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          committed_hours?: number
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          set_by?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "committed_hours_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_reports: {
         Row: {
           created_at: string
@@ -130,6 +171,55 @@ export type Database = {
           },
           {
             foreignKeyName: "incident_appeals_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_outcome_notes: {
+        Row: {
+          created_at: string
+          id: string
+          incident_id: string
+          manager_id: string
+          note: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          incident_id: string
+          manager_id: string
+          note: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          incident_id?: string
+          manager_id?: string
+          note?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_outcome_notes_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_outcome_notes_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_outcome_notes_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -536,7 +626,9 @@ export type Database = {
           daily_report_deadline_hour: number
           default_committed_hours: number
           id: string
+          logo_url: string | null
           name: string
+          reminder_days: number[]
           schedule_deadline_day: number
           schedule_deadline_hour: number
           timezone: string
@@ -547,7 +639,9 @@ export type Database = {
           daily_report_deadline_hour?: number
           default_committed_hours?: number
           id?: string
+          logo_url?: string | null
           name: string
+          reminder_days?: number[]
           schedule_deadline_day?: number
           schedule_deadline_hour?: number
           timezone?: string
@@ -558,7 +652,9 @@ export type Database = {
           daily_report_deadline_hour?: number
           default_committed_hours?: number
           id?: string
+          logo_url?: string | null
           name?: string
+          reminder_days?: number[]
           schedule_deadline_day?: number
           schedule_deadline_hour?: number
           timezone?: string
@@ -626,15 +722,28 @@ export type Database = {
         }
         Returns: undefined
       }
+      format_slot_label: {
+        Args: { p_ts: string; p_tz: string }
+        Returns: string
+      }
       get_or_create_schedule_week: {
         Args: { p_week_of: string }
         Returns: string
       }
+      get_team_avg_commitment_rate: {
+        Args: { p_week_end: string; p_week_start: string }
+        Returns: Json
+      }
+      is_incident_victim: { Args: { p_incident_id: string }; Returns: boolean }
       is_member_of_current_tenant: {
         Args: { check_user_id: string }
         Returns: boolean
       }
       is_tenant_manager: { Args: never; Returns: boolean }
+      is_tenant_manager_or_owner: {
+        Args: { p_tenant_id: string }
+        Returns: boolean
+      }
       is_valid_timezone: { Args: { tz: string }; Returns: boolean }
       update_slot_with_reason: {
         Args: {

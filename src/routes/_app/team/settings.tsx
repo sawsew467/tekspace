@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { TenantLogoUploadCard } from '@/features/tenant/components/TenantLogoUploadCard'
 
 export const Route = createFileRoute('/_app/team/settings')({
   beforeLoad: () => {
@@ -142,6 +143,12 @@ function TeamSettingsPage() {
         </h1>
         <p className='text-muted-foreground mt-1 text-sm'>Cấu hình deadline và timezone cho team</p>
       </div>
+
+      {/* Story 8-14: Logo nhóm — hiển thị TRƯỚC form cài đặt */}
+      <TenantLogoUploadCard
+        logoUrl={settings?.logo_url ?? null}
+        teamName={settings?.name ?? ''}
+      />
 
       <Form {...form}>
         <form

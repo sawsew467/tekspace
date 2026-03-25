@@ -23,6 +23,7 @@ import { QUERY_KEYS } from '@/lib/query-keys'
 import { ROUTES } from '@/lib/routes'
 import { useUnreadCount } from '@/features/notifications/hooks/use-unread-count'
 import { useNotificationsRealtime } from '@/features/notifications/hooks/use-notifications-realtime'
+import { useTabTitle } from '@/features/notifications/hooks/use-tab-title'
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
@@ -35,6 +36,7 @@ export function AppSidebar() {
   // AppSidebar luôn mount → subscription active toàn bộ session
   const { data: unreadCount = 0 } = useUnreadCount(activeTenantId, user?.id ?? null)
   useNotificationsRealtime(activeTenantId, user?.id ?? null)
+  useTabTitle(unreadCount)
 
   // Inject unread badge vào nav item "Notifications" + filter items theo role
   const navGroupsWithBadge = sidebarData.navGroups
@@ -59,7 +61,7 @@ export function AppSidebar() {
       if (tenantIds.length === 0) return []
       const { data, error } = await supabase
         .from('tenants')
-        .select('id, name')
+        .select('id, name, logo_url')  // Story 8-14: thêm logo_url để hiển thị trong TeamSwitcher
         .in('id', tenantIds)
       if (error) throw error
       return data ?? []
@@ -81,7 +83,8 @@ export function AppSidebar() {
   const teams = tenants.map((t) => ({
     id: t.tenantId,
     name: tenantRecords?.find((r) => r.id === t.tenantId)?.name ?? 'Loading...',
-    logo: Building2, // Default icon
+    logo: Building2, // Default icon — fallback khi không có logo
+    logoUrl: tenantRecords?.find((r) => r.id === t.tenantId)?.logo_url ?? null, // Story 8-14
     plan: t.role,    // Hiển thị role dưới team name
   }))
 

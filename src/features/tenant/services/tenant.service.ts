@@ -11,6 +11,7 @@ export type TenantSettings = {
   daily_report_deadline_hour: number
   default_committed_hours: number
   reminder_days: number[] // Story 6.3b: ISO weekday 1=Mon…7=Sun
+  logo_url: string | null  // Story 8-14: Tenant logo upload
 }
 
 export type TenantMemberWithUser = {
@@ -65,7 +66,7 @@ export const getTenantSettings = async (tenantId: string): Promise<TenantSetting
   const { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, name, timezone, schedule_deadline_day, schedule_deadline_hour, daily_report_deadline_hour, default_committed_hours, reminder_days'
+      'id, name, timezone, schedule_deadline_day, schedule_deadline_hour, daily_report_deadline_hour, default_committed_hours, reminder_days, logo_url'
     )
     .eq('id', tenantId)
     .single()
@@ -417,6 +418,73 @@ export const resendInvite = async (
     throw new Error(serverMessage ?? 'Không thể gửi lại lời mời.')
   }
 }
+
+// ================================================================
+// Story 8-14: Tenant Logo Upload
+// ================================================================
+
+// Helper nội bộ: xóa file từ Storage bucket tenant-logos theo public URL (best-effort)
+const removeLogoFromStorage = async (logoUrl: string): Promise<void> => {
+  try {
+    const urlObj = new URL(logoUrl)
+    const pathMatch = urlObj.pathname.match(/\/tenant-logos\/(.+)/)
+    if (pathMatch?.[1]) {
+      await supabase.storage.from('tenant-logos').remove([decodeURIComponent(pathMatch[1])])
+    }
+  } catch {
+    // Best-effort: không throw nếu file không tồn tại hoặc URL không parse được
+  }
+}
+
+// Upload logo lên Storage, return public URL + storage path
+// (caller chịu trách nhiệm gọi updateTenantLogoUrl sau)
+export const uploadTenantLogoFile = async (
+  tenantId: string,
+  file: File
+): Promise<{ publicUrl: string; storagePath: string }> => {
+  const ext = file.name.split('.').pop() ?? 'jpg'
+  const storagePath = `${tenantId}/${Date.now()}.${ext}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('tenant-logos')
+    .upload(storagePath, file, { upsert: true })
+  if (uploadError) throw uploadError
+
+  const { data } = supabase.storage.from('tenant-logos').getPublicUrl(storagePath)
+  return { publicUrl: data.publicUrl, storagePath }
+}
+
+// Cập nhật logo_url trong tenants table
+export const updateTenantLogoUrl = async (
+  tenantId: string,
+  logoUrl: string | null
+): Promise<void> => {
+  const { data, error } = await supabase
+    .from('tenants')
+    .update({ logo_url: logoUrl })
+    .eq('id', tenantId)
+    .select('id')
+    .single()
+  if (error) throw error
+  if (!data) throw new Error('Update blocked — check RLS or session')
+}
+
+// Xóa logo: set null trong DB trước (consistent), rồi xóa Storage (best-effort)
+// Fix F3: đảo thứ tự — DB null trước để tránh trạng thái broken image nếu DB fail
+export const deleteTenantLogo = async (
+  tenantId: string,
+  currentLogoUrl: string | null
+): Promise<void> => {
+  // DB null first — nếu bước này fail, storage file vẫn còn (consistent)
+  await updateTenantLogoUrl(tenantId, null)
+  // Storage cleanup sau (best-effort)
+  if (currentLogoUrl) {
+    await removeLogoFromStorage(currentLogoUrl)
+  }
+}
+
+// Export helper để hook dùng cho rollback và cleanup
+export { removeLogoFromStorage }
 
 export const isSoleOwner = async (userId: string): Promise<boolean> => {
   // Lấy tất cả tenants user đang là owner
