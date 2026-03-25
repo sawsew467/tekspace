@@ -226,6 +226,42 @@ export function getOnlineMemberIds(slots: ScheduleSlot[], nowUTC?: Date): string
   return Array.from(onlineSet)
 }
 
+// ── Current timeslot utilities (Story 8.9) ───────────────────────────────────
+
+/**
+ * getTodayISO — trả "YYYY-MM-DD" của ngày hôm nay trong timezone.
+ * @param timezone IANA timezone string (e.g. "Asia/Ho_Chi_Minh")
+ * @param nowUTC   injectable cho test deterministic (mặc định = new Date())
+ * Falls back to UTC if timezone string is invalid.
+ */
+export function getTodayISO(timezone: string, nowUTC?: Date): string {
+  try {
+    const zoned = toZonedTime(nowUTC ?? new Date(), timezone)
+    if (isNaN(zoned.getTime())) throw new Error('Invalid timezone')
+    return format(zoned, 'yyyy-MM-dd')
+  } catch {
+    return format(toZonedTime(nowUTC ?? new Date(), 'UTC'), 'yyyy-MM-dd')
+  }
+}
+
+/**
+ * getCurrentDecimalHour — trả giờ hiện tại dạng decimal trong timezone.
+ * Ví dụ: 14:30 → 14.5, 09:00 → 9.0, 00:45 → 0.75
+ * @param timezone IANA timezone string
+ * @param nowUTC   injectable cho test deterministic
+ * Falls back to UTC if timezone string is invalid.
+ */
+export function getCurrentDecimalHour(timezone: string, nowUTC?: Date): number {
+  try {
+    const zoned = toZonedTime(nowUTC ?? new Date(), timezone)
+    if (isNaN(zoned.getTime())) throw new Error('Invalid timezone')
+    return zoned.getHours() + zoned.getMinutes() / 60
+  } catch {
+    const zoned = toZonedTime(nowUTC ?? new Date(), 'UTC')
+    return zoned.getHours() + zoned.getMinutes() / 60
+  }
+}
+
 // ── Self-Dashboard utilities (Story 3.3) ─────────────────────────────────────
 
 /**

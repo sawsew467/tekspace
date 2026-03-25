@@ -13,6 +13,7 @@ import type { TenantMemberWithUser } from '@/features/tenant/services/tenant.ser
 import { useTeamWeekSlots } from '../hooks/use-team-week-slots'
 import { TeamScheduleHeatmap } from './TeamScheduleHeatmap'
 import { getOnlineMemberIds, getInitials } from '../utils/dashboard.utils'
+import { PageContainer } from '@/components/layout/page-container'
 
 function getCurrentWeekOf(): string {
   return format(startOfISOWeek(new Date()), 'yyyy-MM-dd')
@@ -68,7 +69,7 @@ export function TeamDashboard() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
+    <PageContainer variant='wide' className='flex flex-col gap-4'>
       {/* Header: title + week nav + timezone selector — 1 dòng */}
       <div className="flex items-center gap-2">
         <CalendarDays className="h-5 w-5 text-muted-foreground shrink-0" />
@@ -159,9 +160,10 @@ export function TeamDashboard() {
           slots={slots}
           weekOf={currentWeekOf}
           displayTimezone={displayTimezone}
+          isCurrentWeek={isViewingCurrentWeek}
         />
       )}
-    </div>
+    </PageContainer>
   )
 }
 

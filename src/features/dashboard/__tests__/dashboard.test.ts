@@ -10,6 +10,8 @@ import {
   getHeatmapBgClass,
   getInitials,
   getOnlineMemberIds,
+  getTodayISO,
+  getCurrentDecimalHour,
 } from '../utils/dashboard.utils'
 import type { ScheduleSlot } from '@/features/schedule/services/schedule.service'
 
@@ -536,5 +538,120 @@ describe('getOnlineMemberIds', () => {
     })
     expect(getOnlineMemberIds([slot], pastNow)).toEqual(['u1'])
     expect(getOnlineMemberIds([slot], NOW)).toEqual([])  // NOW = 2026-03-25T10:00Z → không active
+  })
+})
+
+// ── getTodayISO ───────────────────────────────────────────────────────────────
+
+describe('getTodayISO', () => {
+  it('trả đúng ngày UTC khi timezone = UTC', () => {
+    const fixedUTC = new Date('2026-03-25T12:00:00Z')
+    expect(getTodayISO('UTC', fixedUTC)).toBe('2026-03-25')
+  })
+
+  it('ICT (UTC+7): 16:00 UTC → 23:00 ICT, vẫn cùng ngày 2026-03-25', () => {
+    const fixedUTC = new Date('2026-03-25T16:00:00Z')
+    expect(getTodayISO('Asia/Ho_Chi_Minh', fixedUTC)).toBe('2026-03-25')
+  })
+
+  it('ICT (UTC+7): 17:30 UTC → 00:30 ICT hôm sau (2026-03-26)', () => {
+    const fixedUTC = new Date('2026-03-25T17:30:00Z')
+    expect(getTodayISO('Asia/Ho_Chi_Minh', fixedUTC)).toBe('2026-03-26')
+  })
+
+  it('America/New_York (UTC-4 EDT): 16:00 UTC → 12:00 EDT, vẫn ngày 2026-03-25', () => {
+    const fixedUTC = new Date('2026-03-25T16:00:00Z')
+    expect(getTodayISO('America/New_York', fixedUTC)).toBe('2026-03-25')
+  })
+
+  it('America/New_York (UTC-4 EDT): 03:00 UTC → 23:00 hôm trước (2026-03-24)', () => {
+    const fixedUTC = new Date('2026-03-25T03:00:00Z')
+    expect(getTodayISO('America/New_York', fixedUTC)).toBe('2026-03-24')
+  })
+
+  it('nowUTC injectable → deterministic', () => {
+    const fixed = new Date('2026-01-15T00:00:00Z')
+    expect(getTodayISO('UTC', fixed)).toBe('2026-01-15')
+  })
+})
+
+// ── getCurrentDecimalHour ─────────────────────────────────────────────────────
+
+describe('getCurrentDecimalHour', () => {
+  it('14:30 UTC → 14.5 khi timezone = UTC', () => {
+    const fixedUTC = new Date('2026-03-25T14:30:00Z')
+    expect(getCurrentDecimalHour('UTC', fixedUTC)).toBe(14.5)
+  })
+
+  it('00:00 UTC → 0 khi timezone = UTC (midnight)', () => {
+    const fixedUTC = new Date('2026-03-25T00:00:00Z')
+    expect(getCurrentDecimalHour('UTC', fixedUTC)).toBe(0)
+  })
+
+  it('23:30 UTC → 23.5 khi timezone = UTC', () => {
+    const fixedUTC = new Date('2026-03-25T23:30:00Z')
+    expect(getCurrentDecimalHour('UTC', fixedUTC)).toBe(23.5)
+  })
+
+  it('07:30 UTC → 14.5 khi timezone = Asia/Ho_Chi_Minh (UTC+7)', () => {
+    const fixedUTC = new Date('2026-03-25T07:30:00Z')
+    expect(getCurrentDecimalHour('Asia/Ho_Chi_Minh', fixedUTC)).toBe(14.5)
+  })
+
+  it('02:00 UTC → 9.0 ICT (UTC+7): 02:00 + 7h = 09:00', () => {
+    const fixedUTC = new Date('2026-03-25T02:00:00Z')
+    expect(getCurrentDecimalHour('Asia/Ho_Chi_Minh', fixedUTC)).toBe(9)
+  })
+
+  it('15:15 UTC → 15.25 UTC (giờ lẻ 15 phút = 0.25)', () => {
+    const fixedUTC = new Date('2026-03-25T15:15:00Z')
+    expect(getCurrentDecimalHour('UTC', fixedUTC)).toBeCloseTo(15.25)
+  })
+
+  it('nowUTC injectable → deterministic', () => {
+    const fixed = new Date('2026-03-25T10:00:00Z')
+    expect(getCurrentDecimalHour('UTC', fixed)).toBe(10)
+  })
+
+  // P8: timezone UTC offset âm (America/New_York UTC-4 EDT)
+  it('America/New_York (UTC-4 EDT): 20:00 UTC → 16.0 EDT', () => {
+    const fixedUTC = new Date('2026-03-25T20:00:00Z')
+    expect(getCurrentDecimalHour('America/New_York', fixedUTC)).toBe(16)
+  })
+
+  it('America/New_York (UTC-4 EDT): 03:30 UTC → 23.5 hôm trước (11:30 PM EDT)', () => {
+    const fixedUTC = new Date('2026-03-25T03:30:00Z')
+    expect(getCurrentDecimalHour('America/New_York', fixedUTC)).toBe(23.5)
+  })
+
+  // P2: invalid timezone → fallback UTC, không crash
+  it('invalid timezone string → fallback UTC, không throw', () => {
+    const fixedUTC = new Date('2026-03-25T10:00:00Z')
+    expect(() => getCurrentDecimalHour('Invalid/Zone', fixedUTC)).not.toThrow()
+    // fallback về UTC: 10:00 UTC → 10.0
+    expect(getCurrentDecimalHour('Invalid/Zone', fixedUTC)).toBe(10)
+  })
+
+  // P5: giờ ngoài display range điển hình [8, 20) — verify utility trả đúng giá trị
+  // (guard isCurrentSlot trong component sẽ chặn highlight khi < slotStart hoặc >= slotEnd)
+  it('trả đúng giá trị 7.5 khi giờ = 07:30 — nằm ngoài range [8, 20) thông thường', () => {
+    const fixedUTC = new Date('2026-03-25T07:30:00Z')
+    expect(getCurrentDecimalHour('UTC', fixedUTC)).toBe(7.5)
+  })
+
+  it('trả đúng giá trị 20.0 khi giờ = 20:00 — = slotEnd, nằm ngoài range [8, 20)', () => {
+    const fixedUTC = new Date('2026-03-25T20:00:00Z')
+    expect(getCurrentDecimalHour('UTC', fixedUTC)).toBe(20)
+  })
+})
+
+// ── getTodayISO: invalid timezone fallback (P2) ────────────────────────────────
+
+describe('getTodayISO — invalid timezone fallback', () => {
+  it('invalid timezone string → fallback UTC, không throw', () => {
+    const fixedUTC = new Date('2026-03-25T12:00:00Z')
+    expect(() => getTodayISO('Invalid/Zone', fixedUTC)).not.toThrow()
+    // fallback về UTC: 12:00Z vẫn là 2026-03-25
+    expect(getTodayISO('Invalid/Zone', fixedUTC)).toBe('2026-03-25')
   })
 })
