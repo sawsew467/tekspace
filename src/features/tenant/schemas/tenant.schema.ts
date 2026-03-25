@@ -35,6 +35,15 @@ export const teamSettingsSchema = z.object({
     .int('Số giờ phải là số nguyên')
     .min(1, 'Tối thiểu 1 giờ')
     .max(168, 'Tối đa 168 giờ'),
+  // Story 6.3b: ISO weekday 1=Mon…7=Sun, array rỗng = tắt hoàn toàn
+  // .refine: reject duplicate values (DB CHECK constraint chỉ validate range, không validate uniqueness)
+  reminder_days: z
+    .array(z.number().int().min(1).max(7))
+    .max(7, 'Tối đa 7 ngày')
+    .refine(
+      (days) => new Set(days).size === days.length,
+      { message: 'Các ngày không được trùng nhau' }
+    ),
 })
 
 export const inviteMemberSchema = z.object({

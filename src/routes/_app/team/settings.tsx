@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { useTenantStore } from '@/stores/tenant-store'
 import { usePermissions } from '@/hooks/use-permissions'
 import { QUERY_KEYS } from '@/lib/query-keys'
@@ -51,6 +52,17 @@ const DAYS_OF_WEEK = [
   { value: 6, label: 'Thứ Bảy' },
 ]
 
+// ISO weekday cho reminder_days: 1=Thứ 2 … 7=Chủ Nhật (khác DAYS_OF_WEEK dùng JS 0-index)
+const REMINDER_DAYS = [
+  { value: 1, label: 'T2' },
+  { value: 2, label: 'T3' },
+  { value: 3, label: 'T4' },
+  { value: 4, label: 'T5' },
+  { value: 5, label: 'T6' },
+  { value: 6, label: 'T7' },
+  { value: 7, label: 'CN' },
+]
+
 const HOURS = Array.from({ length: 24 }, (_, i) => ({
   value: i,
   label: `${String(i).padStart(2, '0')}:00`,
@@ -78,6 +90,7 @@ function TeamSettingsPage() {
       schedule_deadline_hour: 23,
       daily_report_deadline_hour: 3,
       default_committed_hours: 40,
+      reminder_days: [1, 2, 3, 4, 5],
     },
     values: settings
       ? {
@@ -86,6 +99,7 @@ function TeamSettingsPage() {
           schedule_deadline_hour: settings.schedule_deadline_hour,
           daily_report_deadline_hour: settings.daily_report_deadline_hour,
           default_committed_hours: settings.default_committed_hours,
+          reminder_days: settings.reminder_days ?? [1, 2, 3, 4, 5],
         }
       : undefined,
   })
@@ -252,6 +266,51 @@ function TeamSettingsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Reminder Days — Story 6.3b */}
+            <FormField
+              control={form.control}
+              name='reminder_days'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Ngày gửi nhắc nhở daily report</FormLabel>
+                  <FormDescription>
+                    Chọn các ngày trong tuần sẽ gửi reminder lúc 7PM. Bỏ chọn hết = tắt reminder.
+                  </FormDescription>
+                  <FormControl>
+                    <div className='flex flex-wrap gap-2'>
+                      {REMINDER_DAYS.map((day) => {
+                        const active = (field.value ?? []).includes(day.value)
+                        return (
+                          <button
+                            key={day.value}
+                            type='button'
+                            onClick={() => {
+                              const current = field.value ?? []
+                              field.onChange(
+                                active
+                                  ? current.filter((d) => d !== day.value)
+                                  : [...current, day.value].sort((a, b) => a - b)
+                              )
+                            }}
+                            className={cn(
+                              'rounded-md border px-3 py-1.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+                              active
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
+                            )}
+                            disabled={mutation.isPending}
+                          >
+                            {day.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

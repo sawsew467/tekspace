@@ -13,6 +13,7 @@ type TenantRow = {
   timezone: string
   schedule_deadline_day: number
   schedule_deadline_hour: number
+  reminder_days: number[] // ISO weekday: 1=Mon…7=Sun
 }
 
 type MemberRow = {
@@ -77,6 +78,16 @@ function computeDeadlineDisplay(
 }
 
 /**
+ * Tính calendar date hôm nay theo timezone của tenant.
+ * pg_cron fires 12:00 UTC → với timezone 'Asia/Ho_Chi_Minh' (UTC+7) = 19:00 ICT → 'YYYY-MM-DD' đúng ngày.
+ * Dùng 'sv-SE' locale để nhận format chuẩn ISO (YYYY-MM-DD) không cần split thủ công.
+ * Throws RangeError nếu timezone string không hợp lệ — caller phải wrap bằng try/catch.
+ */
+function getTodayInTz(timezone: string): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: timezone }).format(new Date())
+}
+
+/**
  * Lấy Set<user_id> của những members đã submit schedule cho weekOf trong tenant.
  * Nếu schedule_weeks chưa tồn tại → trả về Set rỗng (không ai submit).
  * Throws nếu có DB error — caller phải handle thay vì silently treat all-as-pending.
@@ -118,7 +129,7 @@ async function getSubmittedUserIds(tenantId: string, weekOf: string): Promise<Se
 async function handleScheduleReminder(weekOf: string): Promise<{ reminded_count: number }> {
   const { data: tenants, error: tenantsError } = await supabaseAdmin
     .from('tenants')
-    .select('id, name, timezone, schedule_deadline_day, schedule_deadline_hour')
+    .select('id, name, timezone, schedule_deadline_day, schedule_deadline_hour, reminder_days')
 
   if (tenantsError) throw tenantsError
 
@@ -355,6 +366,144 @@ async function handleDeadlineMissed(weekOf: string): Promise<{ notified_count: n
 }
 
 // ----------------------------------------------------------------
+// Action: daily_report_reminder
+// Nhắc nhở members chưa submit daily report hôm nay
+// ----------------------------------------------------------------
+
+async function handleDailyReportReminder(): Promise<{ reminded_count: number }> {
+  const { data: tenants, error: tenantsError } = await supabaseAdmin
+    .from('tenants')
+    .select('id, name, timezone, reminder_days')
+
+  if (tenantsError) throw tenantsError
+
+  let totalCount = 0
+
+  for (const tenant of (tenants ?? []) as Pick<TenantRow, 'id' | 'name' | 'timezone' | 'reminder_days'>[]) {
+    // P-2: getTodayInTz throws RangeError nếu timezone không hợp lệ → skip tenant, không crash job
+    let todayISO: string
+    try {
+      todayISO = getTodayInTz(tenant.timezone)
+    } catch {
+      console.error(`[daily_report_reminder] invalid timezone "${tenant.timezone}" tenant=${tenant.id}, skipping`)
+      continue
+    }
+
+    // isoWeekday: lấy thứ từ calendar date string (YYYY-MM-DD) theo ISO weekday 1=Mon…7=Sun
+    // Dùng UTC midnight của date string đó để tránh local-tz drift trong Deno runtime (UTC)
+    const isoWeekday = (() => {
+      const d = new Date(todayISO + 'T00:00:00Z').getUTCDay()
+      return d === 0 ? 7 : d // getUTCDay: 0=Sun → đổi thành 7 cho ISO weekday
+    })()
+    // Per-tenant reminder days check: chỉ gửi vào ngày được cấu hình
+    // Default {1,2,3,4,5} = Mon–Fri nếu DB chưa có cột (tenant cũ trước migration)
+    // Empty array [] = owner tắt hoàn toàn ([] is truthy → ?? không trigger → reminderDays = [] → skip mọi ngày)
+    const reminderDays: number[] = tenant.reminder_days ?? [1, 2, 3, 4, 5]
+    if (!reminderDays.includes(isoWeekday)) {
+      console.log(`[daily_report_reminder] day ${isoWeekday} not in reminder_days=[${reminderDays}] tenant=${tenant.id}, skipping`)
+      continue
+    }
+
+    // P-1: Idempotent guard dùng calendar-day anchor thay vì rolling 24h
+    // todayCutoff = UTC midnight của calendar date hôm nay trong Deno runtime (UTC)
+    // pg_cron fires 12:00 UTC → job luôn chạy sau cutoff → dedup guard hoạt động đúng
+    // Note: với timezone UTC- job vẫn đúng vì cron file ở 12:00 UTC (7PM UTC+7 / sáng UTC-5)
+    const todayCutoff = todayISO + 'T00:00:00.000Z'
+
+    // Step 1: Lấy user_ids đã submit daily report hôm nay
+    // P-4: .limit(10000) tránh Supabase default 1000-row truncation ở tenant lớn
+    const { data: submitted, error: submittedError } = await supabaseAdmin
+      .from('daily_reports')
+      .select('user_id')
+      .eq('tenant_id', tenant.id)
+      .eq('report_date', todayISO)
+      .limit(10000)
+
+    if (submittedError) {
+      console.error(`[daily_report_reminder] submitted query error tenant=${tenant.id}:`, submittedError)
+      continue // Không dừng toàn bộ — skip tenant này, xử lý tenant tiếp theo
+    }
+
+    const submittedIds = new Set((submitted ?? []).map((r: { user_id: string }) => r.user_id))
+
+    // Step 2: Lấy tất cả active members của tenant
+    // P-5: .limit(10000) tránh Supabase default 1000-row truncation ở tenant lớn
+    const { data: allMembers, error: membersError } = await supabaseAdmin
+      .from('tenant_members')
+      .select('user_id, users!inner(full_name, email)')
+      .eq('tenant_id', tenant.id)
+      .eq('status', 'active')
+      .limit(10000)
+
+    if (membersError) {
+      console.error(`[daily_report_reminder] members error tenant=${tenant.id}:`, membersError)
+      continue
+    }
+
+    // Step 3: Filter members chưa submit report hôm nay
+    const pendingMembers = ((allMembers ?? []) as MemberRow[]).filter(
+      (m) => !submittedIds.has(m.user_id)
+    )
+
+    for (const member of pendingMembers) {
+      // P-3: Idempotent check — handle DB error, fail safe → skip member thay vì fail open
+      const { data: existing, error: existingErr } = await supabaseAdmin
+        .from('notifications')
+        .select('id')
+        .eq('tenant_id', tenant.id)
+        .eq('user_id', member.user_id)
+        .eq('type', 'daily_report_reminder')
+        .gte('created_at', todayCutoff)
+        .limit(1)
+
+      if (existingErr) {
+        console.error(`[daily_report_reminder] dedup check error user=${member.user_id}:`, existingErr)
+        continue // Fail safe: skip khi không thể kiểm tra duplicate → tránh gửi double
+      }
+      if (existing && existing.length > 0) continue
+
+      // INSERT in-app notification
+      const { error: insertErr } = await supabaseAdmin.from('notifications').insert({
+        tenant_id: tenant.id,
+        user_id: member.user_id,
+        type: 'daily_report_reminder',
+        message: 'Nhắc nhở: Bạn chưa nộp daily report hôm nay.',
+        link_to: '/daily-report',
+      })
+      if (insertErr) {
+        console.error(`[daily_report_reminder] insert error user=${member.user_id}:`, insertErr)
+        continue // Không gửi email nếu in-app insert fail → tránh inconsistent state
+      }
+
+      // P-6: Email (non-blocking) — chỉ gửi khi có email address hợp lệ
+      if (member.users?.email) {
+        const safeName = escapeHtml(member.users?.full_name ?? '')
+        try {
+          await sendEmail({
+            to: member.users.email,
+            subject: '[TekSpace] Nhắc nhở: Nộp daily report hôm nay',
+            html: `
+              <h2>Nhắc nhở nộp daily report</h2>
+              <p>Xin chào <strong>${safeName}</strong>,</p>
+              <p>Bạn chưa nộp daily report cho hôm nay.</p>
+              <p>Hãy ghi lại công việc trong ngày để team luôn cập nhật tiến độ.</p>
+              <p><a href="${APP_URL}/daily-report">Nộp report ngay →</a></p>
+              <p>TekSpace</p>
+            `,
+          })
+        } catch (emailErr) {
+          console.error(`[daily_report_reminder] email error ${member.users.email}:`, emailErr)
+        }
+      }
+
+      totalCount++
+    }
+  }
+
+  return { reminded_count: totalCount }
+}
+
+// ----------------------------------------------------------------
 // Entry point
 // ----------------------------------------------------------------
 
@@ -393,6 +542,14 @@ Deno.serve(async (req) => {
     if (action === 'deadline_missed') {
       const result = await handleDeadlineMissed(weekOf)
       console.log('[deadline_missed] result:', result)
+      return new Response(JSON.stringify({ ok: true, ...result }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'daily_report_reminder') {
+      const result = await handleDailyReportReminder()
+      console.log('[daily_report_reminder] result:', result)
       return new Response(JSON.stringify({ ok: true, ...result }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
