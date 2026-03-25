@@ -342,7 +342,6 @@ export const transferOwnership = async (
     }
     throw new Error(serverMessage ?? 'Không thể chuyển quyền Owner. Vui lòng thử lại.')
   }
-  }
   // Refresh JWT để tenant_roles claim được cập nhật — owner mới cần role mới trong JWT ngay
   const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
   if (refreshError) throw refreshError
