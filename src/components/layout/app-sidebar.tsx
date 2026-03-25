@@ -26,7 +26,7 @@ import { useNotificationsRealtime } from '@/features/notifications/hooks/use-not
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
-  const { tenants, activeTenantId, initFromSession, setActiveTenant } = useTenantStore()
+  const { tenants, activeTenantId, activeRole, initFromSession, setActiveTenant } = useTenantStore()
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -36,15 +36,19 @@ export function AppSidebar() {
   const { data: unreadCount = 0 } = useUnreadCount(activeTenantId, user?.id ?? null)
   useNotificationsRealtime(activeTenantId, user?.id ?? null)
 
-  // Inject unread badge vào nav item "Notifications"
-  const navGroupsWithBadge = sidebarData.navGroups.map((group) => ({
-    ...group,
-    items: group.items.map((item) =>
-      item.url === ROUTES.app.notifications
-        ? { ...item, badge: unreadCount > 0 ? String(unreadCount > 99 ? '99+' : unreadCount) : undefined }
-        : item
-    ),
-  }))
+  // Inject unread badge vào nav item "Notifications" + filter items theo role
+  const navGroupsWithBadge = sidebarData.navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items
+        .filter((item) => !item.roles || (activeRole && item.roles.includes(activeRole)))
+        .map((item) =>
+          item.url === ROUTES.app.notifications
+            ? { ...item, badge: unreadCount > 0 ? String(unreadCount > 99 ? '99+' : unreadCount) : undefined }
+            : item
+        ),
+    }))
+    .filter((group) => group.items.length > 0)
   const [isSwitching, setIsSwitching] = useState(false)
 
   // Query tenant names từ DB dựa trên tenant IDs trong store
