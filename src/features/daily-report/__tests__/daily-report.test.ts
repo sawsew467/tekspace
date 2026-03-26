@@ -393,14 +393,17 @@ describe('computeStreak', () => {
     expect(computeStreak(dates, today)).toBe(1)
   })
 
-  it('returns 0 khi hôm nay chưa nộp (chỉ có các ngày trước)', () => {
+  it('hôm nay chưa nộp nhưng hôm qua (T2) đã nộp — hiển thị streak từ T2', () => {
+    // today = '2026-03-24' (T3), T3 chưa nộp
+    // New behavior: T3 chưa nộp → candidate = T2 (23) → has(23) = YES → streak từ T2
     const dates = ['2026-03-23', '2026-03-22', '2026-03-21']
-    expect(computeStreak(dates, today)).toBe(0)
+    expect(computeStreak(dates, today)).toBe(3)
   })
 
-  it('boundary: today-1 nhưng không có today → streak = 0', () => {
+  it('T3 chưa nộp, chỉ có T2 hôm qua → streak = 1 (yesterday fallback)', () => {
+    // today = '2026-03-24' (T3), T3 chưa nộp → candidate = T2 (23) → has = YES → streak = 1
     const dates = ['2026-03-23']
-    expect(computeStreak(dates, today)).toBe(0)
+    expect(computeStreak(dates, today)).toBe(1)
   })
 
   it('trả về đúng streak khi dates không theo thứ tự', () => {
@@ -437,17 +440,74 @@ describe('computeStreak', () => {
     expect(computeStreak(dates, monday)).toBe(3)
   })
 
-  it('hôm nay chưa nộp dù T7/CN trước đó đã nộp → streak = 0', () => {
-    // today = '2026-03-23' (T2), chưa nộp T2 nhưng có CN+T7
+  it('T2 chưa nộp, nhưng CN+T7 tuần trước đã nộp → streak = 2 (weekend fallback)', () => {
+    // today = '2026-03-23' (T2), T2 chưa nộp
+    // candidate = CN (22) → isWeekend && has(22)=YES → while exits → startDay = CN → streak=2
     const monday = '2026-03-23'
     const dates = ['2026-03-22', '2026-03-21']
-    expect(computeStreak(dates, monday)).toBe(0)
+    expect(computeStreak(dates, monday)).toBe(2)
   })
 
   it('xử lý đúng với date string không hợp lệ trong array — không crash', () => {
     const dates = ['2026-03-24', 'invalid-date', '2026-03-23']
     // 'invalid-date' không làm crash, streak vẫn tính được từ valid dates
     expect(() => computeStreak(dates, today)).not.toThrow()
+  })
+
+  // ── Yesterday fallback (Bug 9-6 fix) ─────────────────────────────────────
+
+  it('T2 chưa nộp, CN+T7 không nộp, T6 đã nộp → tính streak từ T6', () => {
+    // today = '2026-03-23' (T2), chưa nộp
+    // candidate = CN (22) → weekend, không nộp → skip
+    // candidate = T7 (21) → weekend, không nộp → skip
+    // candidate = T6 (20) → không phải weekend → has(20)=YES → startDay = T6 → streak = 3
+    const monday = '2026-03-23'
+    const dates = ['2026-03-20', '2026-03-19', '2026-03-18'] // T6, T5, T4
+    expect(computeStreak(dates, monday)).toBe(3)
+  })
+
+  it('T3 chưa nộp, T2 là ngày thường không nộp → streak = 0 (đứt thực sự)', () => {
+    // today = '2026-03-24' (T3), T3 chưa nộp
+    // candidate = T2 (23) → không phải weekend → has(23)=NO → return 0
+    const dates = ['2026-03-22', '2026-03-21'] // CN, T7 có nộp nhưng T2 (23) không nộp
+    expect(computeStreak(dates, '2026-03-24')).toBe(0)
+  })
+
+  it('array rỗng, hôm nay chưa nộp — yesterday fallback cũng không tìm được → streak = 0', () => {
+    // Cả today lẫn yesterday đều không có → return 0
+    expect(computeStreak([], '2026-03-24')).toBe(0)
+  })
+
+  // ── Today = weekend (P2 coverage) ────────────────────────────────────────
+
+  it('T7 chưa nộp, T6 đã nộp → yesterday fallback không qua weekend-skip, streak từ T6', () => {
+    // today = '2026-03-21' (T7), T7 chưa nộp
+    // candidate = T6 (20) → isWeekend(T6)=false → while không chạy
+    // dateSet.has(T6)=YES → startDay = T6 → streak = 3 (T6+T5+T4)
+    const saturday = '2026-03-21'
+    const dates = ['2026-03-20', '2026-03-19', '2026-03-18'] // T6, T5, T4
+    expect(computeStreak(dates, saturday)).toBe(3)
+  })
+
+  it('CN chưa nộp, T7 chưa nộp, T6 đã nộp → skip T7 (weekend không nộp), streak từ T6', () => {
+    // today = '2026-03-22' (CN), CN chưa nộp
+    // candidate = T7 (21) → isWeekend=true, !has(21)=true → skip → candidate = T6 (20)
+    // isWeekend(T6)=false → while thoát → has(T6)=YES → startDay = T6 → streak = 2
+    const sunday = '2026-03-22'
+    const dates = ['2026-03-20', '2026-03-19'] // T6, T5
+    expect(computeStreak(dates, sunday)).toBe(2)
+  })
+
+  // ── Partial weekend (P3 coverage) ────────────────────────────────────────
+
+  it('T2 chưa nộp, CN đã nộp nhưng T7 chưa nộp → streak chỉ tính CN (không bridge qua T7)', () => {
+    // today = '2026-03-23' (T2), T2 chưa nộp
+    // candidate = CN (22) → isWeekend=true, !has(22)=false (đã nộp) → while thoát ngay
+    // startDay = CN → main loop: CN(+1), T7(weekend skip — không nộp), T6(not submitted → break)
+    // streak = 1
+    const monday = '2026-03-23'
+    const dates = ['2026-03-22'] // chỉ CN, T7 không nộp
+    expect(computeStreak(dates, monday)).toBe(1)
   })
 })
 

@@ -192,23 +192,41 @@ function isWeekend(dateStr: string): boolean {
  * Pure function — không side effects, không async.
  *
  * Quy tắc:
- * - Streak bắt đầu chỉ khi hôm nay (today) đã có submission.
- * - T7/CN không nộp → bỏ qua (không phá streak, không tính vào streak).
+ * - Nếu hôm nay đã nộp → tính streak từ hôm nay.
+ * - Nếu hôm nay chưa nộp → bỏ qua weekends không nộp, tìm ngày gần nhất đã nộp:
+ *     - Nếu gặp ngày thường (T2–T6) không nộp → streak = 0 (đã đứt)
+ *     - Nếu gặp ngày đã nộp → tính streak từ ngày đó (yesterday fallback)
+ * - T7/CN không nộp trong chuỗi streak → bỏ qua (không phá streak, không tính vào streak).
  * - T7/CN có nộp → tính vào streak bình thường.
  * - Ngày thường (T2–T6) không nộp → dừng streak.
  *
  * @param reportDates - mảng các report_date strings (ISO yyyy-MM-dd)
  * @param today - ngày hôm nay (yyyy-MM-dd, theo timezone của user)
- * @returns số ngày streak; 0 nếu hôm nay chưa nộp
+ * @returns số ngày streak; 0 nếu không có streak hiện tại
  */
 export function computeStreak(reportDates: string[], today: string): number {
   const dateSet = new Set(reportDates)
 
-  // Streak chỉ đếm khi hôm nay đã nộp
-  if (!dateSet.has(today)) return 0
+  // Tìm startDay: nếu today chưa nộp, bỏ qua weekends không nộp để tìm ngày gần nhất đã nộp
+  let startDay = today
+  if (!dateSet.has(today)) {
+    let candidate: string | null = prevDateStr(today)
+    let skipped = 0
+    // Skip tối đa 3 ngày (T7 + CN + buffer) để xử lý weekend bridge (T2 sáng chưa nộp)
+    while (candidate && isWeekend(candidate) && !dateSet.has(candidate) && skipped < 3) {
+      candidate = prevDateStr(candidate)
+      skipped++
+    }
+    // candidate bây giờ là ngày đầu tiên KHÔNG phải (weekend-không-nộp):
+    // - Nếu là ngày thường không nộp → streak = 0 (đã đứt thực sự)
+    // - Nếu là ngày đã nộp (bất kể T2-CN) → dùng làm startDay
+    if (!candidate || !dateSet.has(candidate)) return 0
+    startDay = candidate
+  }
 
+  // Tính streak từ startDay
   let streak = 0
-  let current: string | null = today
+  let current: string | null = startDay
   // Safety cap: không thể streak nhiều hơn số ngày đã nộp × 2 + 14 (buffer cho 2 tuần weekends)
   const maxIterations = dateSet.size * 2 + 14
 
