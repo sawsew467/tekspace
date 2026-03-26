@@ -129,53 +129,103 @@ function DailyReportPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todayReport, isDeadlineLoading, resolvedDeadlineHour, timezone, tick])
 
-  // Story 4.6: Derive defaultValues từ todayReport cho edit form (pre-fill)
+  // Story 9.2: Derive defaultValues từ todayReport cho edit form (pre-fill)
+  // todayReport giờ là DailyReportWithTasks — tasks là report_tasks relational rows
   const editDefaultValues = useMemo((): DailyReportFormValues | undefined => {
     if (!todayReport) return undefined
-    const rawTasks = Array.isArray(todayReport.tasks) ? todayReport.tasks : []
-    const tasks = (rawTasks as Array<{
-      description: string
-      output_type: string
-      output_link?: string
-      hours?: number
-    }>).map(t => ({
-      description: t.description,
-      output_type: t.output_type as DailyReportFormValues['tasks'][number]['output_type'],
-      output_link: t.output_link ?? '',
-      hours: t.hours ?? 0,  // Story 4.5 per-task hours (fallback 0 cho old reports)
-    }))
-    return { tasks, hours_logged: todayReport.hours_logged }
+
+    const sortedTasks = [...(todayReport.report_tasks ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+
+    // Section 1: completed tasks
+    const tasks = sortedTasks
+      .filter(t => t.task_type !== 'in_progress')
+      .map(t => ({
+        project_tag: t.project_tag ?? '',
+        description: t.description,
+        output_type: (t.output_type ?? 'other') as DailyReportFormValues['tasks'][number]['output_type'],
+        output_link: t.output_link ?? '',
+        hours: t.hours ?? 0,
+      }))
+
+    // Section 2: in_progress tasks
+    const in_progress_tasks = sortedTasks
+      .filter(t => t.task_type === 'in_progress')
+      .map(t => ({
+        task_type: 'in_progress' as const,
+        project_tag: t.project_tag ?? '',
+        description: t.description,
+        hours: t.hours ?? undefined as unknown as number,
+      }))
+
+    return {
+      tasks: tasks.length > 0 ? tasks : [{ project_tag: '', description: '', output_type: 'other', output_link: '', hours: undefined as unknown as number }],
+      in_progress_tasks,
+      plan_for_tomorrow: todayReport.plan_for_tomorrow ?? '',
+      blockers: todayReport.blockers ?? '',
+      hours_logged: todayReport.hours_logged,
+    }
   }, [todayReport])
 
   function handleSubmit(values: DailyReportFormValues) {
     if (!activeTenantId || !user?.id) return
-    submitReport.mutate({
-      tenantId: activeTenantId,
-      userId: user.id,
-      reportDate,
-      tasks: values.tasks.map((t) => ({
-        description: t.description,
-        output_type: t.output_type,
-        // Omit empty output_link
-        ...(t.output_link ? { output_link: t.output_link } : {}),
-        // Per-task hours — omit nếu undefined (Story 4.5)
-        ...(t.hours !== undefined ? { hours: t.hours } : {}),
-      })),
-      hoursLogged: values.hours_logged,
-    })
-  }
 
-  // Story 4.6: Submit update report
-  function handleUpdate(values: DailyReportFormValues) {
-    if (!todayReport) return
-    const tasks: TaskPayload[] = values.tasks.map((t) => ({
+    // Section 1: completed tasks
+    const completedTasks: TaskPayload[] = values.tasks.map((t) => ({
+      task_type: 'completed' as const,
+      project_tag: t.project_tag || undefined,
       description: t.description,
       output_type: t.output_type,
       ...(t.output_link ? { output_link: t.output_link } : {}),
       ...(t.hours !== undefined ? { hours: t.hours } : {}),
     }))
+
+    // Section 2: in_progress tasks
+    const inProgressTasks: TaskPayload[] = (values.in_progress_tasks ?? []).map((t) => ({
+      task_type: 'in_progress' as const,
+      project_tag: t.project_tag || undefined,
+      description: t.description,
+      hours: t.hours,
+    }))
+
+    submitReport.mutate({
+      tenantId: activeTenantId,
+      userId: user.id,
+      reportDate,
+      tasks: [...completedTasks, ...inProgressTasks],
+      hoursLogged: values.hours_logged,
+      planForTomorrow: values.plan_for_tomorrow || undefined,
+      blockers: values.blockers || undefined,
+    })
+  }
+
+  // Story 4.6 + 9.2: Submit update report với 4 sections
+  function handleUpdate(values: DailyReportFormValues) {
+    if (!todayReport) return
+
+    const completedTasks: TaskPayload[] = values.tasks.map((t) => ({
+      task_type: 'completed' as const,
+      project_tag: t.project_tag || undefined,
+      description: t.description,
+      output_type: t.output_type,
+      ...(t.output_link ? { output_link: t.output_link } : {}),
+      ...(t.hours !== undefined ? { hours: t.hours } : {}),
+    }))
+
+    const inProgressTasks: TaskPayload[] = (values.in_progress_tasks ?? []).map((t) => ({
+      task_type: 'in_progress' as const,
+      project_tag: t.project_tag || undefined,
+      description: t.description,
+      hours: t.hours,
+    }))
+
     updateReport.mutate(
-      { reportId: todayReport.id, tasks, hoursLogged: values.hours_logged },
+      {
+        reportId: todayReport.id,
+        tasks: [...completedTasks, ...inProgressTasks],
+        hoursLogged: values.hours_logged,
+        planForTomorrow: values.plan_for_tomorrow || undefined,
+        blockers: values.blockers || undefined,
+      },
       { onSuccess: () => setIsEditing(false) },
     )
   }

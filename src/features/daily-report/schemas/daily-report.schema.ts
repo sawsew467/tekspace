@@ -22,8 +22,12 @@ export const OUTPUT_TYPE_PLACEHOLDERS: Record<OutputType, string> = {
 }
 
 // ── Task Item ────────────────────────────────────────────────────────────────
+// Base schema dùng cho đọc từ report_tasks table (relational, Story 9.2).
+// task_type có default 'completed' — backward compat khi parse rows cũ không có field này.
 
 export const taskItemSchema = z.object({
+  task_type: z.enum(['completed', 'in_progress']).default('completed'),
+  project_tag: z.string().optional(),
   description: z.string().min(1, 'Mô tả task không được để trống'),
   output_type: outputTypeSchema,
   // '' passes, valid URL passes, non-URL non-empty string fails
@@ -41,8 +45,8 @@ export const taskItemSchema = z.object({
 
 export type TaskItem = z.infer<typeof taskItemSchema>
 
-// ── Task Item Form Schema (hours required) ───────────────────────────────────
-// Dùng riêng cho form submission — extend taskItemSchema, require hours.
+// ── Task Item Form Schema (Section 1 — hours required) ───────────────────────
+// Dùng riêng cho form submission Section 1 (completed tasks) — extend taskItemSchema, require hours.
 
 export const taskItemFormSchema = taskItemSchema.extend({
   hours: z
@@ -54,10 +58,34 @@ export const taskItemFormSchema = taskItemSchema.extend({
 
 export type TaskFormItem = z.infer<typeof taskItemFormSchema>
 
+// ── In Progress Task Form Schema (Section 2 — có hours bắt buộc, không có output) ──────────
+// Dùng cho Section 2 "In Progress / Ongoing" trong form submission.
+// hours bắt buộc để tính đủ năng suất ngày — không cần output_type/output_link vì task chưa xong.
+
+export const inProgressTaskFormSchema = z.object({
+  task_type: z.literal('in_progress').default('in_progress'),
+  project_tag: z.string().optional(),
+  description: z.string().min(1, 'Mô tả task không được để trống'),
+  hours: z
+    .number({ error: 'Bắt buộc' })
+    .min(0.5, 'Tối thiểu 0.5h')
+    .max(24, 'Tối đa 24h')
+    .multipleOf(0.5, 'Bội số 0.5'),
+})
+
+export type InProgressTaskFormItem = z.infer<typeof inProgressTaskFormSchema>
+
 // ── Daily Report Form ────────────────────────────────────────────────────────
 
 export const dailyReportFormSchema = z.object({
+  // Section 1: Tasks Completed Today (required, min 1)
   tasks: z.array(taskItemFormSchema).min(1, 'Cần ít nhất 1 task'),
+  // Section 2: In Progress / Ongoing (optional, default empty)
+  in_progress_tasks: z.array(inProgressTaskFormSchema).optional().default([]),
+  // Section 3: Plan for Tomorrow (optional free text)
+  plan_for_tomorrow: z.string().optional(),
+  // Section 4: Blockers / Issues (optional free text)
+  blockers: z.string().optional(),
   hours_logged: z
     .number({ error: 'Vui lòng nhập số giờ' })
     .min(0, 'Số giờ không được âm')

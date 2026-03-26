@@ -4,7 +4,7 @@ import { QUERY_KEYS } from '@/lib/query-keys'
 import {
   DailyReportService,
   type TaskPayload,
-  type DailyReport,
+  type DailyReportWithTasks,
 } from '@/features/daily-report/services/daily-report.service'
 
 type SubmitReportPayload = {
@@ -13,6 +13,8 @@ type SubmitReportPayload = {
   reportDate: string
   tasks: TaskPayload[]
   hoursLogged: number
+  planForTomorrow?: string
+  blockers?: string
 }
 
 export function useSubmitReport() {
@@ -20,7 +22,7 @@ export function useSubmitReport() {
 
   return useMutation({
     mutationFn: (payload: SubmitReportPayload) => DailyReportService.submitReport(payload),
-    onSuccess: (data: DailyReport, variables: SubmitReportPayload) => {
+    onSuccess: (data: DailyReportWithTasks, variables: SubmitReportPayload) => {
       // Populate cache ngay lập tức để UI chuyển sang read-only view không cần chờ refetch
       queryClient.setQueryData(
         [QUERY_KEYS.dailyReports, variables.tenantId, { userId: variables.userId, date: variables.reportDate }],

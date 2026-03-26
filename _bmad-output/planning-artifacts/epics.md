@@ -946,3 +946,246 @@ So that I have objective data for performance reviews and the system is accounta
 **When** action được thực hiện
 **Then** action được lưu với actor_id và created_at timestamp
 **And** không có record nào bị modify hay xóa — toàn bộ history là immutable append-only
+
+---
+
+### Epic 9: Product Quality & Feature Completion
+
+App hoạt động đúng với thực tế cách team làm việc — bug critical được fix, daily report match format thực tế của team, và incident management có lifecycle hoàn chỉnh với outcome rõ ràng.
+**Source:** sprint-change-proposal-2026-03-26.md (từ retro Epic 5+6+8)
+**Technical notes:** Wave 1 (9-1 + 9-4 + 9-5 song song, không conflict) → Wave 2 (9-2 + 9-3 song song). Story 9-2 và 9-3 đều có DB migrations — dùng timestamp naming theo A4 từ retro. `incident_resolutions` là bảng mới append-only, không vi phạm immutable audit trail philosophy.
+
+**Wave 1 — Fully parallel:**
+- **9-1** `login-redirect-fix`: Fix redirect param stringify bug từ story 8-18 — URL không còn thành `/dashboard[object Object]`
+- **9-4** `mobile-ui-fixes`: Stat card text overflow (B3) + Edit/Delete icon contrast (B4) trên mobile
+- **9-5** `page-title-team-schedule`: Browser tab "Team Dashboard" → "Team Schedule" (B2)
+
+**Wave 2 — Sau Wave 1, song song:**
+- **9-2** `daily-report-four-sections`: Mở rộng form thành 4 sections: Tasks Completed (+ project tag) / In Progress / Plan for Tomorrow / Blockers. Migration: `report_tasks.project_tag`, `report_tasks.task_type`, `daily_reports.plan_for_tomorrow`, `daily_reports.blockers`
+- **9-3** `incident-lifecycle-dismiss-uphold`: Complete incident lifecycle với Manager resolve action (Dismiss/Uphold). Bảng mới `incident_resolutions` (append-only). Member thấy violation summary.
+
+**Wave 1 (bổ sung) — Song song với 9-1/9-4/9-5, không conflict:**
+- **9-6** `streak-display-fix`: Stat card "Báo cáo liên tiếp" trên My Dashboard không hiển thị số liệu đúng — investigate và fix `useSelfStreak` / `computeStreak` logic.
+- **9-7** `emergency-override-ux-fix`: Frontend không route đúng sang Emergency Override khi slot hôm nay đã bắt đầu (start_time < now) — fix `getSlotEditMode` để detect `started` tier và mở emergency dialog thay vì regular edit dialog.
+
+---
+
+### Story 9.1: Fix Login Redirect Bug
+
+As a user,
+I want to be redirected correctly after login,
+So that I land on the right page instead of a 404 error.
+
+**Acceptance Criteria:**
+
+**Given** user chưa login và truy cập một protected route
+**When** user hoàn tất đăng nhập
+**Then** user được redirect đến đúng URL trước đó (không phải `/dashboard[object Object]`)
+
+**Given** user login từ sign-in page trực tiếp (không có redirect param)
+**When** login thành công
+**Then** user được redirect đến `/dashboard` (default)
+
+**Given** redirect-back param tồn tại trong URL
+**When** param được parse và dùng
+**Then** param luôn là string hợp lệ — không bao giờ stringify object thành `[object Object]`
+
+### Story 9.2: Daily Report Form — 4 Sections
+
+As a member,
+I want to submit a daily report with 4 structured sections matching how my team actually works,
+So that my report accurately captures completed work, ongoing tasks, tomorrow's plan, and blockers.
+
+**Acceptance Criteria:**
+
+**Given** member mở Daily Report form
+**When** form render
+**Then** form hiển thị 4 sections rõ ràng: Tasks Completed Today / In Progress / Ongoing / Plan for Tomorrow / Blockers / Issues
+
+**Given** member thêm task vào Section 1 (Tasks Completed Today)
+**When** member điền task
+**Then** mỗi task có: [Project tag] + description + output_type + output_link + hours
+**And** project_tag là free-text input, optional, hiển thị như badge prefix "[ProjectName]"
+
+**Given** member điền Section 2 (In Progress / Ongoing)
+**When** member nhập
+**Then** mỗi item có: description + project_tag (optional) + hours (bắt buộc để tính năng suất ngày) — không có output_link
+
+**Given** member điền Section 3 (Plan for Tomorrow) và Section 4 (Blockers / Issues)
+**When** member nhập
+**Then** đây là text area tự do, optional
+
+**Given** manager xem daily report của member
+**When** manager click vào report
+**Then** tất cả 4 sections đều hiển thị đầy đủ, không chỉ "tasks completed"
+
+**Given** member không điền Section 2, 3, 4
+**When** member submit
+**Then** report submit bình thường — chỉ Section 1 là required (backward compatible)
+
+### Story 9.3: Incident Lifecycle — Dismiss/Uphold
+
+As a Manager,
+I want to formally resolve incidents as dismissed or upheld after reviewing any appeal,
+So that there is a clear final outcome and member violation stats are accurate.
+
+**Acceptance Criteria:**
+
+**Given** Manager xem một incident ở trạng thái pending (chưa resolve)
+**When** Manager click "Resolve Incident"
+**Then** Manager thấy 2 options: "Bỏ qua vi phạm" (Dismiss) / "Giữ nguyên vi phạm" (Uphold)
+**And** resolution note là optional
+
+**Given** Manager submit resolution
+**When** submit thành công
+**Then** `incident_resolutions` record được INSERT (không UPDATE incident gốc — immutable)
+**And** incident hiển thị status: Dismissed hoặc Upheld với note và timestamp
+**And** member nhận in-app notification về kết quả resolution
+
+**Given** Member xem incident đã được resolve
+**When** member xem detail
+**Then** member thấy: outcome (Dismissed/Upheld) + resolution note của Manager
+**And** nếu Upheld → violation count tăng trong violation summary của member
+
+**Given** Manager xem Team Incidents page
+**When** filter theo status
+**Then** có thể filter: All / Pending / Dismissed / Upheld
+**And** Pending = incidents chưa có resolution record
+
+**Given** incident đã được resolve
+**When** Manager cố resolve lại
+**Then** UI không cho phép — resolve button bị disabled/ẩn
+
+### Story 9.4: Mobile UI Fixes
+
+As a member on mobile,
+I want stat cards and schedule action buttons to be readable and usable,
+So that I can use TekSpace effectively on my phone.
+
+**Acceptance Criteria:**
+
+**Given** member xem Dashboard trên mobile (màn hình nhỏ)
+**When** stat card "Tỷ lệ hoàn thành" render
+**Then** text không overflow — giá trị được format gọn, card height không bị đẩy quá 2 dòng content
+
+**Given** member xem My Schedule trên mobile
+**When** member muốn edit hoặc delete một slot
+**Then** Edit/Delete icon buttons có đủ contrast — WCAG AA minimum (4.5:1) so với background
+
+**Given** cùng components trên desktop
+**When** desktop render
+**Then** không có thay đổi visual — fix chỉ apply cho mobile breakpoint
+
+### Story 9.5: Fix Page Title "Team Schedule"
+
+As a user,
+I want the page title to match the sidebar label,
+So that browser tab and navigation are consistent.
+
+**Acceptance Criteria:**
+
+**Given** user đang ở trang Team Schedule (`/team-schedule`)
+**When** trang load
+**Then** browser tab title hiển thị "Team Schedule | TekSpace"
+**And** không còn "Team Dashboard" ở bất kỳ đâu trên trang này
+
+### Story 9.6: Fix Streak Display — "Báo cáo liên tiếp"
+
+As a member,
+I want to see my consecutive report submission streak on My Dashboard,
+So that I can track my reporting consistency.
+
+**Context / Bug:**
+Stat card "Báo cáo liên tiếp" trên My Dashboard hiển thị "—" hoặc không hiển thị số liệu đúng mặc dù member đã nộp báo cáo nhiều ngày liên tiếp.
+
+**Files liên quan:**
+- `src/features/dashboard/hooks/use-self-streak.ts` — queryFn fetch + gọi `computeStreak`
+- `src/features/daily-report/schemas/daily-report.schema.ts` — `computeStreak` function
+- `src/features/analytics/services/analytics.service.ts` — `getMemberReportsForPeriod` (filter `isFinite(hours_logged)` có thể drop valid report dates)
+- `src/features/dashboard/components/SelfDashboard.tsx` — render `streakLabel`
+
+**Potential root causes cần investigate:**
+1. `getMemberReportsForPeriod` filter `isFinite(h)` drop reports có `hours_logged = null` → mất report dates → streak sai
+2. `computeStreak` trả về 0 nếu hôm nay chưa nộp — user thấy "—" dù streak trước đó > 0 (UX issue: nên hiển thị streak của ngày hôm qua nếu hôm nay chưa nộp)
+3. Timezone mismatch: `today = format(new Date(), 'yyyy-MM-dd')` dùng browser local timezone, có thể không match với `report_date` trong DB nếu user ở timezone khác
+
+**Acceptance Criteria:**
+
+**Given** member đã nộp báo cáo hôm nay
+**When** member xem My Dashboard
+**Then** stat card "Báo cáo liên tiếp" hiển thị số ngày liên tiếp đúng (≥ 1)
+
+**Given** member đã nộp báo cáo nhiều ngày liên tiếp nhưng hôm nay chưa nộp
+**When** member xem My Dashboard
+**Then** stat card hiển thị streak của ngày hôm qua (không reset về "—" chỉ vì chưa nộp hôm nay)
+
+**Given** member chưa nộp báo cáo ngày nào gần đây
+**When** member xem My Dashboard
+**Then** stat card hiển thị "—" (đúng)
+
+**Given** member có báo cáo nhưng một số report có `hours_logged = null`
+**When** streak được tính
+**Then** những report dates đó vẫn được tính vào streak (không bị filter out)
+
+**Technical notes:**
+- Không có DB migration — pure frontend/query fix
+- `computeStreak` cần thêm tham số hoặc logic: nếu hôm nay chưa nộp → thử tính streak từ hôm qua
+- Hoặc tách riêng query cho streak (chỉ cần `report_date`, không cần filter `hours_logged`)
+- File conflict: không đụng vào bất kỳ file nào của 9-1/9-2/9-3/9-4/9-5
+
+### Story 9.7: Fix Emergency Override UX — Slot hôm nay đã bắt đầu
+
+As a member,
+I want to edit or delete a work slot from earlier today,
+So that I can correct my schedule without hitting an unexplained error.
+
+**Context / Bug:**
+Khi user cố sửa/xóa một slot có `slot_date = today` nhưng `start_time` đã qua (ví dụ: slot 01:30–05:30, hiện tại là 12:00 trưa), dialog "Chỉnh sửa ca làm việc" bình thường mở ra, user điền lý do và submit nhưng nhận được lỗi: *"Không thể cập nhật: Slot này đã bị khóa. Dùng Emergency Override để thay đổi."*
+
+Không có đường nào để user thực sự dùng Emergency Override — UI không route đúng.
+
+**Root cause:**
+Mismatch giữa frontend và backend lock logic:
+- Frontend (`getSlotEditMode`): check `slot_date < today` (date-only) → `'2026-03-26' < '2026-03-26'` = false → Tier 2 (mở regular edit dialog)
+- Backend RPC: check `now() >= start_time` (timestamp-level) → `12:00 >= 01:30` = true → exception
+
+**Files liên quan:**
+- `src/features/schedule/utils/schedule.utils.ts` — `getSlotEditMode` + `SlotEditMode` type
+- `src/routes/_app/my-schedule.tsx` — `handleEditSlot`, `handleDeleteSlot` handlers
+- `src/features/schedule/components/EditSlotDialog.tsx` — đã có `isEmergency` prop, chỉ cần nhận đúng giá trị
+- `src/features/schedule/components/DeleteSlotDialog.tsx` — đã có `isEmergency` prop
+
+**Fix:**
+Thêm tier mới `'started'` vào `SlotEditMode`:
+
+```
+locked   → slot_date < today                              → ẩn button (không thể edit)
+started  → slot_date = today AND start_time < now()       → mở Emergency Override dialog
+reason-required → slot_date = today AND start_time >= now() → mở regular edit dialog với reason
+free     → slot_date >= next_monday                       → direct edit, không cần reason
+```
+
+Handler `handleEditSlot`/`handleDeleteSlot` cần nhận `slot.start_time` (đã có trong `ScheduleSlot`) để pass vào `getSlotEditMode`.
+
+**Acceptance Criteria:**
+
+**Given** member có slot 01:30–05:30 hôm nay, hiện tại là 12:00 trưa (slot đã qua)
+**When** member click Edit hoặc Delete trên slot đó
+**Then** dialog mở với title "Emergency Override" (không phải "Chỉnh sửa ca làm việc")
+**And** có warning banner đỏ: "⚠️ Emergency Override — ca này đã bắt đầu..."
+**And** submit thành công với `isEmergencyOverride = true`
+
+**Given** member có slot 14:00–18:00 hôm nay, hiện tại là 12:00 trưa (slot chưa bắt đầu)
+**When** member click Edit trên slot đó
+**Then** dialog mở bình thường "Chỉnh sửa ca làm việc" (Tier 2, require reason)
+**And** không có emergency warning
+
+**Given** member có slot từ hôm qua (slot_date < today)
+**When** member nhìn vào slot đó
+**Then** Edit/Delete button vẫn ẩn (Tier 1 — không thay đổi behavior này)
+
+**Technical notes:**
+- `getSlotEditMode` cần nhận thêm param `startTime: string` (ISO timestamp từ `slot.start_time`)
+- Không có DB migration — pure frontend fix
+- Backend RPC đã hoạt động đúng khi `isEmergencyOverride = true` — không cần thay đổi
+- File conflict: chỉ đụng `schedule.utils.ts` + `my-schedule.tsx` — không conflict với 9-1/9-2/9-3/9-4/9-5/9-6

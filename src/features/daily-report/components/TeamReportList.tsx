@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { ReportStatusBadge, type ReportStatus } from '@/features/daily-report/components/ReportStatusBadge'
 import { DailyReportView } from '@/features/daily-report/components/DailyReportView'
 import type { TenantMemberWithUser } from '@/features/tenant/services/tenant.service'
-import type { TeamReportRow, DailyReport } from '@/features/daily-report/services/daily-report.service'
+import type { TeamReportRow, DailyReportWithTasks } from '@/features/daily-report/services/daily-report.service'
 
 type StatusFilter = 'all' | ReportStatus
 
@@ -195,7 +195,7 @@ export function TeamReportList({ members, reports, timezone, currentUserId }: Pr
                     {/* F11: border-x + border-b + rounded-b-lg để nối liền với trigger ở trên */}
                     <div className='border-x border-b rounded-b-lg px-4 pb-4 pt-3'>
                       <DailyReportView
-                        report={reportAsDailyReport(report)}
+                        report={reportAsDailyReportWithTasks(report)}
                         timezone={timezone}
                       />
                     </div>
@@ -211,10 +211,9 @@ export function TeamReportList({ members, reports, timezone, currentUserId }: Pr
 }
 
 /**
- * Adapter: chuyển TeamReportRow → DailyReport shape mà DailyReportView nhận.
+ * Adapter: chuyển TeamReportRow → DailyReportWithTasks shape mà DailyReportView nhận.
  * Strip embedded `users` field (chỉ dùng cho merge logic, không cần cho rendering).
- * tasks đã đồng nhất type với DailyReport['tasks'] — DailyReportView guards với Array.isArray.
  */
-function reportAsDailyReport({ users: _users, ...rest }: TeamReportRow): DailyReport {
-  return rest as DailyReport
+function reportAsDailyReportWithTasks({ users: _users, ...rest }: TeamReportRow): DailyReportWithTasks {
+  return rest as DailyReportWithTasks
 }

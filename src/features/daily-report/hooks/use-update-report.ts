@@ -10,6 +10,8 @@ type UpdateReportPayload = {
   reportId: string
   tasks: TaskPayload[]
   hoursLogged: number
+  planForTomorrow?: string
+  blockers?: string
 }
 
 export function useUpdateReport() {
@@ -17,7 +19,12 @@ export function useUpdateReport() {
 
   return useMutation({
     mutationFn: (payload: UpdateReportPayload) =>
-      DailyReportService.updateReport(payload.reportId, payload.tasks, payload.hoursLogged),
+      DailyReportService.updateReport(
+        payload.reportId,
+        payload.tasks,
+        payload.hoursLogged,
+        { planForTomorrow: payload.planForTomorrow, blockers: payload.blockers },
+      ),
     onSuccess: () => {
       // Invalidate để refetch report với updated_at mới
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.dailyReports] })

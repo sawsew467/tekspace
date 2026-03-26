@@ -1,3 +1,4 @@
+Connecting to db 5432
 export type Json =
   | string
   | number
@@ -77,37 +78,40 @@ export type Database = {
       }
       daily_reports: {
         Row: {
+          blockers: string | null
           created_at: string
           hours_logged: number
           id: string
           is_late: boolean
+          plan_for_tomorrow: string | null
           report_date: string
           submitted_at: string
-          tasks: Json
           tenant_id: string
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          blockers?: string | null
           created_at?: string
           hours_logged?: number
           id?: string
           is_late?: boolean
+          plan_for_tomorrow?: string | null
           report_date: string
           submitted_at?: string
-          tasks?: Json
           tenant_id: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          blockers?: string | null
           created_at?: string
           hours_logged?: number
           id?: string
           is_late?: boolean
+          plan_for_tomorrow?: string | null
           report_date?: string
           submitted_at?: string
-          tasks?: Json
           tenant_id?: string
           updated_at?: string | null
           user_id?: string
@@ -220,6 +224,58 @@ export type Database = {
           },
           {
             foreignKeyName: "incident_outcome_notes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_resolutions: {
+        Row: {
+          id: string
+          incident_id: string
+          note: string | null
+          outcome: string
+          resolved_at: string
+          resolved_by: string
+          tenant_id: string
+        }
+        Insert: {
+          id?: string
+          incident_id: string
+          note?: string | null
+          outcome: string
+          resolved_at?: string
+          resolved_by: string
+          tenant_id: string
+        }
+        Update: {
+          id?: string
+          incident_id?: string
+          note?: string | null
+          outcome?: string
+          resolved_at?: string
+          resolved_by?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_resolutions_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: true
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_resolutions_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_resolutions_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -372,6 +428,73 @@ export type Database = {
           },
           {
             foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_tasks: {
+        Row: {
+          created_at: string
+          description: string
+          hours: number | null
+          id: string
+          output_link: string | null
+          output_type: string | null
+          project_tag: string | null
+          report_id: string
+          sort_order: number
+          task_type: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          hours?: number | null
+          id?: string
+          output_link?: string | null
+          output_type?: string | null
+          project_tag?: string | null
+          report_id: string
+          sort_order?: number
+          task_type?: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          hours?: number | null
+          id?: string
+          output_link?: string | null
+          output_type?: string | null
+          project_tag?: string | null
+          report_id?: string
+          sort_order?: number
+          task_type?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_tasks_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "daily_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_tasks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_tasks_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -781,6 +904,7 @@ export type Database = {
         | "incident_logged"
         | "appeal_submitted"
         | "appeal_reviewed"
+        | "incident_resolved"
       slot_change_type: "created" | "updated" | "deleted" | "emergency_override"
     }
     CompositeTypes: {
@@ -933,6 +1057,7 @@ export const Constants = {
         "incident_logged",
         "appeal_submitted",
         "appeal_reviewed",
+        "incident_resolved",
       ],
       slot_change_type: ["created", "updated", "deleted", "emergency_override"],
     },

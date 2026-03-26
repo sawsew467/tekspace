@@ -31,7 +31,8 @@ import {
   hasDiscrepancy,
 } from '@/features/daily-report/schemas/daily-report.schema'
 
-// ── TaskRow — sub-component để tránh form.watch() trong map callback ─────────
+// ── CompletedTaskRow ──────────────────────────────────────────────────────────
+// Section 1: Tasks Completed Today — có project_tag + description + output + hours
 
 type TaskRowProps = {
   index: number
@@ -40,8 +41,7 @@ type TaskRowProps = {
   onRemove: () => void
 }
 
-function TaskRow({ index, control, canRemove, onRemove }: TaskRowProps) {
-  // useWatch là memoization-safe thay cho form.watch() trong loop
+function CompletedTaskRow({ index, control, canRemove, onRemove }: TaskRowProps) {
   const outputType = useWatch({
     control,
     name: `tasks.${index}.output_type`,
@@ -64,13 +64,32 @@ function TaskRow({ index, control, canRemove, onRemove }: TaskRowProps) {
         )}
       </div>
 
+      {/* Project Tag (optional) */}
+      <FormField
+        control={control}
+        name={`tasks.${index}.project_tag`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className='text-xs text-muted-foreground'>Project Tag</FormLabel>
+            <FormControl>
+              <Input
+                {...field}
+                value={field.value ?? ''}
+                placeholder='VD: TekSpace, Backend, Mobile...'
+                className='h-8 text-sm'
+              />
+            </FormControl>
+          </FormItem>
+        )}
+      />
+
       {/* Description */}
       <FormField
         control={control}
         name={`tasks.${index}.description`}
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Mô tả task</FormLabel>
+            <FormLabel>Mô tả task <span className='text-destructive'>*</span></FormLabel>
             <FormControl>
               <Textarea {...field} placeholder='VD: Implement login page, Fix bug #123...' rows={2} />
             </FormControl>
@@ -79,17 +98,14 @@ function TaskRow({ index, control, canRemove, onRemove }: TaskRowProps) {
         )}
       />
 
-      {/* Hours (bắt buộc) + Output type/link (optional) — cùng 1 hàng ngang */}
+      {/* Hours + Output type/link */}
       <div className='flex gap-3 items-start'>
-        {/* Hours — required, label riêng */}
         <FormField
           control={control}
           name={`tasks.${index}.hours`}
           render={({ field }) => (
             <FormItem className='w-[80px] shrink-0'>
-              <FormLabel>
-                Số giờ <span className='text-destructive'>*</span>
-              </FormLabel>
+              <FormLabel>Số giờ <span className='text-destructive'>*</span></FormLabel>
               <FormControl>
                 <Input
                   type='number'
@@ -109,7 +125,6 @@ function TaskRow({ index, control, canRemove, onRemove }: TaskRowProps) {
           )}
         />
 
-        {/* Output type + link — ngang, flex-1 */}
         <div className='flex-1 min-w-0 space-y-1.5'>
           <p className='text-sm font-medium leading-none'>Output</p>
           <div className='flex gap-2'>
@@ -159,14 +174,97 @@ function TaskRow({ index, control, canRemove, onRemove }: TaskRowProps) {
   )
 }
 
-// ── DailyReportForm ──────────────────────────────────────────────────────────
+// ── InProgressTaskRow ─────────────────────────────────────────────────────────
+// Section 2: In Progress / Ongoing — project_tag + description + hours (bắt buộc)
+
+type InProgressRowProps = {
+  index: number
+  control: Control<DailyReportFormValues>
+  onRemove: () => void
+}
+
+function InProgressTaskRow({ index, control, onRemove }: InProgressRowProps) {
+  return (
+    <div className='rounded-lg border border-dashed p-4 space-y-3'>
+      <div className='flex items-center justify-between'>
+        <span className='text-xs font-medium text-muted-foreground'>Đang làm {index + 1}</span>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          onClick={onRemove}
+          className='h-7 w-7 p-0 text-muted-foreground hover:text-destructive'
+        >
+          <Trash2 className='h-4 w-4' />
+        </Button>
+      </div>
+
+      <FormField
+        control={control}
+        name={`in_progress_tasks.${index}.project_tag`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className='text-xs text-muted-foreground'>Project Tag</FormLabel>
+            <FormControl>
+              <Input
+                {...field}
+                value={field.value ?? ''}
+                placeholder='VD: TekSpace, Backend...'
+                className='h-8 text-sm'
+              />
+            </FormControl>
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={control}
+        name={`in_progress_tasks.${index}.description`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Mô tả task đang làm <span className='text-destructive'>*</span></FormLabel>
+            <FormControl>
+              <Textarea {...field} placeholder='VD: Đang implement API authentication...' rows={2} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={control}
+        name={`in_progress_tasks.${index}.hours`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Số giờ đã bỏ hôm nay <span className='text-destructive'>*</span></FormLabel>
+            <FormControl>
+              <Input
+                type='number'
+                step='0.5'
+                min='0.5'
+                max='24'
+                placeholder='VD: 1.5'
+                className='h-8 text-sm w-28'
+                value={field.value ?? ''}
+                onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </div>
+  )
+}
+
+// ── DailyReportForm ───────────────────────────────────────────────────────────
 
 type Props = {
   onSubmit: (values: DailyReportFormValues) => void
   isPending: boolean
-  defaultValues?: DailyReportFormValues  // Story 4.6: pre-fill từ report cũ khi edit
-  submitLabel?: string                   // Story 4.6: override nút submit (default: "Nộp Daily Report")
-  onCancel?: () => void                  // Story 4.6: hiện nút "Huỷ" khi có
+  defaultValues?: DailyReportFormValues
+  submitLabel?: string
+  onCancel?: () => void
 }
 
 export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabel, onCancel }: Props) {
@@ -174,54 +272,69 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
     resolver: zodResolver(dailyReportFormSchema),
     defaultValues: defaultValues ?? {
       tasks: [{ description: '', output_type: 'other', output_link: '', hours: undefined }],
+      in_progress_tasks: [],
+      plan_for_tomorrow: '',
+      blockers: '',
       hours_logged: 0,
     },
   })
 
-  const { fields, append, remove } = useFieldArray({
+  // Section 1: Tasks Completed
+  const { fields: completedFields, append: appendCompleted, remove: removeCompleted } = useFieldArray({
     control: form.control,
     name: 'tasks',
   })
 
-  // Watch reactive values cho discrepancy detection và total display
+  // Section 2: In Progress
+  const { fields: inProgressFields, append: appendInProgress, remove: removeInProgress } = useFieldArray({
+    control: form.control,
+    name: 'in_progress_tasks',
+  })
+
+  // Watch cả Section 1 và Section 2 cho hours auto-compute
   const hoursWatched = useWatch({ control: form.control, name: 'hours_logged' })
   const tasksWatched = useWatch({ control: form.control, name: 'tasks' })
+  const inProgressWatched = useWatch({ control: form.control, name: 'in_progress_tasks' })
 
-  // Auto-compute hours_logged từ sum(task.hours) khi TẤT CẢ tasks đều có hours > 0.
-  // didMountRef: skip reset về 0 trong lần render đầu tiên để bảo toàn defaultValues.hours_logged
-  // (quan trọng khi edit mode: report cũ có hours_logged > 0 nhưng tasks không có per-task hours)
+  // Auto-compute hours_logged = sum(Section 1 hours) + sum(Section 2 hours)
+  // Chỉ auto-compute khi TẤT CẢ tasks (cả 2 section) đều đã nhập hours > 0
   const didMountRef = useRef(false)
   useEffect(() => {
-    const tasks = tasksWatched ?? []
-    const allFilled = tasks.length > 0 && tasks.every(t => t.hours !== undefined && t.hours > 0)
-    if (allFilled) {
-      const sum = tasks.reduce((acc, t) => acc + (t.hours ?? 0), 0)
+    const completed = tasksWatched ?? []
+    const inProgress = inProgressWatched ?? []
+    const allCompletedFilled = completed.length > 0 && completed.every(t => t.hours !== undefined && t.hours > 0)
+    const allInProgressFilled = inProgress.every(t => t.hours !== undefined && t.hours > 0)
+    if (allCompletedFilled && allInProgressFilled) {
+      const sum =
+        completed.reduce((acc, t) => acc + (t.hours ?? 0), 0) +
+        inProgress.reduce((acc, t) => acc + (t.hours ?? 0), 0)
       form.setValue('hours_logged', sum, { shouldDirty: false, shouldValidate: false })
     } else if (didMountRef.current) {
-      // Chỉ reset về 0 sau lần mount đầu tiên — không override defaultValues.hours_logged
       form.setValue('hours_logged', 0, { shouldDirty: false, shouldValidate: false })
     }
     didMountRef.current = true
-  }, [tasksWatched, form])
+  }, [tasksWatched, inProgressWatched, form])
 
-  // Computed — tự update khi field thay đổi, không cần useState
   const showFlag = hasDiscrepancy(hoursWatched ?? 0, tasksWatched ?? [])
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
         <fieldset disabled={isPending} className='space-y-6'>
-          {/* Tasks list */}
-          <div className='space-y-4'>
-            <h3 className='text-sm font-medium'>Danh sách tasks ({fields.length})</h3>
 
-            {fields.map((field, index) => (
-              <TaskRow
+          {/* ── Section 1: Tasks Completed Today ──────────────────────────── */}
+          <div className='space-y-4'>
+            <h3 className='text-sm font-semibold flex items-center gap-2'>
+              ✅ Tasks Completed Today
+            </h3>
+
+            {completedFields.map((field, index) => (
+              <CompletedTaskRow
                 key={field.id}
                 index={index}
                 control={form.control}
-                canRemove={fields.length > 1}
-                onRemove={() => remove(index)}
+                canRemove={completedFields.length > 1}
+                onRemove={() => removeCompleted(index)}
               />
             ))}
 
@@ -229,17 +342,56 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
               type='button'
               variant='outline'
               size='sm'
-              onClick={() => append({ description: '', output_type: 'other', output_link: '', hours: undefined as unknown as number })}
+              onClick={() => appendCompleted({
+                project_tag: '',
+                description: '',
+                output_type: 'other',
+                output_link: '',
+                hours: undefined as unknown as number,
+              })}
               className='w-full'
             >
               <Plus className='mr-2 h-4 w-4' />
-              Thêm task
+              Thêm task hoàn thành
             </Button>
           </div>
 
           <Separator />
 
-          {/* Tổng giờ — auto-computed từ per-task hours, không editable */}
+          {/* ── Section 2: In Progress / Ongoing ──────────────────────────── */}
+          <div className='space-y-4'>
+            <h3 className='text-sm font-semibold flex items-center gap-2'>
+              🔄 In Progress / Ongoing
+            </h3>
+
+            {inProgressFields.length === 0 && (
+              <p className='text-xs text-muted-foreground italic'>Không có task nào đang dở.</p>
+            )}
+
+            {inProgressFields.map((field, index) => (
+              <InProgressTaskRow
+                key={field.id}
+                index={index}
+                control={form.control}
+                onRemove={() => removeInProgress(index)}
+              />
+            ))}
+
+            <Button
+              type='button'
+              variant='outline'
+              size='sm'
+              onClick={() => appendInProgress({ task_type: 'in_progress', project_tag: '', description: '' })}
+              className='w-full border-dashed'
+            >
+              <Plus className='mr-2 h-4 w-4' />
+              Thêm task đang làm
+            </Button>
+          </div>
+
+          <Separator />
+
+          {/* ── Tổng giờ (từ Section 1) ────────────────────────────────────── */}
           <div className='flex items-center justify-between rounded-lg border px-4 py-3'>
             <p className='text-sm font-medium'>Tổng giờ làm việc</p>
             {(hoursWatched ?? 0) > 0 ? (
@@ -249,14 +401,13 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
             )}
           </div>
 
-          {/* Discrepancy flag — hiện khi hours > 4 AND tasks ≤ 1 AND không có output link */}
+          {/* Discrepancy flag */}
           {showFlag && (
             <Alert className='border-yellow-200 bg-yellow-50 text-yellow-800'>
               <TriangleAlert className='h-4 w-4 text-yellow-600' aria-hidden='true' />
               <AlertDescription>
                 <p>
-                  Bạn báo cáo {hoursWatched}h nhưng số lượng tasks có vẻ ít — muốn thêm task
-                  không?
+                  Bạn báo cáo {hoursWatched}h nhưng số lượng tasks có vẻ ít — muốn thêm task không?
                 </p>
                 <div className='mt-2 flex gap-2'>
                   <Button
@@ -264,7 +415,13 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
                     size='sm'
                     variant='outline'
                     className='border-yellow-300 bg-white text-yellow-800 hover:bg-yellow-50'
-                    onClick={() => append({ description: '', output_type: 'other', output_link: '', hours: undefined as unknown as number })}
+                    onClick={() => appendCompleted({
+                      project_tag: '',
+                      description: '',
+                      output_type: 'other',
+                      output_link: '',
+                      hours: undefined as unknown as number,
+                    })}
                   >
                     <Plus className='mr-1 h-3 w-3' />
                     Thêm task
@@ -283,6 +440,47 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
             </Alert>
           )}
 
+          {/* ── Section 3: Plan for Tomorrow ──────────────────────────────── */}
+          <FormField
+            control={form.control}
+            name='plan_for_tomorrow'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className='text-sm font-semibold'>📋 Plan for Tomorrow</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    value={field.value ?? ''}
+                    placeholder='Kế hoạch ngày mai... VD: Viết unit tests cho auth module, Review PR của team...'
+                    rows={3}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* ── Section 4: Blockers / Issues ──────────────────────────────── */}
+          <FormField
+            control={form.control}
+            name='blockers'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className='text-sm font-semibold'>🚧 Blockers / Issues</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    value={field.value ?? ''}
+                    placeholder='Có blockers hay issues nào không? VD: Blocked bởi API chưa ready, Cần review architecture trước khi tiếp tục...'
+                    rows={3}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* ── Submit / Cancel ───────────────────────────────────────────── */}
           <Button type='submit' className='w-full'>
             {isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
             {submitLabel ?? 'Nộp Daily Report'}

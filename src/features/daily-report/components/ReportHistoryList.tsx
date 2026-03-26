@@ -5,10 +5,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ReportStatusBadge } from '@/features/daily-report/components/ReportStatusBadge'
 import { DailyReportView } from '@/features/daily-report/components/DailyReportView'
-import type { DailyReport } from '@/features/daily-report/services/daily-report.service'
+import type { DailyReportWithTasks } from '@/features/daily-report/services/daily-report.service'
 
 type Props = {
-  reports: DailyReport[]
+  reports: DailyReportWithTasks[]
   timezone: string
   isLoading?: boolean
   // Infinite scroll props
@@ -85,7 +85,7 @@ export function ReportHistoryList({
   return (
     <div className='space-y-1'>
       {reports.map((report) => {
-        const taskCount = Array.isArray(report.tasks) ? report.tasks.length : 0
+        const taskCount = (report.report_tasks ?? []).length
         const status = report.is_late ? 'late' : 'submitted'
         const dateLabel = formatDateLabel(report.report_date)
 
