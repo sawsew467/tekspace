@@ -27,7 +27,7 @@ import { useSelfSparkline } from '../hooks/use-self-sparkline'
 import { useSelfStreak } from '../hooks/use-self-streak'
 import { DashboardService } from '../services/dashboard.service'
 import { TeamScheduleHeatmap } from './TeamScheduleHeatmap'
-import { calcCommitmentRate, formatCommitmentRate } from '../utils/dashboard.utils'
+import { calcCommitmentRate } from '../utils/dashboard.utils'
 import { PageContainer } from '@/components/layout/page-container'
 
 // ── Sparkline chart config ─────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ function StatCard({ label, value, isLoading }: { label: string; value: string; i
       {isLoading ? (
         <Skeleton className="h-6 w-24" />
       ) : (
-        <p className="text-lg font-semibold">{value}</p>
+        <p className="text-base sm:text-lg font-semibold break-words leading-snug">{value}</p>
       )}
     </div>
   )
@@ -290,7 +290,7 @@ export function SelfDashboard() {
   // ── Derived values ───────────────────────────────────────────────────────────
 
   const myRate = calcCommitmentRate(actualHours, committedHours)
-  const commitmentLabel = formatCommitmentRate(actualHours, committedHours)
+  const commitmentLabel = myRate !== null ? `${Math.round(myRate * 100)}%` : '—'
 
   // Build sparkline chart data — 4 tuần, fill 0 cho tuần thiếu
   const sparkChartData = useMemo(() => {

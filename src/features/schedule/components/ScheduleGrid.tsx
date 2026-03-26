@@ -53,7 +53,7 @@ function SlotCard({
             disabled
             aria-label="Chỉnh sửa slot"
           >
-            <Pencil className="h-3 w-3" />
+            <Pencil className="h-3 w-3 text-foreground" />
           </Button>
           <Button
             variant="outline"
@@ -62,7 +62,7 @@ function SlotCard({
             disabled
             aria-label="Xóa slot"
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-3 w-3 text-red-600 dark:text-red-400" />
           </Button>
         </div>
       </div>
@@ -83,7 +83,7 @@ function SlotCard({
           disabled={isDeleting}
           aria-label="Chỉnh sửa slot"
         >
-          <Pencil className="h-3 w-3" />
+          <Pencil className="h-3 w-3 text-foreground" />
         </Button>
         <Button
           variant="outline"
@@ -93,7 +93,7 @@ function SlotCard({
           disabled={isDeleting}
           aria-label="Xóa slot"
         >
-          <Trash2 className="h-3 w-3" />
+          <Trash2 className="h-3 w-3 text-red-600 dark:text-red-400" />
         </Button>
       </div>
     </div>
