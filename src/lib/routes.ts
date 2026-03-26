@@ -5,7 +5,7 @@ export const ROUTES = {
   acceptInvite: '/accept-invite',
   app: {
     createTenant: '/create-tenant',
-    teamSchedule: '/team-schedule',       // Team Dashboard (overview of all members)
+    teamSchedule: '/team-schedule',       // Team Schedule (overview of all members)
     dashboard: '/dashboard',               // Personal Dashboard (SelfDashboard)
     schedule: '/my-schedule',              // My Schedule registration
     scheduleManage: '/my-schedule/manage', // Schedule manage

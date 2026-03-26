@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-23
-last_updated: 2026-03-26 (story-3-3 → done; 6-3b code review fixes → done; story-5-2 → done; 6-4 → done; epic-3 → done; retro epic-3 → done; story-7-1 → done; epic-7 → done; story-5-3 → done; story-7-2 → done; story-7-3 → done; epic-8 added via sprint-change-proposal-2026-03-25; 8-1 → ready-for-dev; 8-5 → ready-for-dev; epic-8 → in-progress; 8-2 → review; 8-3 → review; 8-4 → review; 8-1 → review; 8-5 → in-progress; 8-17 → ready-for-dev; 8-18 → ready-for-dev; 8-19 → ready-for-dev; 8-18 → in-progress; 8-18 → review; 8-5 → review; 8-1 → done; 8-17 → done; 8-19 → done; 8-18 code review fixes → done; 8-7 → review; 8-6 → review; 8-5 code review fixes → done; 8-6 code review fixes → done; 8-7 code review fixes → done; 8-8 → done; 8-9 → ready-for-dev; 8-11 → ready-for-dev; 8-10 → ready-for-dev; 8-11 → review; 8-9 → review; 8-9 code review fixes → done; 8-10 code review fixes → done; 8-11 code review fixes → done; 8-12 → ready-for-dev; 8-13 → ready-for-dev; 8-15 → ready-for-dev; 8-12 → in-progress; 8-14 → ready-for-dev; 8-16 → ready-for-dev; 8-13 → in-progress; 8-12 → review; 8-13 → review; 8-16 → review; 8-14 code review fixes → done; 8-16 code review fixes → done; 8-15 code review fixes → done)
+last_updated: 2026-03-26 (story-3-3 → done; 6-3b code review fixes → done; story-5-2 → done; 6-4 → done; epic-3 → done; retro epic-3 → done; story-7-1 → done; epic-7 → done; story-5-3 → done; story-7-2 → done; story-7-3 → done; epic-8 added via sprint-change-proposal-2026-03-25; 8-1 → ready-for-dev; 8-5 → ready-for-dev; epic-8 → in-progress; 8-2 → review; 8-3 → review; 8-4 → review; 8-1 → review; 8-5 → in-progress; 8-17 → ready-for-dev; 8-18 → ready-for-dev; 8-19 → ready-for-dev; 8-18 → in-progress; 8-18 → review; 8-5 → review; 8-1 → done; 8-17 → done; 8-19 → done; 8-18 code review fixes → done; 8-7 → review; 8-6 → review; 8-5 code review fixes → done; 8-6 code review fixes → done; 8-7 code review fixes → done; 8-8 → done; 8-9 → ready-for-dev; 8-11 → ready-for-dev; 8-10 → ready-for-dev; 8-11 → review; 8-9 → review; 8-9 code review fixes → done; 8-10 code review fixes → done; 8-11 code review fixes → done; 8-12 → ready-for-dev; 8-13 → ready-for-dev; 8-15 → ready-for-dev; 8-12 → in-progress; 8-14 → ready-for-dev; 8-16 → ready-for-dev; 8-13 → in-progress; 8-12 → review; 8-13 → review; 8-16 → review; 8-14 code review fixes → done; 8-16 code review fixes → done; 8-15 code review fixes → done; retro epic-5+6+8 → done; epic-5 → done; epic-6 → done; epic-8 → done; epic-9 added via sprint-change-proposal-2026-03-26; 9-5 → ready-for-dev; epic-9 → in-progress; 9-5 → review; 9-4 → ready-for-dev; 9-5 → done)
 project: TekSpace
 project_key: NOKEY
 tracking_system: file-system
@@ -90,22 +90,22 @@ development_status:
   # ─────────────────────────────────────────────
   # Epic 5: Hours Analytics
   # ─────────────────────────────────────────────
-  epic-5: in-progress
+  epic-5: done
   5-1-committed-hours-configuration: done
   5-2-team-hours-analytics-dashboard: done
   5-3-member-self-analytics-history: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
 
   # ─────────────────────────────────────────────
   # Epic 6: Smart Notifications
   # ─────────────────────────────────────────────
-  epic-6: in-progress
+  epic-6: done
   6-1-in-app-notification-center: done
   6-2-schedule-deadline-notifications: done
   6-3-daily-report-reminder: done
   6-3b-reminder-days-config: done
   6-4-event-based-notifications: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
 
   # ─────────────────────────────────────────────
   # Epic 7: Incident Management
@@ -115,7 +115,7 @@ development_status:
   # Source: sprint-change-proposal-2026-03-25.md
   # Parallel execution: 5 waves
   # ─────────────────────────────────────────────
-  epic-8: in-progress
+  epic-8: done
 
   # ── Wave 1: Fully independent (spawn tất cả cùng lúc) ──
   # Không có file conflict với nhau
@@ -150,4 +150,20 @@ development_status:
   # ── Wave 5: Sau Wave 4 (high effort, 1 agent) ──
   8-16-schedule-week-picker-drag: done   # ScheduleGrid overhaul
 
-  epic-8-retrospective: optional
+  epic-8-retrospective: done
+
+  # ─────────────────────────────────────────────
+  # Epic 9: Product Quality & Feature Completion
+  # Source: sprint-change-proposal-2026-03-26.md
+  # Parallel execution: 2 waves
+  # ─────────────────────────────────────────────
+  epic-9: in-progress
+
+  # ── Wave 1: Fully independent (spawn song song) ──
+  9-1-login-redirect-fix: ready-for-dev  # sign-in.tsx + beforeLoad redirect param fix
+  9-4-mobile-ui-fixes: ready-for-dev    # stat card overflow + icon contrast mobile
+  9-5-page-title-team-schedule: done        # browser tab title fix
+
+  # ── Wave 2: Sau Wave 1 (spawn song song) ──
+  9-2-daily-report-four-sections: backlog      # migration + form + manager view
+  9-3-incident-lifecycle-dismiss-uphold: backlog  # incident_resolutions table + resolve UI
