@@ -36,7 +36,17 @@ export function useIncidentAppealsRealtime(tenantId: string | null) {
           })
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (import.meta.env.DEV) {
+          if (status === 'CHANNEL_ERROR') {
+            // eslint-disable-next-line no-console
+            console.error('[Realtime] incident-appeals channel error:', err)
+          } else {
+            // eslint-disable-next-line no-console
+            console.log(`[Realtime] incident-appeals channel status: ${status}`)
+          }
+        }
+      })
 
     return () => {
       void supabase.removeChannel(channel)

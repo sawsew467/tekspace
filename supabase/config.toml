@@ -388,6 +388,21 @@ verify_jwt = false
 [functions.notify-schedule-reminder]
 verify_jwt = false
 
+[functions.notify-incident]
+verify_jwt = false
+
+[functions.notify-appeal]
+verify_jwt = false
+
+[functions.notify-outcome-note]
+verify_jwt = false
+
+[functions.notify-resolution]
+verify_jwt = false
+
+[functions.demote-member]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
