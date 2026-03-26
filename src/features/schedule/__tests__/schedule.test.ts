@@ -305,32 +305,59 @@ describe('getSlotEditMode', () => {
   })
 
   it('slot_date trước today → locked', () => {
-    expect(getSlotEditMode('2026-03-24', TZ)).toBe('locked')
+    expect(getSlotEditMode('2026-03-24', '2026-03-24T08:00:00Z', TZ)).toBe('locked')
   })
 
-  it('slot_date = today → reason-required', () => {
-    expect(getSlotEditMode('2026-03-25', TZ)).toBe('reason-required')
+  it('slot_date = today, start_time chưa qua → reason-required', () => {
+    // 14:00 ICT = 07:00Z → sau now (05:00Z) → reason-required
+    expect(getSlotEditMode('2026-03-25', '2026-03-25T07:00:00Z', TZ)).toBe('reason-required')
   })
 
   it('slot_date = Sunday (cuối tuần này) → reason-required', () => {
     // Thứ Tư 25/03, Sunday = 29/03
-    expect(getSlotEditMode('2026-03-29', TZ)).toBe('reason-required')
+    expect(getSlotEditMode('2026-03-29', '2026-03-29T07:00:00Z', TZ)).toBe('reason-required')
   })
 
   it('slot_date = next Monday → free', () => {
     // Thứ Tư 25/03, next Monday = 30/03
-    expect(getSlotEditMode('2026-03-30', TZ)).toBe('free')
+    expect(getSlotEditMode('2026-03-30', '2026-03-30T07:00:00Z', TZ)).toBe('free')
   })
 
   it('slot_date 2 tuần sau → free', () => {
-    expect(getSlotEditMode('2026-04-06', TZ)).toBe('free')
+    expect(getSlotEditMode('2026-04-06', '2026-04-06T07:00:00Z', TZ)).toBe('free')
   })
 
   it('khi today là Sunday, next_monday = tomorrow', () => {
     vi.setSystemTime(new Date('2026-03-29T05:00:00Z')) // Sunday 29/03 ICT
     // Sunday 29/03 = reason-required (còn trong current week)
-    expect(getSlotEditMode('2026-03-29', TZ)).toBe('reason-required')
+    expect(getSlotEditMode('2026-03-29', '2026-03-29T07:00:00Z', TZ)).toBe('reason-required')
     // Monday 30/03 = free
-    expect(getSlotEditMode('2026-03-30', TZ)).toBe('free')
+    expect(getSlotEditMode('2026-03-30', '2026-03-30T07:00:00Z', TZ)).toBe('free')
+  })
+
+  // ── started tier (Story 9.7) ──────────────────────────────────────────────
+
+  it('slot_date = today, start_time đã qua → started', () => {
+    // slot 01:30 ICT = 18:30Z ngày hôm trước → đã qua 12:00 ICT (05:00Z)
+    expect(getSlotEditMode('2026-03-25', '2026-03-24T18:30:00Z', TZ)).toBe('started')
+  })
+
+  it('slot_date = today, start_time = đúng now (không strictly less than) → reason-required', () => {
+    // 2026-03-25T05:00:00Z = now → new Date(startTime) < now → false → reason-required
+    expect(getSlotEditMode('2026-03-25', '2026-03-25T05:00:00Z', TZ)).toBe('reason-required')
+  })
+
+  it('slot_date = today, start_time 1ms trước now → started', () => {
+    expect(getSlotEditMode('2026-03-25', '2026-03-25T04:59:59.999Z', TZ)).toBe('started')
+  })
+
+  it('slot_date = hôm qua, start_time đã qua → locked (không phải started)', () => {
+    // locked check chạy trước started check
+    expect(getSlotEditMode('2026-03-24', '2026-03-23T18:30:00Z', TZ)).toBe('locked')
+  })
+
+  it('slot_date = ngày mai trong tuần, start_time đã qua → reason-required (không phải started)', () => {
+    // started chỉ apply khi slot_date === today
+    expect(getSlotEditMode('2026-03-26', '2026-03-26T02:00:00Z', TZ)).toBe('reason-required')
   })
 })

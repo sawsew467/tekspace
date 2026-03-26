@@ -209,8 +209,8 @@ export function EditSlotDialog({
       return
     }
 
-    // Validate reason khi bắt buộc (Tier 2)
-    if (requireReason && !values.reason.trim()) {
+    // Validate reason khi bắt buộc (Tier 2 hoặc Emergency Override)
+    if ((requireReason || isEmergency) && !values.reason.trim()) {
       form.setError('reason', { message: 'Lý do không được để trống' })
       return
     }
@@ -409,8 +409,8 @@ export function EditSlotDialog({
               </div>
             )}
 
-            {/* Lý do thay đổi — chỉ hiển thị khi requireReason=true (Tier 2) */}
-            {requireReason && (
+            {/* Lý do thay đổi — hiển thị khi requireReason=true (Tier 2) hoặc isEmergency=true */}
+            {(requireReason || isEmergency) && (
             <FormField
               control={form.control}
               name="reason"

@@ -125,7 +125,7 @@ function DayColumn({
   onDeleteSlot,
   isDeletingSlotId,
 }: DayColumnProps) {
-  const dayLocked = getSlotEditMode(date, userTimezone) === 'locked'
+  const dayLocked = getSlotEditMode(date, '9999-12-31T00:00:00Z', userTimezone) === 'locked'
 
   return (
     <div className="flex flex-col gap-2">
@@ -144,7 +144,7 @@ function DayColumn({
             key={slot.id}
             slot={slot}
             userTimezone={userTimezone}
-            editMode={getSlotEditMode(slot.slot_date, userTimezone)}
+            editMode={getSlotEditMode(slot.slot_date, slot.start_time, userTimezone)}
             onEdit={onEditSlot}
             onDelete={onDeleteSlot}
             isDeleting={isDeletingSlotId === slot.id}
@@ -189,7 +189,7 @@ function DayRow({
   onDeleteSlot,
   isDeletingSlotId,
 }: DayRowProps) {
-  const dayLocked = getSlotEditMode(date, userTimezone) === 'locked'
+  const dayLocked = getSlotEditMode(date, '9999-12-31T00:00:00Z', userTimezone) === 'locked'
 
   return (
     <div className="space-y-2">
@@ -215,7 +215,7 @@ function DayRow({
               key={slot.id}
               slot={slot}
               userTimezone={userTimezone}
-              editMode={getSlotEditMode(slot.slot_date, userTimezone)}
+              editMode={getSlotEditMode(slot.slot_date, slot.start_time, userTimezone)}
               onEdit={onEditSlot}
               onDelete={onDeleteSlot}
               isDeleting={isDeletingSlotId === slot.id}

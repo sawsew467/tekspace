@@ -87,6 +87,7 @@ function SchedulePage() {
   // Edit/Delete dialog state
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
   const [editingSlotMode, setEditingSlotMode] = useState<SlotEditMode>('free') // P-6: capture mode lúc open
+  const [deletingSlotMode, setDeletingSlotMode] = useState<SlotEditMode>('free') // P-6: capture mode lúc open
   const [deletingSlot, setDeletingSlot] = useState<ScheduleSlot | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -221,10 +222,10 @@ function SchedulePage() {
   function handleEditSlot(slotId: string) {
     const slot = findSlot(slotId)
     if (!slot) return
-    const mode = getSlotEditMode(slot.slot_date, userTimezone)
+    const mode = getSlotEditMode(slot.slot_date, slot.start_time, userTimezone)
 
-    if (mode === 'reason-required') {
-      // Tier 2: mở EditSlotDialog (cần reason, gọi RPC, manager notified)
+    if (mode === 'started' || mode === 'reason-required') {
+      // Tier started: Emergency Override dialog; Tier 2: regular edit dialog (cần reason, gọi RPC)
       setEditingSlot(slot)
       setEditingSlotMode(mode) // P-6: capture mode lúc mở, tránh race condition midnight
       setEditDialogOpen(true)
@@ -240,11 +241,12 @@ function SchedulePage() {
   function handleDeleteSlot(slotId: string) {
     const slot = findSlot(slotId)
     if (!slot) return
-    const mode = getSlotEditMode(slot.slot_date, userTimezone)
+    const mode = getSlotEditMode(slot.slot_date, slot.start_time, userTimezone)
 
-    if (mode === 'reason-required') {
-      // Tier 2: mở DeleteSlotDialog (cần reason, gọi RPC, manager notified)
+    if (mode === 'started' || mode === 'reason-required') {
+      // Tier started: Emergency Override dialog; Tier 2: mở DeleteSlotDialog (cần reason, gọi RPC)
       setDeletingSlot(slot)
+      setDeletingSlotMode(mode) // P-6: capture mode lúc mở
       setDeleteDialogOpen(true)
     } else if (mode === 'free') {
       // Tier 3: direct delete — không cần dialog, không notify manager (AC6)
@@ -287,7 +289,7 @@ function SchedulePage() {
           newStartTimeUTC: data.newStartTimeUTC,
           newDurationMinutes: data.newDurationMinutes,
           reason: data.reason,
-          isEmergencyOverride: false,
+          isEmergencyOverride: data.isEmergency,
         },
         {
           onSuccess: () => {
@@ -481,7 +483,7 @@ function SchedulePage() {
           weekOf={currentWeekOf}
           userTimezone={userTimezone}
           tenantTimezone={tenantTimezone}
-          isEmergency={false}
+          isEmergency={editingSlotMode === 'started'}
           requireReason={editingSlotMode === 'reason-required'} // P-6: dùng captured mode
           isLoading={updateSlot.isPending || updateSlotDirect.isPending}
           onSubmit={handleEditSubmit}
@@ -495,7 +497,7 @@ function SchedulePage() {
           onOpenChange={setDeleteDialogOpen}
           slot={deletingSlot}
           userTimezone={userTimezone}
-          isEmergency={false}
+          isEmergency={deletingSlotMode === 'started'}
           isLoading={deleteSlotWithReason.isPending}
           onConfirm={handleDeleteConfirm}
         />

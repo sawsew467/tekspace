@@ -3,28 +3,33 @@ import { addDays, format, parseISO } from 'date-fns'
 import { toZonedTime, format as formatTz } from 'date-fns-tz'
 
 /**
- * SlotEditMode — 3-tier lock model (Story 2.5)
+ * SlotEditMode — 4-tier lock model (Story 2.5 + Story 9.7)
  *
- * | Tầng           | Điều kiện                              | Hành vi                           |
- * |----------------|----------------------------------------|-----------------------------------|
- * | locked         | slot_date < today                      | Card grayed out, no edit/delete   |
- * | reason-required| today <= slot_date <= end_of_week (Sun)| Edit/delete → reason dialog + RPC |
- * | free           | slot_date >= next_monday               | Edit/delete → direct call, no notify|
+ * | Tầng           | Điều kiện                                      | Hành vi                                  |
+ * |----------------|------------------------------------------------|------------------------------------------|
+ * | locked         | slot_date < today                              | Card grayed out, no edit/delete          |
+ * | started        | slot_date = today AND start_time < now()       | Emergency Override dialog + RPC          |
+ * | reason-required| slot_date = today (start_time >= now()) hoặc   | Edit/delete → reason dialog + RPC        |
+ * |                | slot_date trong tuần này (đến CN)              |                                          |
+ * | free           | slot_date >= next_monday                       | Edit/delete → direct call, no notify     |
  */
-export type SlotEditMode = 'locked' | 'reason-required' | 'free'
+export type SlotEditMode = 'locked' | 'started' | 'reason-required' | 'free'
 
 /**
- * getSlotEditMode — xác định edit mode của slot dựa theo slot_date so với ngày hôm nay
+ * getSlotEditMode — xác định edit mode của slot dựa theo slot_date và start_time so với thời điểm hiện tại
  *
  * @param slotDate     "YYYY-MM-DD" — slot_date từ DB
+ * @param startTime    ISO timestamp UTC — slot.start_time từ DB (e.g. "2026-03-25T18:30:00+00:00")
  * @param userTimezone IANA timezone của user (e.g. "Asia/Ho_Chi_Minh")
  */
 export function getSlotEditMode(
   slotDate: string,
+  startTime: string,
   userTimezone: string,
 ): SlotEditMode {
+  const now = new Date()
   const todayInUserTz = format(
-    toZonedTime(new Date(), userTimezone),
+    toZonedTime(now, userTimezone),
     'yyyy-MM-dd',
   )
   // parseISO parses "YYYY-MM-DD" as local midnight — getDay() trả đúng weekday
@@ -39,9 +44,10 @@ export function getSlotEditMode(
     'yyyy-MM-dd',
   )
 
-  if (slotDate < todayInUserTz) return 'locked'          // Tầng 1: quá khứ
-  if (slotDate < nextMondayISO) return 'reason-required' // Tầng 2: tuần này
-  return 'free'                                          // Tầng 3: tuần sau+
+  if (slotDate < todayInUserTz) return 'locked'                                               // Tầng 1: quá khứ
+  if (slotDate === todayInUserTz && startTime && new Date(startTime) < now) return 'started'  // Tầng 2a: hôm nay, đã bắt đầu
+  if (slotDate < nextMondayISO) return 'reason-required'                           // Tầng 2b: tuần này
+  return 'free'                                                                    // Tầng 3: tuần sau+
 }
 
 /**
