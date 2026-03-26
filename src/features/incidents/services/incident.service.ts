@@ -4,6 +4,7 @@ import type { Tables } from '@/lib/supabase-types'
 export type Incident = Tables<'incidents'>
 export type IncidentAppeal = Tables<'incident_appeals'>
 export type IncidentOutcomeNote = Tables<'incident_outcome_notes'>
+export type IncidentResolution = Tables<'incident_resolutions'>
 
 export const IncidentService = {
   getIncidents: async (tenantId: string): Promise<Incident[]> => {
@@ -169,6 +170,57 @@ export const IncidentService = {
       .range(from, to)
     if (error) throw error
     return data ?? []
+  },
+
+  getResolutions: async (tenantId: string): Promise<IncidentResolution[]> => {
+    const { data, error } = await supabase
+      .from('incident_resolutions')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('resolved_at', { ascending: false })
+    if (error) throw error
+    return data ?? []
+  },
+
+  createResolution: async (params: {
+    tenantId:   string
+    incidentId: string
+    memberId:   string   // member của incident — để Edge Function INSERT notification
+    resolvedBy: string
+    outcome:    'dismissed' | 'upheld'
+    note?:      string
+  }): Promise<IncidentResolution> => {
+    // INSERT resolution — append-only, UNIQUE constraint enforce 1 resolution per incident
+    const { data: resolution, error: resolutionError } = await supabase
+      .from('incident_resolutions')
+      .insert({
+        tenant_id:   params.tenantId,
+        incident_id: params.incidentId,
+        outcome:     params.outcome,
+        note:        params.note ?? null,
+        resolved_by: params.resolvedBy,
+      })
+      .select()
+      .single()
+    if (resolutionError) throw resolutionError
+
+    // Notify member qua Edge Function — best-effort (service role bypass RLS)
+    // Member không thể nhận notification INSERT trực tiếp từ manager
+    try {
+      await supabase.functions.invoke('notify-resolution', {
+        body: {
+          tenantId:   params.tenantId,
+          memberId:   params.memberId,
+          incidentId: params.incidentId,
+          outcome:    params.outcome,
+        },
+      })
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[createResolution] notification failed (best-effort):', err)
+    }
+
+    return resolution
   },
 }
 

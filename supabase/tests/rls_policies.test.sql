@@ -14,7 +14,7 @@
 
 BEGIN;
 
-SELECT plan(34);
+SELECT plan(41);
 
 -- =============================================================
 -- FIXTURES (chạy với quyền postgres superuser — bypass RLS)
@@ -142,7 +142,7 @@ ON CONFLICT (id) DO NOTHING;
 -- Dùng bypass mode (postgres superuser) để insert fixture
 -- submitted_at = '2026-01-15 10:00:00+00' (10am UTC = trước deadline 03:00 ICT ngày 16)
 -- → trigger compute_is_late sẽ set is_late = false (10:00 UTC < 20:00 UTC = 03:00 ICT)
-INSERT INTO public.daily_reports (id, tenant_id, user_id, report_date, tasks, hours_logged, is_late, submitted_at)
+INSERT INTO public.daily_reports (id, tenant_id, user_id, report_date, hours_logged, is_late, submitted_at)
 VALUES
   -- Member's own report in Tenant A (is_late = false vì submitted trước deadline)
   (
@@ -150,7 +150,6 @@ VALUES
     'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',  -- member
     '2026-01-15',
-    '[{"description": "Task 1", "output_type": "other"}]'::jsonb,
     8,
     false,
     '2026-01-15 10:00:00+00'  -- 5pm ICT, trước deadline 03:00 ICT ngày 16 (= 20:00 UTC)
@@ -161,7 +160,6 @@ VALUES
     'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',  -- owner
     '2026-01-15',
-    '[{"description": "Owner task", "output_type": "pr"}]'::jsonb,
     6,
     false,
     '2026-01-15 10:00:00+00'
@@ -172,10 +170,23 @@ VALUES
     'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b12',
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14',  -- outsider in Tenant B
     '2026-01-15',
-    '[{"description": "Tenant B task", "output_type": "other"}]'::jsonb,
     4,
     false,
     '2026-01-15 10:00:00+00'
+  )
+ON CONFLICT (id) DO NOTHING;
+
+-- report_tasks fixtures (Story 9.2: tasks đã chuyển sang bảng relational)
+INSERT INTO public.report_tasks (id, tenant_id, report_id, user_id, task_type, description, sort_order)
+VALUES
+  (
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e21',
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e11',  -- member's report (Tenant A)
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',  -- member
+    'completed',
+    'RLS test task — member completed',
+    0
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -229,7 +240,6 @@ RETURNS int LANGUAGE sql AS $$
   WITH upd AS (
     UPDATE public.daily_reports
     SET
-      tasks = '[{"description": "Updated task", "output_type": "other", "hours": 2}]'::jsonb,
       hours_logged = 2,
       updated_at = now()
     WHERE id = p_report_id
@@ -834,6 +844,156 @@ SELECT throws_ok(
   $sql$,
   '42501', NULL,
   '34. Member KHÔNG THỂ INSERT outcome note (is_tenant_manager() fail — 42501)'
+);
+
+RESET ROLE;
+
+-- =============================================================
+-- TEST SECTION 9: incident_resolutions — Story 9.3
+-- =============================================================
+
+-- Test 35: Manager CÓ THỂ INSERT incident_resolution (outcome + resolved_by = auth.uid())
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'::uuid,  -- manager
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT lives_ok(
+  $sql$
+    INSERT INTO public.incident_resolutions (tenant_id, incident_id, outcome, resolved_by)
+    VALUES (
+      'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+      'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f11',  -- incident f11: manager là manager_id
+      'dismissed',
+      'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'   -- resolved_by = auth.uid() ✓
+    )
+  $sql$,
+  '35. Manager CÓ THỂ INSERT incident_resolution (resolved_by = auth.uid() pass)'
+);
+
+RESET ROLE;
+
+-- Test 36: Member KHÔNG THỂ INSERT incident_resolution (is_tenant_manager() fail)
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT throws_ok(
+  $sql$
+    INSERT INTO public.incident_resolutions (tenant_id, incident_id, outcome, resolved_by)
+    VALUES (
+      'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+      'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f11',
+      'upheld',
+      'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'
+    )
+  $sql$,
+  '42501', NULL,
+  '36. Member KHÔNG THỂ INSERT incident_resolution (is_tenant_manager() fail — 42501)'
+);
+
+RESET ROLE;
+
+-- Test 37: Manager thấy resolution trong tenant của mình
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'::uuid,  -- manager
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT ok(
+  (SELECT count(*) FROM public.incident_resolutions
+   WHERE incident_id = 'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f11') = 1,
+  '37. Manager CÓ THỂ SELECT resolution trong tenant của mình'
+);
+
+RESET ROLE;
+
+-- Test 38: Member thấy resolution của incident mà mình là victim
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member (victim của f11)
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT ok(
+  (SELECT count(*) FROM public.incident_resolutions
+   WHERE incident_id = 'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f11') = 1,
+  '38. Member THẤY resolution của incident mà mình là victim (is_incident_victim pass)'
+);
+
+RESET ROLE;
+
+-- =============================================================
+-- TEST SECTION 10: report_tasks — SELECT & INSERT policy (Story 9.2)
+-- =============================================================
+
+-- Test 39: Member thấy tasks trong report của chính mình (Tenant A)
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid   -- Tenant A
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  (SELECT count(*)::int FROM public.report_tasks
+   WHERE report_id = 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e11'),
+  1,
+  '39. Member THẤY tasks trong report của chính mình'
+);
+
+RESET ROLE;
+
+-- Test 40: Member KHÔNG THỂ INSERT tasks vào report của người khác
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid   -- Tenant A
+);
+SET LOCAL ROLE authenticated;
+
+SELECT throws_ok(
+  $sql$
+    INSERT INTO public.report_tasks (tenant_id, report_id, user_id, task_type, description, sort_order)
+    VALUES (
+      'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+      'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e12',  -- owner's report
+      'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',  -- owner's user_id
+      'completed',
+      'Unauthorized task insert',
+      0
+    )
+  $sql$,
+  '42501', NULL,
+  '40. Member KHÔNG INSERT được task vào report của người khác'
+);
+
+RESET ROLE;
+
+-- Test 41: Member KHÔNG THẤY resolution của incident mà mình không phải victim (cross-member isolation)
+-- Fixture: insert resolution cho f12 (victim=owner/a11) — chạy như postgres superuser (bypass RLS)
+INSERT INTO public.incident_resolutions (tenant_id, incident_id, outcome, resolved_by)
+VALUES (
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11',
+  'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f12',  -- incident f12: victim = owner (a11)
+  'upheld',
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'   -- resolved by manager
+)
+ON CONFLICT (incident_id) DO NOTHING;
+
+SELECT public._test_set_auth(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'::uuid,  -- member (a13, KHÔNG phải victim của f12)
+  'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b11'::uuid
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  (SELECT count(*)::int FROM public.incident_resolutions
+   WHERE incident_id = 'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f12'),
+  0,
+  '41. Member KHÔNG THẤY resolution của incident mà mình không phải victim (cross-member isolation)'
 );
 
 RESET ROLE;

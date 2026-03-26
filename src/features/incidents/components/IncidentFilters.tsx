@@ -11,23 +11,31 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 interface IncidentFiltersProps {
-  members:                    TenantMemberWithUser[]
-  filterMemberId:             string
-  filterCategory:             string
-  filterDateFrom:             string
-  filterDateTo:               string
-  filterAppealStatus:         string
-  onFilterMemberChange:       (value: string) => void
-  onFilterCategoryChange:     (value: string) => void
-  onFilterDateFromChange:     (value: string) => void
-  onFilterDateToChange:       (value: string) => void
-  onFilterAppealStatusChange: (value: string) => void
-  onReset:                    () => void
+  members:                          TenantMemberWithUser[]
+  filterMemberId:                   string
+  filterCategory:                   string
+  filterDateFrom:                   string
+  filterDateTo:                     string
+  filterAppealStatus:               string
+  filterResolutionStatus:           string
+  onFilterMemberChange:             (value: string) => void
+  onFilterCategoryChange:           (value: string) => void
+  onFilterDateFromChange:           (value: string) => void
+  onFilterDateToChange:             (value: string) => void
+  onFilterAppealStatusChange:       (value: string) => void
+  onFilterResolutionStatusChange:   (value: string) => void
+  onReset:                          () => void
 }
 
 const APPEAL_STATUS_OPTIONS = [
   { value: 'appealed',     label: 'Đã appeal' },
   { value: 'not_appealed', label: 'Chưa appeal' },
+]
+
+const RESOLUTION_STATUS_OPTIONS = [
+  { value: 'pending',   label: 'Pending' },
+  { value: 'dismissed', label: 'Dismissed' },
+  { value: 'upheld',    label: 'Upheld' },
 ]
 
 export function IncidentFilters({
@@ -37,15 +45,17 @@ export function IncidentFilters({
   filterDateFrom,
   filterDateTo,
   filterAppealStatus,
+  filterResolutionStatus,
   onFilterMemberChange,
   onFilterCategoryChange,
   onFilterDateFromChange,
   onFilterDateToChange,
   onFilterAppealStatusChange,
+  onFilterResolutionStatusChange,
   onReset,
 }: IncidentFiltersProps) {
   const hasActiveFilter =
-    filterMemberId || filterCategory || filterDateFrom || filterDateTo || filterAppealStatus
+    filterMemberId || filterCategory || filterDateFrom || filterDateTo || filterAppealStatus || filterResolutionStatus
 
   // Cảnh báo khi date range bị đảo ngược
   const dateRangeInvalid =
@@ -110,6 +120,21 @@ export function IncidentFilters({
         <SelectContent>
           <SelectItem value='__all__'>Tất cả</SelectItem>
           {APPEAL_STATUS_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Filter: Resolution status */}
+      <Select value={filterResolutionStatus || '__all__'} onValueChange={(v) => onFilterResolutionStatusChange(v === '__all__' ? '' : v)}>
+        <SelectTrigger className='h-8 w-36 text-xs'>
+          <SelectValue placeholder='Kết quả' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='__all__'>Tất cả kết quả</SelectItem>
+          {RESOLUTION_STATUS_OPTIONS.map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>
               {opt.label}
             </SelectItem>

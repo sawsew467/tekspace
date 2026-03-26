@@ -16,7 +16,11 @@ import {
   INCIDENT_CATEGORY_LABELS,
   CATEGORY_BADGE_VARIANT,
 } from '@/features/incidents/schemas/incident.schema'
-import type { Incident, IncidentAppeal } from '@/features/incidents/services/incident.service'
+import {
+  RESOLUTION_OUTCOME_LABELS,
+  RESOLUTION_OUTCOME_BADGE_VARIANT,
+} from '@/features/incidents/schemas/resolution.schema'
+import type { Incident, IncidentAppeal, IncidentResolution } from '@/features/incidents/services/incident.service'
 import type { TenantMemberWithUser } from '@/features/tenant/services/tenant.service'
 
 // Badge variant per category — defined in incident.schema.ts (shared with detail page)
@@ -27,6 +31,7 @@ interface IncidentListProps {
   members: TenantMemberWithUser[]
   userTimezone: string | null
   appeals: IncidentAppeal[]
+  resolutions: IncidentResolution[]
   canAppeal: boolean                         // true = member; false = manager/owner
   onAppeal: (incidentId: string) => void     // callback mở AppealDialog
   onViewDetail?: (incidentId: string) => void  // cả member lẫn manager đều có thể navigate
@@ -46,6 +51,7 @@ export function IncidentList({
   members,
   userTimezone,
   appeals,
+  resolutions,
   canAppeal,
   onAppeal,
   onViewDetail,
@@ -116,8 +122,9 @@ export function IncidentList({
         const categoryLabel = INCIDENT_CATEGORY_LABELS[incident.category] ?? incident.category
         const badgeVariant = CATEGORY_BADGE_VARIANT[incident.category] ?? 'outline'
 
-        // Tìm appeal cho incident này
-        const appeal = appeals.find((a) => a.incident_id === incident.id)
+        // Tìm appeal và resolution cho incident này
+        const appeal     = appeals.find((a) => a.incident_id === incident.id)
+        const resolution = resolutions.find((r) => r.incident_id === incident.id)
 
         // Truncate note nếu dài
         const NOTE_LIMIT = 120
@@ -147,6 +154,19 @@ export function IncidentList({
                     ? (canAppeal ? 'Đã gửi appeal' : 'Đã appeal')
                     : 'Chưa appeal'}
                 </Badge>
+                {/* Badge resolution status */}
+                {resolution ? (
+                  <Badge
+                    variant={RESOLUTION_OUTCOME_BADGE_VARIANT[resolution.outcome as keyof typeof RESOLUTION_OUTCOME_BADGE_VARIANT] ?? 'outline'}
+                    className='text-xs'
+                  >
+                    {RESOLUTION_OUTCOME_LABELS[resolution.outcome as keyof typeof RESOLUTION_OUTCOME_LABELS]}
+                  </Badge>
+                ) : (
+                  <Badge variant='outline' className='text-xs text-muted-foreground'>
+                    Pending
+                  </Badge>
+                )}
               </div>
               <div className='flex items-center gap-2 shrink-0'>
                 <time

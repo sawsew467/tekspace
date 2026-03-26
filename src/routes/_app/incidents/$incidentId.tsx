@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -17,6 +17,7 @@ import { useIncidents } from '@/features/incidents/hooks/use-incidents'
 import { useAppeals } from '@/features/incidents/hooks/use-appeals'
 import { useOutcomeNotes } from '@/features/incidents/hooks/use-outcome-notes'
 import { useCreateOutcomeNote } from '@/features/incidents/hooks/use-create-outcome-note'
+import { useResolutions } from '@/features/incidents/hooks/use-resolutions'
 import {
   createOutcomeNoteSchema,
   type CreateOutcomeNoteInput,
@@ -25,6 +26,11 @@ import {
   INCIDENT_CATEGORY_LABELS,
   CATEGORY_BADGE_VARIANT,
 } from '@/features/incidents/schemas/incident.schema'
+import {
+  RESOLUTION_OUTCOME_LABELS,
+  RESOLUTION_OUTCOME_BADGE_VARIANT,
+} from '@/features/incidents/schemas/resolution.schema'
+import { ResolveIncidentDialog } from '@/features/incidents/components/ResolveIncidentDialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -74,6 +80,9 @@ function IncidentDetailPage() {
   const { activeTenantId } = useTenantStore()
   const { canCreateIncident } = usePermissions()
 
+  // Resolve dialog state — chỉ manager dùng
+  const [resolveDialogOpen, setResolveDialogOpen] = useState(false)
+
   // Reuse existing cached queries — tránh tạo query riêng cho incident/appeal
   const { data: incidents = [], isLoading: isIncidentsLoading } = useIncidents(activeTenantId)
   const { data: appeals   = [], isLoading: isAppealsLoading }   = useAppeals(activeTenantId)
@@ -106,11 +115,15 @@ function IncidentDetailPage() {
     activeTenantId
   )
 
+  // Resolutions — cache shared với incidents list page (cùng queryKey)
+  const { data: resolutions = [] } = useResolutions(activeTenantId)
+
   const createOutcomeNote = useCreateOutcomeNote()
 
   // Find specific incident & appeal từ cached data
   const incident = incidents.find((i) => i.id === incidentId)
   const appeal   = appeals.find((a) => a.incident_id === incidentId)
+  const resolution = resolutions.find((r) => r.incident_id === incidentId)
 
   // Outcome note form
   const form = useForm<CreateOutcomeNoteInput>({
@@ -283,6 +296,74 @@ function IncidentDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Section 4: Kết quả xử lý (Resolution) */}
+      <Card>
+        <CardHeader className='pb-3'>
+          <CardTitle className='text-base'>Kết quả xử lý</CardTitle>
+        </CardHeader>
+        <CardContent className='space-y-3'>
+          {resolution ? (
+            // Đã có resolution — hiển thị outcome + note + timestamp
+            <div className='space-y-3'>
+              <div className='flex items-center gap-3 flex-wrap'>
+                <Badge variant={RESOLUTION_OUTCOME_BADGE_VARIANT[resolution.outcome as keyof typeof RESOLUTION_OUTCOME_BADGE_VARIANT] ?? 'outline'}>
+                  {RESOLUTION_OUTCOME_LABELS[resolution.outcome as keyof typeof RESOLUTION_OUTCOME_LABELS]}
+                </Badge>
+                <span className='text-xs text-muted-foreground'>
+                  bởi {getMemberName(members, resolution.resolved_by)}
+                  {' · '}
+                  {timezone
+                    ? format(toZonedTime(new Date(resolution.resolved_at), timezone), 'dd/MM/yyyy HH:mm', { locale: vi })
+                    : format(new Date(resolution.resolved_at), 'dd/MM/yyyy HH:mm', { locale: vi })}
+                </span>
+              </div>
+
+              {resolution.note && (
+                <div className='rounded-md bg-muted/50 border px-3 py-2'>
+                  <p className='text-xs font-medium text-muted-foreground mb-1'>Ghi chú kết quả:</p>
+                  <p className='text-sm whitespace-pre-wrap'>{resolution.note}</p>
+                </div>
+              )}
+
+              {/* Member view: cảnh báo nếu Upheld */}
+              {resolution.outcome === 'upheld' && !canCreateIncident && (
+                <p className='text-sm text-destructive'>
+                  ⚠️ Incident này đã xác nhận vi phạm và được tính vào hồ sơ của bạn.
+                </p>
+              )}
+            </div>
+          ) : (
+            // Chưa có resolution
+            canCreateIncident ? (
+              <div className='space-y-2'>
+                <p className='text-sm text-muted-foreground'>Incident chưa được xử lý chính thức.</p>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => setResolveDialogOpen(true)}
+                >
+                  Resolve Incident
+                </Button>
+              </div>
+            ) : (
+              <p className='text-sm text-muted-foreground'>Đang chờ Manager xử lý.</p>
+            )
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ResolveIncidentDialog — chỉ manager/owner */}
+      {canCreateIncident && incident && (
+        <ResolveIncidentDialog
+          open={resolveDialogOpen}
+          onOpenChange={setResolveDialogOpen}
+          incidentId={incidentId}
+          tenantId={activeTenantId}
+          memberId={incident.member_id}
+          resolvedBy={user!.id}
+        />
+      )}
     </PageContainer>
   )
 }

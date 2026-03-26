@@ -16,4 +16,5 @@ export const QUERY_KEYS = {
   teamAvgCommitment: 'team-avg-commitment', // Story 3.3: anonymous team average commitment rate
   selfStreak: 'self-streak',               // Story 8.12: consecutive report days streak
   incidentOutcomeNotes: 'incident-outcome-notes', // incident outcome notes
+  incidentResolutions: 'incident-resolutions',    // Story 9.3: incident lifecycle resolutions
 } as const

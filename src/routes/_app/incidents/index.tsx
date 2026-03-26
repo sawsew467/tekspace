@@ -11,6 +11,7 @@ import { getMembers } from '@/features/tenant/services/tenant.service'
 import { useInfiniteIncidents } from '@/features/incidents/hooks/use-infinite-incidents'
 import { useAppeals } from '@/features/incidents/hooks/use-appeals'
 import { useIncidentAppealsRealtime } from '@/features/incidents/hooks/use-incident-appeals-realtime'
+import { useResolutions } from '@/features/incidents/hooks/use-resolutions'
 import { usePermissions } from '@/hooks/use-permissions'
 import { IncidentList } from '@/features/incidents/components/IncidentList'
 import { IncidentFilters } from '@/features/incidents/components/IncidentFilters'
@@ -48,11 +49,12 @@ function IncidentsPage() {
   const { canCreateIncident } = usePermissions()
 
   // Filter state — chỉ active cho manager view
-  const [filterMemberId,     setFilterMemberId]     = useState('')
-  const [filterCategory,     setFilterCategory]     = useState('')
-  const [filterDateFrom,     setFilterDateFrom]     = useState('')
-  const [filterDateTo,       setFilterDateTo]       = useState('')
-  const [filterAppealStatus, setFilterAppealStatus] = useState('')
+  const [filterMemberId,          setFilterMemberId]          = useState('')
+  const [filterCategory,          setFilterCategory]          = useState('')
+  const [filterDateFrom,          setFilterDateFrom]          = useState('')
+  const [filterDateTo,            setFilterDateTo]            = useState('')
+  const [filterAppealStatus,      setFilterAppealStatus]      = useState('')
+  const [filterResolutionStatus,  setFilterResolutionStatus]  = useState('')
 
   // User profile để lấy timezone (pattern từ notifications.tsx)
   const { data: userProfile, isLoading: isProfileLoading } = useQuery({
@@ -85,6 +87,9 @@ function IncidentsPage() {
 
   // Appeals — RLS tự lọc: member chỉ thấy của mình, manager thấy tất cả
   const { data: appeals = [] } = useAppeals(activeTenantId)
+
+  // Resolutions — RLS tự lọc: member chỉ thấy của incidents của mình, manager thấy tất cả
+  const { data: resolutions = [] } = useResolutions(activeTenantId)
 
   // Realtime: khi member submit appeal → invalidate cache ngay, không cần F5
   useIncidentAppealsRealtime(activeTenantId)
@@ -125,9 +130,18 @@ function IncidentsPage() {
       }
       if (filterAppealStatus === 'appealed'     && !appeals.some((a) => a.incident_id === incident.id)) return false
       if (filterAppealStatus === 'not_appealed' &&  appeals.some((a) => a.incident_id === incident.id)) return false
+
+      // Resolution status filter
+      if (filterResolutionStatus) {
+        const res = resolutions.find((r) => r.incident_id === incident.id)
+        if (filterResolutionStatus === 'pending'   && res)                                   return false
+        if (filterResolutionStatus === 'dismissed' && (!res || res.outcome !== 'dismissed')) return false
+        if (filterResolutionStatus === 'upheld'    && (!res || res.outcome !== 'upheld'))    return false
+      }
+
       return true
     })
-  }, [allIncidents, appeals, filterMemberId, filterCategory, filterDateFrom, filterDateTo, filterAppealStatus, canCreateIncident, timezone])
+  }, [allIncidents, appeals, resolutions, filterMemberId, filterCategory, filterDateFrom, filterDateTo, filterAppealStatus, filterResolutionStatus, canCreateIncident, timezone])
 
   const handleResetFilters = () => {
     setFilterMemberId('')
@@ -135,6 +149,7 @@ function IncidentsPage() {
     setFilterDateFrom('')
     setFilterDateTo('')
     setFilterAppealStatus('')
+    setFilterResolutionStatus('')
   }
 
   return (
@@ -166,11 +181,13 @@ function IncidentsPage() {
           filterDateFrom={filterDateFrom}
           filterDateTo={filterDateTo}
           filterAppealStatus={filterAppealStatus}
+          filterResolutionStatus={filterResolutionStatus}
           onFilterMemberChange={setFilterMemberId}
           onFilterCategoryChange={setFilterCategory}
           onFilterDateFromChange={setFilterDateFrom}
           onFilterDateToChange={setFilterDateTo}
           onFilterAppealStatusChange={setFilterAppealStatus}
+          onFilterResolutionStatusChange={setFilterResolutionStatus}
           onReset={handleResetFilters}
         />
       )}
@@ -182,6 +199,7 @@ function IncidentsPage() {
         members={members}
         userTimezone={timezone}
         appeals={appeals}
+        resolutions={resolutions}
         canAppeal={!canCreateIncident}
         onAppeal={(incidentId) => setAppealIncidentId(incidentId)}
         onViewDetail={(incidentId) => navigate({ to: '/incidents/$incidentId', params: { incidentId } })}
