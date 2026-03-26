@@ -161,10 +161,10 @@ development_status:
 
   # ── Wave 1: Fully independent (spawn song song) ──
   9-1-login-redirect-fix: done            # sign-in.tsx + beforeLoad redirect param fix
-  9-4-mobile-ui-fixes: review             # stat card overflow + icon contrast mobile
+  9-4-mobile-ui-fixes: done               # stat card overflow + icon contrast mobile
   9-5-page-title-team-schedule: done        # browser tab title fix
   9-6-streak-display-fix: backlog          # useSelfStreak + computeStreak fix (no migration)
 
   # ── Wave 2: Sau Wave 1 (spawn song song) ──
   9-2-daily-report-four-sections: ready-for-dev      # migration + form + manager view
-  9-3-incident-lifecycle-dismiss-uphold: backlog  # incident_resolutions table + resolve UI
+  9-3-incident-lifecycle-dismiss-uphold: ready-for-dev  # incident_resolutions table + resolve UI
