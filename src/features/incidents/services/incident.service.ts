@@ -41,17 +41,19 @@ export const IncidentService = {
     // INSERT in-app notification cho member — qua Edge Function (service role bypass RLS)
     // notifications_insert_policy yêu cầu user_id = auth.uid() → client không thể INSERT cho người khác
     // Best-effort: nếu notification fail → bỏ qua, incident đã được tạo thành công
-    try {
-      await supabase.functions.invoke('notify-incident', {
+    // NOTE: functions.invoke() KHÔNG throw trên HTTP error — phải check { error } return value
+    {
+      const { error: notifError } = await supabase.functions.invoke('notify-incident', {
         body: {
           tenantId:   params.tenantId,
           memberId:   params.memberId,
           incidentId: incident.id,
         },
       })
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn('[createIncident] notification failed (best-effort):', err)
+      if (notifError) {
+        // eslint-disable-next-line no-console
+        console.warn('[createIncident] notification failed (best-effort):', notifError)
+      }
     }
 
     return incident
@@ -89,16 +91,18 @@ export const IncidentService = {
     // Notify managers qua Edge Function (service role bypass RLS)
     // Member không thể INSERT notification cho manager trực tiếp
     // Best-effort: appeal đã tạo thành công dù notification fail
-    try {
-      await supabase.functions.invoke('notify-appeal', {
+    // NOTE: functions.invoke() KHÔNG throw trên HTTP error — phải check { error } return value
+    {
+      const { error: notifError } = await supabase.functions.invoke('notify-appeal', {
         body: {
           incidentId: params.incidentId,
           tenantId:   params.tenantId,
         },
       })
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn('[createAppeal] notification failed (best-effort):', err)
+      if (notifError) {
+        // eslint-disable-next-line no-console
+        console.warn('[createAppeal] notification failed (best-effort):', notifError)
+      }
     }
 
     return appeal
@@ -141,17 +145,19 @@ export const IncidentService = {
     // Notify member qua Edge Function (service role bypass RLS)
     // notifications_insert_policy: user_id = auth.uid() → manager không thể INSERT cho member trực tiếp
     // Best-effort: outcome note đã tạo thành công dù notification fail
-    try {
-      await supabase.functions.invoke('notify-outcome-note', {
+    // NOTE: functions.invoke() KHÔNG throw trên HTTP error — phải check { error } return value
+    {
+      const { error: notifError } = await supabase.functions.invoke('notify-outcome-note', {
         body: {
           incidentId: params.incidentId,
           memberId:   params.memberId,
           tenantId:   params.tenantId,
         },
       })
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn('[createOutcomeNote] notification failed (best-effort):', err)
+      if (notifError) {
+        // eslint-disable-next-line no-console
+        console.warn('[createOutcomeNote] notification failed (best-effort):', notifError)
+      }
     }
 
     return outcomeNote
@@ -206,8 +212,9 @@ export const IncidentService = {
 
     // Notify member qua Edge Function — best-effort (service role bypass RLS)
     // Member không thể nhận notification INSERT trực tiếp từ manager
-    try {
-      await supabase.functions.invoke('notify-resolution', {
+    // NOTE: functions.invoke() KHÔNG throw trên HTTP error — phải check { error } return value
+    {
+      const { error: notifError } = await supabase.functions.invoke('notify-resolution', {
         body: {
           tenantId:   params.tenantId,
           memberId:   params.memberId,
@@ -215,9 +222,10 @@ export const IncidentService = {
           outcome:    params.outcome,
         },
       })
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn('[createResolution] notification failed (best-effort):', err)
+      if (notifError) {
+        // eslint-disable-next-line no-console
+        console.warn('[createResolution] notification failed (best-effort):', notifError)
+      }
     }
 
     return resolution
