@@ -159,7 +159,8 @@ export function SelfAnalyticsHistory() {
   const effectiveCommittedHours = myMember?.committed_hours ?? defaultCommittedHours
 
   // ── Chart data ────────────────────────────────────────────────────────────
-  const chartData = viewMode === 'week'
+  type ChartDataPoint = { weekLabel?: string; monthLabel?: string; actual: number; committed: number }
+  const chartData: ChartDataPoint[] = viewMode === 'week'
     ? buildWeeklyChartData(weeklyHours, startDate, endDate, committedHistory, effectiveCommittedHours)
     : buildMonthlyChartData(weeklyHours, startDate, endDate, effectiveCommittedHours)
 

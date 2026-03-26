@@ -17,13 +17,15 @@ export const CATEGORY_BADGE_VARIANT: Record<IncidentCategory, 'destructive' | 's
   low_commitment:   'outline',
 }
 
+const INCIDENT_CATEGORIES = ['late_schedule', 'missed_report', 'low_commitment', 'policy_violation'] as const
+
 export const createIncidentSchema = z.object({
   memberId: z.string().uuid('Vui lòng chọn thành viên'),
   category: z.enum(
-    ['late_schedule', 'missed_report', 'low_commitment', 'policy_violation'] as const,
+    INCIDENT_CATEGORIES,
     {
-      // errorMap phủ tất cả lỗi (required, invalid_type, invalid_enum_value)
-      errorMap: () => ({ message: 'Vui lòng chọn loại incident' }),
+      // message phủ tất cả lỗi (required, invalid_type, invalid_enum_value)
+      message: 'Vui lòng chọn loại incident',
     }
   ),
   note: z

@@ -31,7 +31,7 @@ import { Input } from '@/components/ui/input'
 // .refine(v => v === null || isFinite(v)) loại NaN và Infinity trước khi đến .int().
 const committedHoursSchema = z.object({
   committedHours: z
-    .number({ invalid_type_error: 'Vui lòng nhập số' })
+    .number({ message: 'Vui lòng nhập số' })
     .refine((v) => isFinite(v), { message: 'Vui lòng nhập số hợp lệ' })
     .int('Phải là số nguyên')
     .min(1, 'Tối thiểu 1 giờ')

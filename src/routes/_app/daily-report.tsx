@@ -142,7 +142,7 @@ function DailyReportPage() {
       description: t.description,
       output_type: t.output_type as DailyReportFormValues['tasks'][number]['output_type'],
       output_link: t.output_link ?? '',
-      hours: t.hours,  // Story 4.5 per-task hours (optional, backward compat)
+      hours: t.hours ?? 0,  // Story 4.5 per-task hours (fallback 0 cho old reports)
     }))
     return { tasks, hours_logged: todayReport.hours_logged }
   }, [todayReport])

@@ -43,7 +43,7 @@ export const AnalyticsService = {
     // Client-side aggregation: group by user_id
     const map = new Map<string, number>()
     for (const row of data ?? []) {
-      const h = parseFloat(row.hours_logged)
+      const h = Number(row.hours_logged)
       if (!isFinite(h)) continue // bỏ qua null / NaN silently
       const prev = map.get(row.user_id) ?? 0
       map.set(row.user_id, prev + h)
@@ -76,7 +76,7 @@ export const AnalyticsService = {
 
     if (error) throw error
     return (data ?? []).flatMap(r => {
-      const h = parseFloat(r.hours_logged)
+      const h = Number(r.hours_logged)
       if (!isFinite(h)) return [] // bỏ qua null / NaN
       return [{ report_date: r.report_date, hours_logged: h }]
     })
