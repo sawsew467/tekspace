@@ -30,7 +30,7 @@ export const Route = createFileRoute('/_app')({
       if (userError.status === 401 || isNoSession) {
         throw redirect({
           to: ROUTES.signIn,
-          search: { redirect: location.pathname + location.search },
+          search: { redirect: location.pathname + location.searchStr },
         })
       }
       throw userError
@@ -39,7 +39,7 @@ export const Route = createFileRoute('/_app')({
     if (!user) {
       throw redirect({
         to: ROUTES.signIn,
-        search: { redirect: location.pathname + location.search },
+        search: { redirect: location.pathname + location.searchStr },
       })
     }
 
@@ -52,7 +52,7 @@ export const Route = createFileRoute('/_app')({
     if (!session) {
       throw redirect({
         to: ROUTES.signIn,
-        search: { redirect: location.pathname + location.search },
+        search: { redirect: location.pathname + location.searchStr },
       })
     }
 
