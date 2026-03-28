@@ -272,13 +272,14 @@ describe('OUTPUT_TYPE_PLACEHOLDERS', () => {
 
 // ── hasDiscrepancy ────────────────────────────────────────────────────────────
 
-const taskNoLink: TaskItem = { description: 'Fix bug', output_type: 'pr', output_link: '' }
+const taskNoLink: TaskItem = { task_type: 'completed', description: 'Fix bug', output_type: 'pr', output_link: '' }
 const taskWithLink: TaskItem = {
+  task_type: 'completed',
   description: 'Fix bug',
   output_type: 'pr',
   output_link: 'https://github.com/org/repo/pull/1',
 }
-const taskNoLinkField: TaskItem = { description: 'Fix bug', output_type: 'pr' }
+const taskNoLinkField: TaskItem = { task_type: 'completed', description: 'Fix bug', output_type: 'pr' }
 
 describe('hasDiscrepancy', () => {
   it('returns true: hours > 4, 1 task, no output_link', () => {
@@ -315,6 +316,7 @@ describe('hasDiscrepancy', () => {
 
   it('returns true: output_link is whitespace — trim() nên không tính là có link', () => {
     const taskWhitespaceLink: TaskItem = {
+      task_type: 'completed',
       description: 'task',
       output_type: 'other',
       output_link: '   ',
@@ -334,34 +336,34 @@ describe('hasDiscrepancy', () => {
 
   // ── Per-task hours path (Story 4.5) ──────────────────────────────────────
   it('per-task hours: all tasks have hours:2.5, sum=2.5, 1 task no link → false (allHasTaskHours bypasses flag)', () => {
-    const task: TaskItem = { description: 'Task', output_type: 'other', output_link: '', hours: 2.5 }
+    const task: TaskItem = { task_type: 'completed', description: 'Task', output_type: 'other', output_link: '', hours: 2.5 }
     expect(hasDiscrepancy(0, [task])).toBe(false)
   })
 
   it('per-task hours: 1 task hours:5, sum=5 > 4, no link → false (allHasTaskHours → no flag)', () => {
-    const task: TaskItem = { description: 'Task', output_type: 'other', output_link: '', hours: 5 }
+    const task: TaskItem = { task_type: 'completed', description: 'Task', output_type: 'other', output_link: '', hours: 5 }
     expect(hasDiscrepancy(0, [task])).toBe(false)
   })
 
   it('per-task hours: all tasks hours:2, sum=4, 1 task no link → false (allHasTaskHours → no flag)', () => {
-    const task: TaskItem = { description: 'Task', output_type: 'other', output_link: '', hours: 2 }
+    const task: TaskItem = { task_type: 'completed', description: 'Task', output_type: 'other', output_link: '', hours: 2 }
     expect(hasDiscrepancy(0, [task])).toBe(false)
   })
 
   it('per-task hours: all tasks hours:3, sum=6, task has output_link → false', () => {
-    const task: TaskItem = { description: 'Task', output_type: 'pr', output_link: 'https://github.com/org/repo/pull/1', hours: 3 }
+    const task: TaskItem = { task_type: 'completed', description: 'Task', output_type: 'pr', output_link: 'https://github.com/org/repo/pull/1', hours: 3 }
     expect(hasDiscrepancy(0, [task])).toBe(false)
   })
 
   it('per-task hours: 1 of 2 tasks has hours → not allHasTaskHours → fallback to hoursLogged', () => {
-    const taskWithHours: TaskItem = { description: 'Task A', output_type: 'other', output_link: '', hours: 5 }
-    const taskNoHours: TaskItem = { description: 'Task B', output_type: 'other', output_link: '' }
+    const taskWithHours: TaskItem = { task_type: 'completed', description: 'Task A', output_type: 'other', output_link: '', hours: 5 }
+    const taskNoHours: TaskItem = { task_type: 'completed', description: 'Task B', output_type: 'other', output_link: '' }
     // Not allHasTaskHours → use hoursLogged=8, 2 tasks (length > 1) → false
     expect(hasDiscrepancy(8, [taskWithHours, taskNoHours])).toBe(false)
   })
 
   it('per-task hours fallback: only 1 task no hours, hoursLogged=5, no link → true', () => {
-    const task: TaskItem = { description: 'Task', output_type: 'other', output_link: '' }
+    const task: TaskItem = { task_type: 'completed', description: 'Task', output_type: 'other', output_link: '' }
     // task.hours = undefined → not allHasTaskHours → fallback to hoursLogged=5
     expect(hasDiscrepancy(5, [task])).toBe(true)
   })

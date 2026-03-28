@@ -269,9 +269,9 @@ type Props = {
 
 export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabel, onCancel }: Props) {
   const form = useForm<DailyReportFormValues>({
-    resolver: zodResolver(dailyReportFormSchema),
+    resolver: zodResolver(dailyReportFormSchema) as any,
     defaultValues: defaultValues ?? {
-      tasks: [{ description: '', output_type: 'other', output_link: '', hours: undefined }],
+      tasks: [{ task_type: 'completed' as const, description: '', output_type: 'other', output_link: '', hours: undefined }],
       in_progress_tasks: [],
       plan_for_tomorrow: '',
       blockers: '',
@@ -343,6 +343,7 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
               variant='outline'
               size='sm'
               onClick={() => appendCompleted({
+                task_type: 'completed',
                 project_tag: '',
                 description: '',
                 output_type: 'other',
@@ -381,7 +382,7 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
               type='button'
               variant='outline'
               size='sm'
-              onClick={() => appendInProgress({ task_type: 'in_progress', project_tag: '', description: '' })}
+              onClick={() => appendInProgress({ task_type: 'in_progress', project_tag: '', description: '', hours: undefined as unknown as number })}
               className='w-full border-dashed'
             >
               <Plus className='mr-2 h-4 w-4' />
@@ -416,6 +417,7 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
                     variant='outline'
                     className='border-yellow-300 bg-white text-yellow-800 hover:bg-yellow-50'
                     onClick={() => appendCompleted({
+                      task_type: 'completed',
                       project_tag: '',
                       description: '',
                       output_type: 'other',

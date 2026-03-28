@@ -86,7 +86,7 @@ export const DailyReportService = {
       .maybeSingle()
     if (error) throw error
     if (!data) return null
-    return sortTasks(data as DailyReportWithTasks)
+    return sortTasks(data as unknown as unknown as DailyReportWithTasks)
   },
 
   /**
@@ -154,7 +154,7 @@ export const DailyReportService = {
       .eq('id', report.id)
       .single()
     if (fetchError) throw fetchError
-    return sortTasks(fullReport as DailyReportWithTasks)
+    return sortTasks(fullReport as unknown as DailyReportWithTasks)
   },
 
   /**
@@ -173,7 +173,7 @@ export const DailyReportService = {
       .order('report_date', { ascending: false })
       .limit(365)
     if (error) throw error
-    return ((data ?? []) as DailyReportWithTasks[]).map(sortTasks)
+    return ((data ?? []) as unknown as DailyReportWithTasks[]).map(sortTasks)
   },
 
   /**
@@ -247,7 +247,7 @@ export const DailyReportService = {
       .eq('id', reportId)
       .single()
     if (fetchError) throw fetchError
-    return sortTasks(fullReport as DailyReportWithTasks)
+    return sortTasks(fullReport as unknown as DailyReportWithTasks)
   },
 
   /**
@@ -304,9 +304,9 @@ export const DailyReportService = {
       .eq('report_date', reportDate)
       .order('submitted_at', { ascending: false })
     if (error) throw error
-    return ((data ?? []) as TeamReportRow[])
+    return ((data ?? []) as unknown as TeamReportRow[])
       .filter(r => r.users != null)
-      .map(r => ({ ...sortTasks(r as DailyReportWithTasks), users: r.users }) as TeamReportRow)
+      .map(r => ({ ...sortTasks(r as unknown as DailyReportWithTasks), users: r.users }) as TeamReportRow)
   },
 
   /**
@@ -326,6 +326,6 @@ export const DailyReportService = {
       .order('report_date', { ascending: false })
       .range(from, to)
     if (error) throw error
-    return ((data ?? []) as DailyReportWithTasks[]).map(sortTasks)
+    return ((data ?? []) as unknown as DailyReportWithTasks[]).map(sortTasks)
   },
 }

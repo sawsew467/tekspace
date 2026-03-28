@@ -183,7 +183,7 @@ const DayColumn = memo(function DayColumn({
         {/* Slot blocks */}
         {slots.map((slot) => {
           const pos = slotToPosition(slot, userTimezone)
-          const editMode = getSlotEditMode(slot.slot_date, userTimezone)
+          const editMode = getSlotEditMode(slot.slot_date, slot.start_time, userTimezone)
           const isDeleting = isDeletingSlotId === slot.id
           const canEdit = editMode !== 'locked'
           return (
@@ -323,7 +323,7 @@ export function TimeGrid({
     const locked: Record<string, boolean> = {}
     for (const { date } of weekDays) {
       byDate[date] = slots.filter((s) => s.slot_date === date)
-      locked[date] = getSlotEditMode(date, userTimezone) === 'locked'
+      locked[date] = getSlotEditMode(date, undefined, userTimezone) === 'locked'
     }
     return { slotsByDate: byDate, isLockedByDate: locked }
   }, [slots, weekDays, userTimezone])

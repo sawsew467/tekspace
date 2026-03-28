@@ -140,6 +140,7 @@ function DailyReportPage() {
     const tasks = sortedTasks
       .filter(t => t.task_type !== 'in_progress')
       .map(t => ({
+        task_type: 'completed' as const,
         project_tag: t.project_tag ?? '',
         description: t.description,
         output_type: (t.output_type ?? 'other') as DailyReportFormValues['tasks'][number]['output_type'],
@@ -154,11 +155,11 @@ function DailyReportPage() {
         task_type: 'in_progress' as const,
         project_tag: t.project_tag ?? '',
         description: t.description,
-        hours: t.hours ?? undefined as unknown as number,
+        hours: t.hours ?? 0,
       }))
 
     return {
-      tasks: tasks.length > 0 ? tasks : [{ project_tag: '', description: '', output_type: 'other', output_link: '', hours: undefined as unknown as number }],
+      tasks: tasks.length > 0 ? tasks : [{ task_type: 'completed' as const, project_tag: '', description: '', output_type: 'other', output_link: '', hours: 0 }],
       in_progress_tasks,
       plan_for_tomorrow: todayReport.plan_for_tomorrow ?? '',
       blockers: todayReport.blockers ?? '',

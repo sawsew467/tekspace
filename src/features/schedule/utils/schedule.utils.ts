@@ -24,7 +24,7 @@ export type SlotEditMode = 'locked' | 'started' | 'reason-required' | 'free'
  */
 export function getSlotEditMode(
   slotDate: string,
-  startTime: string,
+  startTime: string | undefined,
   userTimezone: string,
 ): SlotEditMode {
   const now = new Date()
