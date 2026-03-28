@@ -46,3 +46,4 @@ playwright-report/
 SECURITY_AUDIT_REPORT.md
 debug-*.png
 supabase/rls_manual_check.sql
+.vercel

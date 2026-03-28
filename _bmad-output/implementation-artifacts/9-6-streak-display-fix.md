@@ -4,7 +4,7 @@
 **Story Key:** 9-6-streak-display-fix
 **Epic:** 9 — Product Quality & Feature Completion
 **Wave:** Wave 1 (bổ sung) — song song với 9-1/9-4/9-5 — **KHÔNG chạy song song với 9-2** (cùng touch `daily-report.schema.ts`)
-**Status:** review
+**Status:** done
 **Created:** 2026-03-26
 
 ---

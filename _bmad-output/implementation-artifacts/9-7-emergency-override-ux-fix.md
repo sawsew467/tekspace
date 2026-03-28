@@ -4,7 +4,7 @@
 **Story Key:** 9-7-emergency-override-ux-fix
 **Epic:** 9 — Product Quality & Feature Completion
 **Wave:** Wave 1 (bổ sung) — song song với 9-6 — **KHÔNG conflict với bất kỳ story nào khác**
-**Status:** review
+**Status:** done
 **Created:** 2026-03-26
 
 ---
