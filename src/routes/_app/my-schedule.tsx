@@ -42,8 +42,19 @@ export const Route = createFileRoute('/_app/my-schedule')({
   component: SchedulePage,
 })
 
+const SESSION_KEY = 'teksiyam_last_week'
+
 function getCurrentWeekOf(): string {
   return format(startOfISOWeek(new Date()), 'yyyy-MM-dd')
+}
+
+function getInitialWeekOf(): string {
+  // Ưu tiên sessionStorage để giữ lại week đã chọn khi switch tab
+  if (typeof window !== 'undefined') {
+    const saved = sessionStorage.getItem(SESSION_KEY)
+    if (saved) return saved
+  }
+  return getCurrentWeekOf()
 }
 
 function SchedulePage() {
@@ -51,17 +62,33 @@ function SchedulePage() {
   const { activeTenantId } = useTenantStore()
   const isMobile = useIsMobile()
 
-  // currentWeekOf: tuần đang xem (navigable, mặc định là tuần hiện tại)
-  // Focus listener: cập nhật về tuần thực khi tuần mới bắt đầu trong lúc app nền
-  const [currentWeekOf, setCurrentWeekOf] = useState(getCurrentWeekOf)
+  // currentWeekOf: tuần đang xem (navigable, mặc định = saved week hoặc tuần hiện tại)
+  const [currentWeekOf, setCurrentWeekOf] = useState(getInitialWeekOf)
+
+  // Persist vào sessionStorage mỗi khi user navigate
   useEffect(() => {
+    sessionStorage.setItem(SESSION_KEY, currentWeekOf)
+  }, [currentWeekOf])
+
+  // Focus listener: chỉ auto-reset về tuần hiện tại KHI user đang xem đúng tuần đó
+  // → handle crossing midnight (tuần mới bắt đầu trong lúc app nền)
+  // → KHÔNG reset khi user đã navigate sang tuần khác
+  useEffect(() => {
+    const todayWeekOf = getCurrentWeekOf()
     const checkWeekChange = () => {
-      const newWeek = getCurrentWeekOf()
-      setCurrentWeekOf((prev) => (prev !== newWeek ? newWeek : prev))
+      const newToday = getCurrentWeekOf()
+      if (newToday !== todayWeekOf) {
+        // Tuần thực đã thay đổi (crossed midnight / new week started)
+        if (currentWeekOf === todayWeekOf) {
+          // User đang xem tuần cũ → advance lên tuần mới
+          setCurrentWeekOf(newToday)
+        }
+        // User đang xem tuần khác → không làm gì, giữ nguyên lựa chọn
+      }
     }
     window.addEventListener('focus', checkWeekChange)
     return () => window.removeEventListener('focus', checkWeekChange)
-  }, [])
+  }, [currentWeekOf])
 
   // todayWeekOf: tuần thực tế hôm nay — dùng để hiện nút "Về tuần này"
   const todayWeekOf = format(startOfISOWeek(new Date()), 'yyyy-MM-dd')
