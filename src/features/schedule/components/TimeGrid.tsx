@@ -153,7 +153,7 @@ const DayColumn = memo(function DayColumn({
         {HOURS.map((h) => (
           <div
             key={h}
-            className="absolute left-0 right-0 border-t border-border/30"
+            className="absolute left-0 right-0 border-t border-border/60"
             style={{ top: h * 60 }}
           />
         ))}
@@ -162,7 +162,7 @@ const DayColumn = memo(function DayColumn({
         {HOURS.map((h) => (
           <div
             key={`half-${h}`}
-            className="absolute left-0 right-0 border-t border-border/10"
+            className="absolute left-0 right-0 border-t border-border/30"
             style={{ top: h * 60 + 30 }}
           />
         ))}
