@@ -20,6 +20,8 @@ interface RoleActionDropdownProps {
   currentRole: 'owner' | 'manager' | 'member'
   /** User ID of the current session — để ẩn actions cho chính mình */
   currentUserId: string
+  /** Chỉ Owner/Manager mới thấy dropdown này (truyền từ MemberList) */
+  canManage: boolean
 }
 
 export function RoleActionDropdown({
@@ -27,6 +29,7 @@ export function RoleActionDropdown({
   memberName,
   currentRole,
   currentUserId,
+  canManage,
 }: RoleActionDropdownProps) {
   const [removeOpen, setRemoveOpen] = useState(false)
   const [promoteOpen, setPromoteOpen] = useState(false)
@@ -38,10 +41,11 @@ export function RoleActionDropdown({
   // Không hiện dropdown cho chính mình
   if (userId === currentUserId) return null
 
+  const hasRemoveAction = canManage && currentRole !== 'owner'
   const hasPromoteActions = canPromoteMembers && currentRole === 'member'
   const hasDemoteAction = canPromoteMembers && currentRole === 'manager'
   const hasTransferAction = canPromoteMembers && currentRole !== 'owner'
-  const hasSeparator = hasPromoteActions || hasDemoteAction || hasTransferAction
+  const hasSeparator = hasPromoteActions || hasDemoteAction || hasTransferAction || hasRemoveAction
 
   return (
     <>
@@ -72,13 +76,15 @@ export function RoleActionDropdown({
             </DropdownMenuItem>
           )}
           {hasSeparator && <DropdownMenuSeparator />}
-          {/* "Xóa khỏi team" — Owner và Manager có thể xóa — AC#1 */}
-          <DropdownMenuItem
-            onClick={() => setRemoveOpen(true)}
-            className='text-destructive focus:text-destructive'
-          >
-            Xóa khỏi team
-          </DropdownMenuItem>
+          {/* "Xóa khỏi team" — Owner và Manager có thể xóa, nhưng không xóa được owner */}
+          {hasRemoveAction && (
+            <DropdownMenuItem
+              onClick={() => setRemoveOpen(true)}
+              className='text-destructive focus:text-destructive'
+            >
+              Xóa khỏi team
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

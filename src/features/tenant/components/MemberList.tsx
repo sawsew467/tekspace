@@ -115,6 +115,7 @@ export function MemberList({ canManage, currentUserId, defaultCommittedHours }: 
                       memberName={member.users.full_name}
                       currentRole={member.role}
                       currentUserId={currentUserId}
+                      canManage={canManage}
                     />
                   )}
                 </div>

@@ -81,7 +81,7 @@ export const sidebarData: SidebarData = {
           title: 'Thành viên',
           url: ROUTES.app.team.members,
           icon: Users,
-          roles: ['owner', 'manager'],
+          // roles: all roles — member được xem danh sách read-only
         },
         {
           title: 'Lời mời',
