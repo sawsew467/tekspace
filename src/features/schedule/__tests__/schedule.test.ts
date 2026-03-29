@@ -11,19 +11,27 @@ describe('slotFormSchema', () => {
       slotDate: '2026-03-23',
       startTime: '09:00',
       endTime: '17:00',
-      isOvernight: false,
     })
     expect(result.success).toBe(true)
   })
 
-  it('rejects duration < 30 min (09:00–09:00 same time)', () => {
+  it('rejects endTime <= startTime (09:00–09:00 same time)', () => {
     const result = slotFormSchema.safeParse({
       slotDate: '2026-03-23',
       startTime: '09:00',
       endTime: '09:00',
-      isOvernight: false,
     })
     expect(result.success).toBe(false)
+  })
+
+  it('rejects endTime < startTime (22:00–02:00 overnight)', () => {
+    const result = slotFormSchema.safeParse({
+      slotDate: '2026-03-23',
+      startTime: '22:00',
+      endTime: '02:00',
+    })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('Giờ kết thúc phải lớn hơn giờ bắt đầu. Hoặc chọn ngày tiếp theo.')
   })
 
   it('rejects duration > 720 min (00:00–12:30 = 750 min)', () => {
@@ -31,19 +39,8 @@ describe('slotFormSchema', () => {
       slotDate: '2026-03-23',
       startTime: '00:00',
       endTime: '12:30',
-      isOvernight: false,
     })
     expect(result.success).toBe(false)
-  })
-
-  it('valid overnight slot (22:00–02:00 = 240 min) passes', () => {
-    const result = slotFormSchema.safeParse({
-      slotDate: '2026-03-23',
-      startTime: '22:00',
-      endTime: '02:00',
-      isOvernight: true,
-    })
-    expect(result.success).toBe(true)
   })
 
   it('rejects non-30min startTime (09:15)', () => {
@@ -51,7 +48,6 @@ describe('slotFormSchema', () => {
       slotDate: '2026-03-23',
       startTime: '09:15',
       endTime: '10:00',
-      isOvernight: false,
     })
     expect(result.success).toBe(false)
   })
@@ -61,7 +57,6 @@ describe('slotFormSchema', () => {
       slotDate: '2026-03-23',
       startTime: '09:00',
       endTime: '09:30',
-      isOvernight: false,
     })
     expect(result.success).toBe(true)
   })
@@ -71,7 +66,33 @@ describe('slotFormSchema', () => {
       slotDate: '2026-03-23',
       startTime: '00:00',
       endTime: '12:00',
-      isOvernight: false,
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts 22:00–24:00 = 120 min (late shift ending at midnight)', () => {
+    const result = slotFormSchema.safeParse({
+      slotDate: '2026-03-23',
+      startTime: '22:00',
+      endTime: '24:00',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts 23:30–24:00 = 30 min', () => {
+    const result = slotFormSchema.safeParse({
+      slotDate: '2026-03-23',
+      startTime: '23:30',
+      endTime: '24:00',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts 23:00–24:00 = 60 min', () => {
+    const result = slotFormSchema.safeParse({
+      slotDate: '2026-03-23',
+      startTime: '23:00',
+      endTime: '24:00',
     })
     expect(result.success).toBe(true)
   })
@@ -81,28 +102,23 @@ describe('slotFormSchema', () => {
 
 describe('calcDurationMinutes', () => {
   it('09:00–17:00 = 480 min', () => {
-    expect(
-      calcDurationMinutes({ slotDate: '2026-03-23', startTime: '09:00', endTime: '17:00', isOvernight: false })
-    ).toBe(480)
-  })
-
-  it('overnight 22:00–02:00 = 240 min', () => {
-    expect(
-      calcDurationMinutes({ slotDate: '2026-03-23', startTime: '22:00', endTime: '02:00', isOvernight: true })
-    ).toBe(240)
-  })
-
-  it('auto-detect overnight when end <= start without isOvernight flag', () => {
-    // endTime < startTime → treated as overnight
-    expect(
-      calcDurationMinutes({ slotDate: '2026-03-23', startTime: '23:00', endTime: '01:00', isOvernight: false })
-    ).toBe(120)
+    expect(calcDurationMinutes({ startTime: '09:00', endTime: '17:00' })).toBe(480)
   })
 
   it('09:00–09:30 = 30 min (minimum)', () => {
-    expect(
-      calcDurationMinutes({ slotDate: '2026-03-23', startTime: '09:00', endTime: '09:30', isOvernight: false })
-    ).toBe(30)
+    expect(calcDurationMinutes({ startTime: '09:00', endTime: '09:30' })).toBe(30)
+  })
+
+  it('22:00–24:00 = 120 min (late shift ending at midnight)', () => {
+    expect(calcDurationMinutes({ startTime: '22:00', endTime: '24:00' })).toBe(120)
+  })
+
+  it('23:30–24:00 = 30 min', () => {
+    expect(calcDurationMinutes({ startTime: '23:30', endTime: '24:00' })).toBe(30)
+  })
+
+  it('00:00–12:00 = 720 min (maximum)', () => {
+    expect(calcDurationMinutes({ startTime: '00:00', endTime: '12:00' })).toBe(720)
   })
 })
 

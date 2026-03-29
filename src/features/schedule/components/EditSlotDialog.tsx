@@ -37,7 +37,7 @@ import {
 import { hasOverlapWithExisting } from '../utils/schedule.utils'
 import { convertSlotToUTC, type ScheduleSlot } from '../services/schedule.service'
 
-// ── Time options (00:00–23:30, bước 30 phút) — giống SlotForm ────────────────
+// ── Time options (00:00–23:30 + 24:00, bước 30 phút) — giống SlotForm ──────
 
 const TIME_OPTIONS: string[] = []
 for (let h = 0; h < 24; h++) {
@@ -45,8 +45,19 @@ for (let h = 0; h < 24; h++) {
     TIME_OPTIONS.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
   }
 }
+// Thêm 24:00 làm end time hợp lệ (AC2)
+if (!TIME_OPTIONS.includes('24:00')) {
+  TIME_OPTIONS.push('24:00')
+}
 
 // ── Zod schema ────────────────────────────────────────────────────────────────
+
+/** Parse endTime string → minutes-in-day. "24:00" → 1440, otherwise HH:MM → h*60+m */
+function parseEndMins(endTime: string): number {
+  if (endTime === '24:00') return 24 * 60
+  const [h, m] = endTime.split(':').map(Number)
+  return h * 60 + m
+}
 
 const editSlotDialogSchema = z
   .object({
@@ -62,25 +73,25 @@ const editSlotDialogSchema = z
       .string()
       .regex(/^\d{2}:\d{2}$/, 'Giờ kết thúc không hợp lệ')
       .refine(
-        (t) => { const [, mm] = t.split(':').map(Number); return mm === 0 || mm === 30 },
+        (t) => {
+          if (t === '24:00') return true
+          const [, mm] = t.split(':').map(Number)
+          return mm === 0 || mm === 30
+        },
         { message: 'Giờ kết thúc phải là bội số 30 phút' }
       ),
-    isOvernight: z.boolean(),
     reason: z.string(),  // validation tùy theo requireReason prop (xử lý ở handleSubmit)
   })
   .refine(
     (data) => {
       const [sh, sm] = data.startTime.split(':').map(Number)
-      const [eh, em] = data.endTime.split(':').map(Number)
       const startMins = sh * 60 + sm
-      const endMins = eh * 60 + em
-      const durationMins =
-        data.isOvernight || endMins <= startMins
-          ? 24 * 60 - startMins + endMins
-          : endMins - startMins
+      const endMins = parseEndMins(data.endTime)
+      if (endMins <= startMins) return false
+      const durationMins = endMins - startMins
       return durationMins >= 30 && durationMins <= 720
     },
-    { message: 'Thời lượng slot phải từ 30 phút đến 12 giờ', path: ['endTime'] }
+    { message: 'Giờ kết thúc phải lớn hơn giờ bắt đầu. Hoặc chọn ngày tiếp theo.', path: ['endTime'] }
   )
 
 type EditSlotFormValues = z.infer<typeof editSlotDialogSchema>
@@ -121,13 +132,10 @@ function getDefaultValues(slot: ScheduleSlot, userTimezone: string): EditSlotFor
   const endInUserTz = toZonedTime(new Date(endMs), userTimezone)
   const defaultEndTime = formatTz(endInUserTz, 'HH:mm', { timeZone: userTimezone })
 
-  const isOvernight = defaultEndTime <= defaultStartTime
-
   return {
     slotDate: slot.slot_date,
     startTime: defaultStartTime,
     endTime: defaultEndTime,
-    isOvernight,
     reason: '',
   }
 }
@@ -140,7 +148,7 @@ function getDefaultValues(slot: ScheduleSlot, userTimezone: string): EditSlotFor
  * Features:
  * - Pre-fill thời gian từ slot hiện tại (convert UTC → user timezone)
  * - Chọn ngày/giờ bắt đầu/kết thúc (giống SlotForm)
- * - Overnight support
+ * - Validation: endTime phải > startTime, duration 30–720 phút
  * - Client-side overlap check (exclude slot đang edit)
  * - Lý do thay đổi bắt buộc (textarea)
  * - Emergency mode: hiển thị warning banner khi slot đã bị lock
@@ -179,13 +187,13 @@ export function EditSlotDialog({
   }, [slot.id])
 
   const watchedValues = form.watch()
-  const { startTime, endTime, isOvernight } = watchedValues
+  const { startTime, endTime } = watchedValues
 
   // Duration preview
   const durationPreview = (() => {
     if (!startTime || !endTime) return null
     try {
-      const mins = calcDurationMinutes({ ...watchedValues, isOvernight: isOvernight ?? false })
+      const mins = calcDurationMinutes({ startTime, endTime })
       if (mins < 30 || mins > 720) return null
       return formatDuration(mins)
     } catch {
@@ -193,11 +201,8 @@ export function EditSlotDialog({
     }
   })()
 
-  // End time options — giống SlotForm
-  const endTimeOptions = TIME_OPTIONS.filter((t) => {
-    if (isOvernight) return true
-    return t > startTime
-  })
+  // End time options: luôn là t > startTime (AC4)
+  const endTimeOptions = TIME_OPTIONS.filter((t) => t > startTime)
 
   function handleSubmit(values: EditSlotFormValues) {
     // Validate slotDate nằm trong tuần hiện tại
@@ -215,12 +220,9 @@ export function EditSlotDialog({
       return
     }
 
-    const overnight = values.isOvernight || values.endTime <= values.startTime
-    const finalValues = { ...values, isOvernight: overnight }
-
     // Client-side overlap check — exclude slot đang được edit
     const { startTimeUTC, durationMinutes } = convertSlotToUTC(
-      finalValues,
+      values,
       userTimezone,
       tenantTimezone
     )
@@ -242,14 +244,6 @@ export function EditSlotDialog({
       form.reset(getDefaultValues(slot, userTimezone))
     }
     onOpenChange(open)
-  }
-
-  function cancelOvernight() {
-    const currentStart = form.getValues('startTime')
-    const nextTime = TIME_OPTIONS.find((t) => t > currentStart)
-    if (!nextTime) return  // startTime=23:30: không có slot tiếp theo — nút đã bị disabled
-    form.setValue('isOvernight', false)
-    form.setValue('endTime', nextTime)
   }
 
   return (
@@ -314,11 +308,9 @@ export function EditSlotDialog({
                     <Select
                       onValueChange={(val) => {
                         field.onChange(val)
-                        if (!isOvernight && endTime <= val) {
-                          const nextTime =
-                            TIME_OPTIONS.find((t) => t > val) ?? '23:30'
+                        if (endTime <= val) {
+                          const nextTime = TIME_OPTIONS.find((t) => t > val) ?? '24:00'
                           form.setValue('endTime', nextTime)
-                          form.setValue('isOvernight', false)
                         }
                       }}
                       value={field.value}
@@ -351,7 +343,6 @@ export function EditSlotDialog({
                     <Select
                       onValueChange={(val) => {
                         field.onChange(val)
-                        form.setValue('isOvernight', val <= form.getValues('startTime'))
                       }}
                       value={field.value}
                     >
@@ -366,17 +357,6 @@ export function EditSlotDialog({
                             {t}
                           </SelectItem>
                         ))}
-                        {!isOvernight && (
-                          <SelectItem value="__overnight_separator__" disabled>
-                            ── Ngày hôm sau ──
-                          </SelectItem>
-                        )}
-                        {!isOvernight &&
-                          TIME_OPTIONS.filter((t) => t <= startTime).map((t) => (
-                            <SelectItem key={`overnight-${t}`} value={t}>
-                              {t} (hôm sau)
-                            </SelectItem>
-                          ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -385,28 +365,12 @@ export function EditSlotDialog({
               />
             </div>
 
-            {/* Duration preview + overnight */}
+            {/* Duration preview */}
             {durationPreview && (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Thời lượng:{' '}
-                  <span className="font-medium text-foreground">{durationPreview}</span>
-                  {(isOvernight || endTime <= startTime) && (
-                    <span className="ml-2 text-xs text-yellow-600">(qua đêm)</span>
-                  )}
-                </p>
-                {isOvernight && (
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground underline hover:text-foreground disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
-                    onClick={cancelOvernight}
-                    disabled={!TIME_OPTIONS.find((t) => t > startTime)}
-                    title={!TIME_OPTIONS.find((t) => t > startTime) ? 'Không thể hủy qua đêm khi bắt đầu lúc 23:30' : undefined}
-                  >
-                    Hủy qua đêm
-                  </button>
-                )}
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Thời lượng:{' '}
+                <span className="font-medium text-foreground">{durationPreview}</span>
+              </p>
             )}
 
             {/* Lý do thay đổi — hiển thị khi requireReason=true (Tier 2) hoặc isEmergency=true */}

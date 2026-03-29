@@ -157,6 +157,8 @@ ON CONFLICT (id) DO NOTHING;
 
 -- ──────────────────────────────────────────────────────────────
 -- 5. SCHEDULE SLOTS — tuần hiện tại (03-23)
+--    slot_date: ngày ICT của start_time (không còn overnight support —
+--    ca qua đêm vẫn lưu ngày bắt đầu, heatmap tách 2 phần để hiển thị)
 --    Tất cả start_time là UTC (ICT - 7h)
 -- ──────────────────────────────────────────────────────────────
 

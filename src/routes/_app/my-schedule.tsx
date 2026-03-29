@@ -184,10 +184,8 @@ function SchedulePage() {
 
   // AC8: drag-to-create → mở SlotForm pre-filled với start/end time từ drag
   function handleDragCreate({ date, startMinutes, durationMinutes }: DragCreateParams) {
-    // P2: clamp endMinutes tới 23:30 max để tránh endTime='00:00' gây blank Select trong SlotForm
-    // (TIME_OPTIONS chỉ có 00:00–23:30, filter t > startTime loại '00:00' nếu startTime gần midnight)
-    const MAX_END_MINUTES = 23 * 60 + 30 // 1410 = 23:30
-    const endMinutes = Math.min(startMinutes + durationMinutes, MAX_END_MINUTES)
+    // TIME_OPTIONS bao gồm 24:00 nên không cần clamp endMinutes về 23:30
+    const endMinutes = startMinutes + durationMinutes
     const startTime = minutesToTimeString(startMinutes)
     const endTime = minutesToTimeString(endMinutes)
     setSlotFormDefaultDate(date)
@@ -207,6 +205,12 @@ function SchedulePage() {
     // Guard: không submit khi profile đang loading (userTimezone có thể là 'UTC' fallback sai)
     if (isProfileLoading) {
       toast.error('Đang tải thông tin người dùng, vui lòng đợi...')
+      return
+    }
+
+    // Guard: không submit khi tenant timezone đang loading (tenantTimezone default 'UTC' → overlap sai)
+    if (isTenantLoading) {
+      toast.error('Đang tải thông tin tenant, vui lòng đợi...')
       return
     }
 
@@ -484,6 +488,8 @@ function SchedulePage() {
       )}
 
       {/* Slot form dialog — Add slot (AC3: defaultDate pre-fill, AC8: drag-to-create defaults) */}
+      {/* ⚠️ KHÔNG render khi tenant timezone còn loading — tenantTimezone default 'UTC' gây slot sai giờ/ngày */}
+      {!isTenantLoading && (
       <SlotForm
         open={slotFormOpen}
         onOpenChange={handleSlotFormOpenChange}
@@ -497,6 +503,7 @@ function SchedulePage() {
         userTimezone={userTimezone}
         tenantTimezone={tenantTimezone}
       />
+      )}
 
       {/* Edit slot dialog — Tier 2 (reason required) + Tier 3 (direct via handleEditSubmit routing) */}
       {/* key={editingSlot.id} — force remount khi slot thay đổi để useForm reset defaultValues đúng */}

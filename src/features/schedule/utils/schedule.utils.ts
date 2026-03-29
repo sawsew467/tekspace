@@ -120,6 +120,8 @@ export function minutesToTimeString(minutes: number): string {
   const totalMins = ((minutes % DAY) + DAY) % DAY
   const h = Math.floor(totalMins / 60)
   const m = totalMins % 60
+  // Special case: 1440 minutes = midnight end of day → display as "24:00"
+  if (minutes >= DAY) return '24:00'
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 

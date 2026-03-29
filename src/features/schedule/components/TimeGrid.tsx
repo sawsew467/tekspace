@@ -45,9 +45,9 @@ interface TimeGridProps {
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
 const TOTAL_MINUTES = 1440 // 24 * 60
 
-// P1: Drag position capped at 23:30 so snapTo30 never returns 1440 (off-grid)
-// and the minimum 30-min ghost always fits within the 1440px column height.
-const MAX_DRAG_MINUTES = TOTAL_MINUTES - 30 // 1410 = 23:30
+// P1: Allow dragging to 24:00 (1440 minutes).
+// snapTo30(1440) = 1440 (exact boundary) — still within grid height.
+const MAX_DRAG_MINUTES = TOTAL_MINUTES // 1440 = 24:00
 
 function slotToPosition(slot: ScheduleSlot, userTimezone: string) {
   const startUtc = new Date(slot.start_time)
@@ -322,7 +322,11 @@ export function TimeGrid({
     const byDate: Record<string, ScheduleSlot[]> = {}
     const locked: Record<string, boolean> = {}
     for (const { date } of weekDays) {
-      byDate[date] = slots.filter((s) => s.slot_date === date)
+      byDate[date] = slots.filter((s) => {
+        const startInUserTz = toZonedTime(new Date(s.start_time), userTimezone)
+        const displayDate = format(startInUserTz, 'yyyy-MM-dd')
+        return displayDate === date
+      })
       locked[date] = getSlotEditMode(date, undefined, userTimezone) === 'locked'
     }
     return { slotsByDate: byDate, isLockedByDate: locked }
@@ -433,6 +437,13 @@ export function TimeGrid({
               {String(h).padStart(2, '0')}:00
             </div>
           ))}
+          {/* 24:00 label at bottom — needed since 24:00 end time is now valid */}
+          <div
+            className="absolute right-2 text-[10px] text-muted-foreground tabular-nums select-none"
+            style={{ top: TOTAL_MINUTES - 6, lineHeight: '12px' }}
+          >
+            24:00
+          </div>
         </div>
 
         {/* 7 day columns */}

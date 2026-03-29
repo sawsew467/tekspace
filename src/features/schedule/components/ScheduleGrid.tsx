@@ -1,5 +1,6 @@
 import { addDays, format, parseISO } from 'date-fns'
 import { vi } from 'date-fns/locale'
+import { toZonedTime } from 'date-fns-tz'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -275,11 +276,16 @@ export function ScheduleGrid({
     return { date: dateStr, dayName, dateFormatted, dayLabel }
   })
 
-  // Group slots by slot_date
+  // Group slots by user-local date (derived from start_time UTC)
   const slotsByDate = weekDays.reduce<Record<string, ScheduleSlot[]>>((acc, { date }) => {
-    acc[date] = slots.filter((s) => s.slot_date === date)
+    acc[date] = slots.filter((s) => {
+      const startInUserTz = toZonedTime(new Date(s.start_time), userTimezone)
+      const displayDate = format(startInUserTz, 'yyyy-MM-dd')
+      return displayDate === date
+    })
     return acc
   }, {})
+
 
   const totalHours = totalWeekHours(slots)
 

@@ -78,7 +78,7 @@ VALUES
 
 -- ── Step 3: schedule_slots ────────────────────────────────────────────────────
 -- week_id: bd531691-c8a8-4e8e-866f-cee392ca5ade (tuần 2026-03-23 ICT)
--- slot_date: ngày ICT của start_time (bắt buộc theo validate_slot_date trigger)
+-- slot_date: ngày ICT của start_time (không còn overnight support — ca qua đêm vẫn lưu ngày bắt đầu, heatmap tách 2 phần để hiển thị)
 -- start_time: UTC (ICT - 7h)
 
 INSERT INTO public.schedule_slots

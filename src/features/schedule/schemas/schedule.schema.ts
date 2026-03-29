@@ -2,6 +2,13 @@ import { z } from 'zod'
 
 // ── Zod schema cho một time slot trong form (input từ user) ──────────────────
 
+/** Parse endTime string → minutes-in-day. "24:00" → 1440, otherwise HH:MM → h*60+m */
+function parseEndMins(endTime: string): number {
+  if (endTime === '24:00') return 24 * 60
+  const [h, m] = endTime.split(':').map(Number)
+  return h * 60 + m
+}
+
 export const slotFormSchema = z
   .object({
     // ISO date string "YYYY-MM-DD" — ngày của slot trong tuần được đăng ký
@@ -17,40 +24,33 @@ export const slotFormSchema = z
         },
         { message: 'Giờ bắt đầu phải là bội số 30 phút (VD: 09:00, 09:30)' }
       ),
-    // "HH:MM" 24h — giờ kết thúc, bội số 30 phút
+    // "HH:MM" 24h — giờ kết thúc, bội số 30 phút (bao gồm 24:00)
     endTime: z
       .string()
       .regex(/^\d{2}:\d{2}$/, 'Giờ kết thúc không hợp lệ')
       .refine(
         (t) => {
+          if (t === '24:00') return true
           const [, mm] = t.split(':').map(Number)
           return mm === 0 || mm === 30
         },
-        { message: 'Giờ kết thúc phải là bội số 30 phút (VD: 10:00, 10:30)' }
+        { message: 'Giờ kết thúc phải là bội số 30 phút (VD: 10:00, 10:30, 24:00)' }
       ),
-    // true nếu slot overnight (end time là ngày hôm sau)
-    isOvernight: z.boolean(),
   })
   .refine(
     (data) => {
-      // Tính duration_minutes để validate min/max
       const [sh, sm] = data.startTime.split(':').map(Number)
-      const [eh, em] = data.endTime.split(':').map(Number)
       const startMins = sh * 60 + sm
-      const endMins = eh * 60 + em
+      const endMins = parseEndMins(data.endTime)
 
-      let durationMins: number
-      if (data.isOvernight || endMins <= startMins) {
-        // overnight: tính qua midnight
-        durationMins = 24 * 60 - startMins + endMins
-      } else {
-        durationMins = endMins - startMins
-      }
+      // endTime must be strictly greater than startTime
+      if (endMins <= startMins) return false
 
+      const durationMins = endMins - startMins
       return durationMins >= 30 && durationMins <= 720
     },
     {
-      message: 'Thời lượng slot phải từ 30 phút đến 12 giờ',
+      message: 'Giờ kết thúc phải lớn hơn giờ bắt đầu. Hoặc chọn ngày tiếp theo.',
       path: ['endTime'],
     }
   )
@@ -66,17 +66,12 @@ export const scheduleSubmitSchema = z.object({
 
 export type ScheduleSubmitValues = z.infer<typeof scheduleSubmitSchema>
 
-// ── Helper: tính duration_minutes từ slotFormValues ─────────────────────────
+// ── Helper: tính duration_minutes từ startTime + endTime ─────────────────────
 
-export function calcDurationMinutes(values: SlotFormValues): number {
+export function calcDurationMinutes(values: Pick<SlotFormValues, 'startTime' | 'endTime'>): number {
   const [sh, sm] = values.startTime.split(':').map(Number)
-  const [eh, em] = values.endTime.split(':').map(Number)
   const startMins = sh * 60 + sm
-  const endMins = eh * 60 + em
-
-  if (values.isOvernight || endMins <= startMins) {
-    return 24 * 60 - startMins + endMins
-  }
+  const endMins = parseEndMins(values.endTime)
   return endMins - startMins
 }
 

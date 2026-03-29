@@ -34,15 +34,18 @@ export interface SlotInput {
 }
 
 // ── Tính toán UTC start_time và slot_date từ user input ──────────────────────
-
+// ⚠️ CRITICAL: slotDate trong form = ngày tenant timezone (user chọn trên UI theo tenant).
+// Do đó phải dùng tenantTimezone để parse → UTC, không phải userTimezone.
+// Nếu dùng userTimezone khi tenantTimezone ≠ userTimezone → slot_date bị shift ngày sai.
 export function convertSlotToUTC(
   values: SlotFormValues,
   userTimezone: string,
   tenantTimezone: string
 ): SlotInput {
-  const durationMinutes = calcDurationMinutes(values)
+  const durationMinutes = calcDurationMinutes({ startTime: values.startTime, endTime: values.endTime })
 
-  // Convert user-selected datetime (in user timezone) → UTC
+  // Convert user-selected datetime (in USER timezone) → UTC
+  // Form hiển thị/nhập theo user timezone để khớp với TimeGrid
   const localDateTimeStr = `${values.slotDate}T${values.startTime}:00`
   const startTimeUTC = fromZonedTime(localDateTimeStr, userTimezone)
 
