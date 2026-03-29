@@ -88,7 +88,7 @@ export function MemberList({ canManage, currentUserId, defaultCommittedHours }: 
                     {/* Committed hours — read-only cho tất cả */}
                     <p className='text-muted-foreground text-xs'>
                       {member.committed_hours != null
-                        ? `${member.committed_hours}h/tuần (riêng)`
+                        ? `${member.committed_hours}h/tuần`
                         : defaultCommittedHours !== undefined
                           ? `${defaultCommittedHours}h/tuần (mặc định nhóm)`
                           : '—h/tuần (mặc định nhóm)'}
