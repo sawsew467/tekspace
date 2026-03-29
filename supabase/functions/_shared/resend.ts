@@ -23,7 +23,7 @@ export async function sendEmail({ to, subject, html, from }: SendEmailParams) {
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: from ?? 'TekSpace <noreply@tekspace.io>',
+      from: from ?? 'TekSpace <noreply@tekmium.com>',
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
