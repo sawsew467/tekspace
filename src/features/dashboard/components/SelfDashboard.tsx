@@ -342,7 +342,7 @@ export function SelfDashboard() {
       {/* Header row */}
       <div className="flex items-center gap-2">
         <User className="size-5 text-muted-foreground shrink-0" />
-        <h1 className="text-lg font-semibold">My Dashboard</h1>
+        <h1 className="text-lg font-semibold">Bảng điều khiển</h1>
         <div className="ml-auto w-48 shrink-0">
           <TimezoneSelector value={displayTimezone} onChange={setViewTimezone} />
         </div>

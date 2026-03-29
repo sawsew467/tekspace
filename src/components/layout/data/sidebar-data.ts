@@ -25,32 +25,32 @@ export const sidebarData: SidebarData = {
     {
       name: 'TekSpace',
       logo: Bell,
-      plan: 'Team Workspace',
+      plan: 'Vai trò',
     },
   ],
   navGroups: [
     {
-      title: 'Overview',
+      title: 'Tổng quan',
       items: [
         {
-          title: 'Dashboard',
+          title: 'Trang chủ',
           url: ROUTES.app.dashboard,
           icon: Home,
         },
         {
-          title: 'Team Schedule',
+          title: 'Lịch nhóm',
           url: ROUTES.app.teamSchedule,
           icon: LayoutDashboard,
         },
         {
-          title: 'Analytics',
+          title: 'Phân tích',
           url: ROUTES.app.analytics,
           icon: BarChart3,
         },
       ],
     },
     {
-      title: 'Work',
+      title: 'Công việc',
       items: [
         {
           title: 'Lịch làm việc',
@@ -63,19 +63,19 @@ export const sidebarData: SidebarData = {
           icon: FileText,
         },
         {
-          title: 'Notifications',
+          title: 'Thông báo',
           url: ROUTES.app.notifications,
           icon: Bell,
         },
         {
-          title: 'Incidents',
+          title: 'Vi phạm',
           url: ROUTES.app.incidents,
           icon: AlertTriangle,
         },
       ],
     },
     {
-      title: 'Team',
+      title: 'Nhóm',
       items: [
         {
           title: 'Thành viên',

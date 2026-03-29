@@ -193,7 +193,7 @@ export function SelfAnalyticsHistory() {
       {/* Header: avg rate + toggle + range selector */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-medium">Lịch sử commitment</p>
+          <p className="text-sm font-medium">Lịch sử cam kết</p>
           <p className="text-xs text-muted-foreground">
             Trung bình:{' '}
             <span className={`font-semibold ${avgRateColorClass}`}>{formatRate(avgRate)}</span>

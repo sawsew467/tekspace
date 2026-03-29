@@ -44,7 +44,7 @@ export function TeamSwitcher({ teams, onSwitch, onCreateTeam }: TeamSwitcherProp
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton size='lg' disabled>
-            <div className='text-muted-foreground text-sm'>No team selected</div>
+            <div className='text-muted-foreground text-sm'>Chưa chọn team</div>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

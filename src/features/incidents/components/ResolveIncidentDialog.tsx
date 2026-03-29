@@ -87,7 +87,7 @@ export function ResolveIncidentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className='max-w-md'>
         <DialogHeader>
-          <DialogTitle>Resolve Incident</DialogTitle>
+          <DialogTitle>Giải quyết vi phạm</DialogTitle>
           <DialogDescription>
             Chọn kết quả xử lý cho incident này. Quyết định sẽ được ghi nhận và không thể thay đổi.
           </DialogDescription>
@@ -180,7 +180,7 @@ export function ResolveIncidentDialog({
                 type='submit'
                 disabled={createResolution.isPending || !form.watch('outcome')}
               >
-                {createResolution.isPending ? 'Đang xử lý...' : 'Xác nhận resolve'}
+                {createResolution.isPending ? 'Đang xử lý...' : 'Xác nhận'}
               </Button>
             </DialogFooter>
           </form>

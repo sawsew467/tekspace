@@ -50,7 +50,7 @@ function CompletedTaskRow({ index, control, canRemove, onRemove }: TaskRowProps)
   return (
     <div className='rounded-lg border p-4 space-y-3'>
       <div className='flex items-center justify-between'>
-        <span className='text-xs font-medium text-muted-foreground'>Task {index + 1}</span>
+        <span className='text-xs font-medium text-muted-foreground'>Công việc {index + 1}</span>
         {canRemove && (
           <Button
             type='button'
@@ -70,7 +70,7 @@ function CompletedTaskRow({ index, control, canRemove, onRemove }: TaskRowProps)
         name={`tasks.${index}.project_tag`}
         render={({ field }) => (
           <FormItem>
-            <FormLabel className='text-xs text-muted-foreground'>Project Tag</FormLabel>
+            <FormLabel className='text-xs text-muted-foreground'>Tag dự án</FormLabel>
             <FormControl>
               <Input
                 {...field}
@@ -204,7 +204,7 @@ function InProgressTaskRow({ index, control, onRemove }: InProgressRowProps) {
         name={`in_progress_tasks.${index}.project_tag`}
         render={({ field }) => (
           <FormItem>
-            <FormLabel className='text-xs text-muted-foreground'>Project Tag</FormLabel>
+            <FormLabel className='text-xs text-muted-foreground'>Tag dự án</FormLabel>
             <FormControl>
               <Input
                 {...field}
@@ -325,7 +325,7 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
           {/* ── Section 1: Tasks Completed Today ──────────────────────────── */}
           <div className='space-y-4'>
             <h3 className='text-sm font-semibold flex items-center gap-2'>
-              ✅ Tasks Completed Today
+              ✅ Các task đã hoàn thành
             </h3>
 
             {completedFields.map((field, index) => (
@@ -353,7 +353,7 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
               className='w-full'
             >
               <Plus className='mr-2 h-4 w-4' />
-              Thêm task hoàn thành
+              Thêm task đã hoàn thành
             </Button>
           </div>
 
@@ -362,7 +362,7 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
           {/* ── Section 2: In Progress / Ongoing ──────────────────────────── */}
           <div className='space-y-4'>
             <h3 className='text-sm font-semibold flex items-center gap-2'>
-              🔄 In Progress / Ongoing
+              🔄 Đang làm dở
             </h3>
 
             {inProgressFields.length === 0 && (
@@ -426,7 +426,7 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
                     })}
                   >
                     <Plus className='mr-1 h-3 w-3' />
-                    Thêm task
+                    Thêm công việc
                   </Button>
                   <Button
                     type='button'
@@ -485,7 +485,7 @@ export function DailyReportForm({ onSubmit, isPending, defaultValues, submitLabe
           {/* ── Submit / Cancel ───────────────────────────────────────────── */}
           <Button type='submit' className='w-full'>
             {isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-            {submitLabel ?? 'Nộp Daily Report'}
+            {submitLabel ?? 'Nộp báo cáo'}
           </Button>
           {onCancel && (
             <Button

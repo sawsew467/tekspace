@@ -17,7 +17,7 @@ export function NotFoundPage() {
         </Button>
         {session ? (
           <Button onClick={() => navigate({ to: ROUTES.app.dashboard }).catch(console.error)}>
-            Về Dashboard
+            Về Trang chủ
           </Button>
         ) : (
           <Button onClick={() => navigate({ to: ROUTES.signIn }).catch(console.error)}>

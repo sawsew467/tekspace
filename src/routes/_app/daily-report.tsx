@@ -47,7 +47,7 @@ function isValidTimezone(tz: string | null | undefined): tz is string {
 
 export const Route = createFileRoute('/_app/daily-report')({
   head: () => ({
-    meta: [{ title: 'Daily Report — TekSpace' }],
+    meta: [{ title: 'Báo cáo ngày — TekSpace' }],
   }),
   component: DailyReportPage,
 })
@@ -336,7 +336,7 @@ function DailyReportPage() {
       <div className='flex items-center gap-3'>
         <CalendarDays className='h-6 w-6 text-primary' />
         <div>
-          <h1 className='text-xl font-bold'>Daily Report</h1>
+          <h1 className='text-xl font-bold'>Báo cáo ngày</h1>
           <p className='text-sm text-muted-foreground capitalize'>{reportDateDisplay}</p>
         </div>
       </div>
@@ -380,7 +380,7 @@ function DailyReportPage() {
                 {isLoading
                   ? 'Đang tải...'
                   : todayReport
-                    ? isEditing ? 'Chỉnh sửa report' : 'Report hôm nay'
+                    ? isEditing ? 'Chỉnh sửa báo cáo' : 'Báo cáo hôm nay'
                     : 'Nộp report hôm nay'}
               </CardTitle>
               {!isLoading && !todayReport && (
@@ -405,7 +405,7 @@ function DailyReportPage() {
                     onSubmit={handleUpdate}
                     isPending={updateReport.isPending}
                     defaultValues={editDefaultValues}
-                    submitLabel='Cập nhật Report'
+                    submitLabel='Cập nhật báo cáo'
                     onCancel={() => setIsEditing(false)}
                   />
                 ) : (
@@ -427,7 +427,7 @@ function DailyReportPage() {
         <TabsContent value='history'>
           <Card>
             <CardHeader>
-              <CardTitle className='text-base'>Lịch sử nộp report</CardTitle>
+              <CardTitle className='text-base'>Lịch sử báo cáo</CardTitle>
             </CardHeader>
             <CardContent>
               <ReportHistoryList
@@ -450,7 +450,7 @@ function DailyReportPage() {
                 <div className='flex items-center justify-between flex-wrap gap-2'>
                   <div className='flex items-center gap-2'>
                     <Users className='h-4 w-4 text-muted-foreground' />
-                    <CardTitle className='text-base'>Team Reports</CardTitle>
+                    <CardTitle className='text-base'>Báo cáo nhóm</CardTitle>
                   </div>
 
                   {/* Date navigation — F1: date span là clickable Popover/Calendar */}

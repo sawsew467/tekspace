@@ -32,7 +32,7 @@ export function DataTable<TData, TValue>({
   columns,
   toolbar,
   bulkActions,
-  emptyMessage = 'No results.',
+  emptyMessage = 'Không có kết quả.',
   className,
   showPagination = true,
   renderSubComponent,

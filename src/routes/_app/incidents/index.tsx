@@ -34,7 +34,7 @@ function isValidTimezone(tz: string | null | undefined): tz is string {
 
 export const Route = createFileRoute('/_app/incidents/')({
   head: () => ({
-    meta: [{ title: 'Incidents — TekSpace' }],
+    meta: [{ title: 'Vi phạm — TekSpace' }],
   }),
   component: IncidentsPage,
 })
@@ -158,7 +158,7 @@ function IncidentsPage() {
       <div className='flex items-center justify-between'>
         <div className='flex items-center gap-3'>
           <ShieldAlert className='h-6 w-6 text-primary' />
-          <h1 className='text-xl font-bold'>Incidents</h1>
+          <h1 className='text-xl font-bold'>Vi phạm</h1>
         </div>
 
         <Can do='createIncident'>

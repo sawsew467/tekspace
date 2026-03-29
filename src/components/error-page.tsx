@@ -29,7 +29,7 @@ export function ErrorPage({ error, reset }: ErrorComponentProps) {
               Thử lại
             </Button>
             <Button onClick={() => navigate({ to: ROUTES.app.dashboard }).catch(console.error)}>
-              Về Dashboard
+              Về Trang chủ
             </Button>
           </>
         ) : (

@@ -3,7 +3,7 @@ import { SelfDashboard } from '@/features/dashboard/components/SelfDashboard'
 
 export const Route = createFileRoute('/_app/dashboard')({
   head: () => ({
-    meta: [{ title: 'Dashboard — TekSpace' }],
+    meta: [{ title: 'Trang chủ — TekSpace' }],
   }),
   component: SelfDashboard,
 })

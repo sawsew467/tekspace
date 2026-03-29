@@ -40,7 +40,7 @@ const RANGE_OPTIONS = [
 
 export const Route = createFileRoute('/_app/analytics')({
   head: () => ({
-    meta: [{ title: 'Analytics — TekSpace' }],
+    meta: [{ title: 'Phân tích — TekSpace' }],
   }),
   component: AnalyticsPage,
 })
@@ -153,7 +153,7 @@ function AnalyticsPage() {
       {/* Page header */}
       <div className="flex items-center gap-2">
         <BarChart3 className="size-5 text-muted-foreground shrink-0" />
-        <h1 className="text-lg font-semibold">Analytics</h1>
+        <h1 className="text-lg font-semibold">Phân tích</h1>
         <span className="text-xs text-muted-foreground ml-1">
           Tuần {format(new Date(weekStart + 'T00:00:00'), 'dd/MM')}–
           {format(new Date(weekEnd + 'T00:00:00'), 'dd/MM/yyyy')}
@@ -163,7 +163,7 @@ function AnalyticsPage() {
       {/* Team Overview table (AC1) */}
       <section aria-label="Team hours overview">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-          Team Overview — Tuần này
+          Tổng quan nhóm — Tuần này
         </h2>
         <TeamAnalyticsOverview
           members={members}
@@ -182,7 +182,7 @@ function AnalyticsPage() {
         <section aria-label={`${selectedMemberName} trend chart`}>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Trend — {selectedMemberName}
+              Xu hướng — {selectedMemberName}
             </h2>
             <Select
               value={String(rangeWeeks)}

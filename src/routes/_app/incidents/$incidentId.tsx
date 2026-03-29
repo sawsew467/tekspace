@@ -69,7 +69,7 @@ function formatDate(dateStr: string, timezone: string | null): string {
 
 export const Route = createFileRoute('/_app/incidents/$incidentId')({
   head: () => ({
-    meta: [{ title: 'Chi tiết Incident — TekSpace' }],
+    meta: [{ title: 'Chi tiết vi phạm — TekSpace' }],
   }),
   component: IncidentDetailPage,
 })
@@ -167,10 +167,10 @@ function IncidentDetailPage() {
           className='inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground'
         >
           <ArrowLeft className='h-4 w-4' />
-          Quay lại Incidents
+          Quay lại Vi phạm
         </Link>
         <p className='text-sm text-muted-foreground'>
-          Incident không tồn tại hoặc bạn không có quyền xem.
+          Vi phạm không tồn tại hoặc bạn không có quyền xem.
         </p>
       </PageContainer>
     )
@@ -190,15 +190,15 @@ function IncidentDetailPage() {
           className='inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground'
         >
           <ArrowLeft className='h-4 w-4' />
-          Quay lại Incidents
+          Quay lại Vi phạm
         </Link>
-        <h1 className='text-xl font-bold'>Chi tiết Incident</h1>
+        <h1 className='text-xl font-bold'>Chi tiết vi phạm</h1>
       </div>
 
       {/* Section 1: Incident Details */}
       <Card>
         <CardHeader className='pb-3'>
-          <CardTitle className='text-base'>Thông tin Incident</CardTitle>
+          <CardTitle className='text-base'>Thông tin vi phạm</CardTitle>
         </CardHeader>
         <CardContent className='space-y-3'>
           <div className='flex items-center gap-2'>
@@ -276,7 +276,7 @@ function IncidentDetailPage() {
             <form onSubmit={handleSubmitNote} className='space-y-2 pt-2 border-t'>
               <Textarea
                 {...form.register('note')}
-                placeholder='Thêm ghi chú về incident này...'
+                placeholder='Thêm ghi chú về vi phạm này...'
                 rows={3}
                 className='resize-none'
               />
@@ -337,13 +337,13 @@ function IncidentDetailPage() {
             // Chưa có resolution
             canCreateIncident ? (
               <div className='space-y-2'>
-                <p className='text-sm text-muted-foreground'>Incident chưa được xử lý chính thức.</p>
+                <p className='text-sm text-muted-foreground'>Vi phạm chưa được xử lý chính thức.</p>
                 <Button
                   variant='outline'
                   size='sm'
                   onClick={() => setResolveDialogOpen(true)}
                 >
-                  Resolve Incident
+                  Giải quyết vi phạm
                 </Button>
               </div>
             ) : (

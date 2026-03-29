@@ -73,7 +73,7 @@ export function TeamDashboard() {
       {/* Header: title + week nav + timezone selector — 1 dòng */}
       <div className="flex items-center gap-2">
         <CalendarDays className="h-5 w-5 text-muted-foreground shrink-0" />
-        <h1 className="text-xl font-semibold shrink-0">Team Schedule</h1>
+        <h1 className="text-xl font-semibold shrink-0">Lịch nhóm</h1>
 
         {/* Week navigation — căn giữa */}
         <div className="flex items-center gap-1 mx-auto">

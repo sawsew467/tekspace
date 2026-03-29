@@ -33,7 +33,7 @@ export function AppTitle() {
           {!isCollapsed && (
             <div className='ml-2 grid flex-1 text-start text-sm leading-tight'>
               <span className='truncate font-bold'>TekSpace</span>
-              <span className='truncate text-xs'>Team Workspace</span>
+              <span className='truncate text-xs'>Không gian nhóm</span>
             </div>
           )}
         </SidebarMenuButton>
