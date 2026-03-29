@@ -9,6 +9,7 @@ import {
   Users,
   Mail,
   Home,
+  Upload,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 import { ROUTES } from '@/lib/routes'
@@ -94,6 +95,12 @@ export const sidebarData: SidebarData = {
           url: ROUTES.app.team.settings,
           icon: Settings,
           roles: ['owner'],
+        },
+        {
+          title: 'Import',
+          url: ROUTES.app.admin.import,
+          icon: Upload,
+          roles: ['owner', 'manager'],
         },
       ],
     },

@@ -25,12 +25,14 @@ import { Route as AppDailyReportRouteImport } from './routes/_app/daily-report'
 import { Route as AppCreateTenantRouteImport } from './routes/_app/create-tenant'
 import { Route as AppAnalyticsRouteImport } from './routes/_app/analytics'
 import { Route as AppTeamRouteRouteImport } from './routes/_app/team/route'
+import { Route as AppAdminRouteRouteImport } from './routes/_app/admin/route'
 import { Route as AppAccountRouteRouteImport } from './routes/_app/account/route'
 import { Route as AppIncidentsIndexRouteImport } from './routes/_app/incidents/index'
 import { Route as AppTeamSettingsRouteImport } from './routes/_app/team/settings'
 import { Route as AppTeamMembersRouteImport } from './routes/_app/team/members'
 import { Route as AppTeamInvitesRouteImport } from './routes/_app/team/invites'
 import { Route as AppIncidentsIncidentIdRouteImport } from './routes/_app/incidents/$incidentId'
+import { Route as AppAdminImportRouteImport } from './routes/_app/admin/import'
 import { Route as AppAccountSecurityRouteImport } from './routes/_app/account/security'
 import { Route as AppAccountProfileRouteImport } from './routes/_app/account/profile'
 
@@ -113,6 +115,11 @@ const AppTeamRouteRoute = AppTeamRouteRouteImport.update({
   path: '/team',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppAdminRouteRoute = AppAdminRouteRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppAccountRouteRoute = AppAccountRouteRouteImport.update({
   id: '/account',
   path: '/account',
@@ -143,6 +150,11 @@ const AppIncidentsIncidentIdRoute = AppIncidentsIncidentIdRouteImport.update({
   path: '/incidents/$incidentId',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppAdminImportRoute = AppAdminImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AppAdminRouteRoute,
+} as any)
 const AppAccountSecurityRoute = AppAccountSecurityRouteImport.update({
   id: '/security',
   path: '/security',
@@ -161,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/account': typeof AppAccountRouteRouteWithChildren
+  '/admin': typeof AppAdminRouteRouteWithChildren
   '/team': typeof AppTeamRouteRouteWithChildren
   '/analytics': typeof AppAnalyticsRoute
   '/create-tenant': typeof AppCreateTenantRoute
@@ -173,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/team-schedule': typeof AppTeamScheduleRoute
   '/account/profile': typeof AppAccountProfileRoute
   '/account/security': typeof AppAccountSecurityRoute
+  '/admin/import': typeof AppAdminImportRoute
   '/incidents/$incidentId': typeof AppIncidentsIncidentIdRoute
   '/team/invites': typeof AppTeamInvitesRoute
   '/team/members': typeof AppTeamMembersRoute
@@ -186,6 +200,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/account': typeof AppAccountRouteRouteWithChildren
+  '/admin': typeof AppAdminRouteRouteWithChildren
   '/team': typeof AppTeamRouteRouteWithChildren
   '/analytics': typeof AppAnalyticsRoute
   '/create-tenant': typeof AppCreateTenantRoute
@@ -198,6 +213,7 @@ export interface FileRoutesByTo {
   '/team-schedule': typeof AppTeamScheduleRoute
   '/account/profile': typeof AppAccountProfileRoute
   '/account/security': typeof AppAccountSecurityRoute
+  '/admin/import': typeof AppAdminImportRoute
   '/incidents/$incidentId': typeof AppIncidentsIncidentIdRoute
   '/team/invites': typeof AppTeamInvitesRoute
   '/team/members': typeof AppTeamMembersRoute
@@ -213,6 +229,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/_app/account': typeof AppAccountRouteRouteWithChildren
+  '/_app/admin': typeof AppAdminRouteRouteWithChildren
   '/_app/team': typeof AppTeamRouteRouteWithChildren
   '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/create-tenant': typeof AppCreateTenantRoute
@@ -225,6 +242,7 @@ export interface FileRoutesById {
   '/_app/team-schedule': typeof AppTeamScheduleRoute
   '/_app/account/profile': typeof AppAccountProfileRoute
   '/_app/account/security': typeof AppAccountSecurityRoute
+  '/_app/admin/import': typeof AppAdminImportRoute
   '/_app/incidents/$incidentId': typeof AppIncidentsIncidentIdRoute
   '/_app/team/invites': typeof AppTeamInvitesRoute
   '/_app/team/members': typeof AppTeamMembersRoute
@@ -240,6 +258,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/account'
+    | '/admin'
     | '/team'
     | '/analytics'
     | '/create-tenant'
@@ -252,6 +271,7 @@ export interface FileRouteTypes {
     | '/team-schedule'
     | '/account/profile'
     | '/account/security'
+    | '/admin/import'
     | '/incidents/$incidentId'
     | '/team/invites'
     | '/team/members'
@@ -265,6 +285,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/account'
+    | '/admin'
     | '/team'
     | '/analytics'
     | '/create-tenant'
@@ -277,6 +298,7 @@ export interface FileRouteTypes {
     | '/team-schedule'
     | '/account/profile'
     | '/account/security'
+    | '/admin/import'
     | '/incidents/$incidentId'
     | '/team/invites'
     | '/team/members'
@@ -291,6 +313,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/sign-in'
     | '/_app/account'
+    | '/_app/admin'
     | '/_app/team'
     | '/_app/analytics'
     | '/_app/create-tenant'
@@ -303,6 +326,7 @@ export interface FileRouteTypes {
     | '/_app/team-schedule'
     | '/_app/account/profile'
     | '/_app/account/security'
+    | '/_app/admin/import'
     | '/_app/incidents/$incidentId'
     | '/_app/team/invites'
     | '/_app/team/members'
@@ -433,6 +457,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTeamRouteRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/admin': {
+      id: '/_app/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AppAdminRouteRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/account': {
       id: '/_app/account'
       path: '/account'
@@ -475,6 +506,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIncidentsIncidentIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/admin/import': {
+      id: '/_app/admin/import'
+      path: '/import'
+      fullPath: '/admin/import'
+      preLoaderRoute: typeof AppAdminImportRouteImport
+      parentRoute: typeof AppAdminRouteRoute
+    }
     '/_app/account/security': {
       id: '/_app/account/security'
       path: '/security'
@@ -506,6 +544,18 @@ const AppAccountRouteRouteWithChildren = AppAccountRouteRoute._addFileChildren(
   AppAccountRouteRouteChildren,
 )
 
+interface AppAdminRouteRouteChildren {
+  AppAdminImportRoute: typeof AppAdminImportRoute
+}
+
+const AppAdminRouteRouteChildren: AppAdminRouteRouteChildren = {
+  AppAdminImportRoute: AppAdminImportRoute,
+}
+
+const AppAdminRouteRouteWithChildren = AppAdminRouteRoute._addFileChildren(
+  AppAdminRouteRouteChildren,
+)
+
 interface AppTeamRouteRouteChildren {
   AppTeamInvitesRoute: typeof AppTeamInvitesRoute
   AppTeamMembersRoute: typeof AppTeamMembersRoute
@@ -524,6 +574,7 @@ const AppTeamRouteRouteWithChildren = AppTeamRouteRoute._addFileChildren(
 
 interface AppRouteRouteChildren {
   AppAccountRouteRoute: typeof AppAccountRouteRouteWithChildren
+  AppAdminRouteRoute: typeof AppAdminRouteRouteWithChildren
   AppTeamRouteRoute: typeof AppTeamRouteRouteWithChildren
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppCreateTenantRoute: typeof AppCreateTenantRoute
@@ -540,6 +591,7 @@ interface AppRouteRouteChildren {
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAccountRouteRoute: AppAccountRouteRouteWithChildren,
+  AppAdminRouteRoute: AppAdminRouteRouteWithChildren,
   AppTeamRouteRoute: AppTeamRouteRouteWithChildren,
   AppAnalyticsRoute: AppAnalyticsRoute,
   AppCreateTenantRoute: AppCreateTenantRoute,

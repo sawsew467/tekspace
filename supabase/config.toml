@@ -361,9 +361,6 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-APP_URL = "env(APP_URL)"
-
 # Edge Functions JWT verification
 # verify_jwt = false vì tất cả functions đã tự verify JWT qua getUserFromJwt()
 # Edge Runtime dùng HS256 secret cũ nhưng GoTrue mới sign bằng ES256 → mismatch nếu verify tại đây

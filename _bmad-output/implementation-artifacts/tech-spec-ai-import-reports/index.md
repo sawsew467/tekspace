@@ -1,0 +1,26 @@
+# Tech-Spec: AI Import Daily Reports
+
+## Table of Contents
+
+- [Tech-Spec: AI Import Daily Reports](#table-of-contents)
+  - [Overview](./overview.md)
+    - [Problem Statement](./overview.md#problem-statement)
+    - [Solution](./overview.md#solution)
+    - [Scope](./overview.md#scope)
+  - [Context for Development](./context-for-development.md)
+    - [Architecture Overview](./context-for-development.md#architecture-overview)
+    - [Codebase Patterns](./context-for-development.md#codebase-patterns)
+    - [Files to Reference](./context-for-development.md#files-to-reference)
+  - [Technical Decisions](./technical-decisions.md)
+    - [LLM Parser (Primary)](./technical-decisions.md#llm-parser-primary)
+    - [User Mapping (INLINE)](./technical-decisions.md#user-mapping-inline)
+    - [Import: PostgreSQL RPC](./technical-decisions.md#import-postgresql-rpc)
+    - [Types](./technical-decisions.md#types)
+  - [Implementation Plan](./implementation-plan.md)
+    - [Tasks](./implementation-plan.md#tasks)
+  - [Acceptance Criteria](./acceptance-criteria.md)
+  - [Additional Context](./additional-context.md)
+    - [Dependencies](./additional-context.md#dependencies)
+    - [API Keys](./additional-context.md#api-keys)
+    - [Testing Strategy](./additional-context.md#testing-strategy)
+    - [Notes](./additional-context.md#notes)

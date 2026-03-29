@@ -22,5 +22,8 @@ export const ROUTES = {
       invites: '/team/invites',
       settings: '/team/settings',
     },
+    admin: {
+      import: '/admin/import',
+    },
   },
 } as const
