@@ -1,6 +1,6 @@
 # Story 11.1: AI Import Daily Reports
 
-Status: review
+Status: done
 Epic: 11 — AI Import Daily Reports
 Story ID: 11.1
 Story Key: 11-1-ai-import-reports
