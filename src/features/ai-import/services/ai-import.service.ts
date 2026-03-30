@@ -12,6 +12,80 @@ import type {
 
 const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-parse`
 
+// ── Batch types ───────────────────────────────────────────────────────────────
+
+export interface Batch {
+  id: string
+  text: string
+  dateRange: string
+  preview: string
+}
+
+// ── Batching helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Extract date strings from text for date range display.
+ * Matches: D/M/YYYY, D/M/YY, YYYY-MM-DD
+ */
+function extractDates(text: string): string[] {
+  const patterns = [
+    /\d{1,2}\/\d{1,2}\/\d{4}/g,
+    /\d{1,2}\/\d{1,2}\/\d{2}/g,
+    /\d{4}-\d{2}-\d{2}/g,
+  ]
+  const dates: string[] = []
+  for (const pat of patterns) {
+    let match
+    while ((match = pat.exec(text)) !== null) {
+      dates.push(match[0])
+    }
+  }
+  return dates
+}
+
+/**
+ * Split by "Daily report" marker first, then group ~7 reports per batch.
+ * This gives meaningful, human-readable batches.
+ */
+function splitByReportMarker(text: string): string[] {
+  // Split on "Daily report" (case-insensitive) boundary
+  const parts = text.split(/daily report/i).filter((s) => s.trim().length > 0)
+  if (parts.length <= 1) return [text]
+
+  // Re-add "Daily report" prefix to each part
+  return parts.map((part) => `Daily report ${part.trim()}`)
+}
+
+/**
+ * Build batch objects from raw text.
+ * Strategy: Each report → ~7 reports per batch for AI context.
+ */
+export function buildBatches(text: string, reportsPerBatch = 7): Batch[] {
+  // Step 1: Split into individual reports
+  const reports = splitByReportMarker(text)
+
+  // Step 2: Group reports into batches
+  const batches: Batch[] = []
+  for (let i = 0; i < reports.length; i += reportsPerBatch) {
+    const batchReports = reports.slice(i, i + reportsPerBatch)
+    const batchText = batchReports.join('\n\n')
+    const dates = extractDates(batchText)
+    const uniqueDates = [...new Set(dates)]
+    const dateRange = uniqueDates.length > 0
+      ? uniqueDates.slice(0, 4).join(', ') + (uniqueDates.length > 4 ? '...' : '')
+      : `Báo cáo ${i + 1}–${i + batchReports.length}`
+    const preview = batchText.replace(/\s+/g, ' ').trim().slice(0, 80)
+    batches.push({
+      id: `batch-${i}`,
+      text: batchText,
+      dateRange,
+      preview,
+    })
+  }
+
+  return batches
+}
+
 // ── Internal types ────────────────────────────────────────────────────────────
 
 interface TenantMember {
@@ -27,35 +101,14 @@ interface TenantMember {
 
 export const AiImportService = {
   /**
-   * Parse raw chat export text using AI (Supabase Edge Function).
+   * Parse a single batch of chat export text via AI.
+   * Batching is handled by the UI layer (buildBatches).
    */
   parseReports: async (text: string): Promise<AiParseResponse> => {
     const { data: sessionData } = await supabase.auth.getSession()
     const accessToken = sessionData?.session?.access_token
     if (!accessToken) throw new Error('Unauthorized — no active session')
-
-    const response = await fetch(EDGE_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ text }),
-    })
-
-    if (!response.ok) {
-      let errorMessage = 'AI parse failed'
-      try {
-        const errorData = await response.json()
-        errorMessage = errorData.error ?? errorMessage
-      } catch {
-        // ignore JSON parse errors
-      }
-      throw new Error(errorMessage)
-    }
-
-    const data = await response.json() as AiParseResponse
-    return data
+    return callParseEndpoint(accessToken, text)
   },
 
   /**
@@ -165,3 +218,47 @@ export const AiImportService = {
     )
   },
 }
+
+// ── Internal helper ───────────────────────────────────────────────────────────
+
+async function callParseEndpoint(
+  accessToken: string,
+  text: string,
+  retries = 2,
+): Promise<AiParseResponse> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ text }),
+    })
+
+    if (response.ok) {
+      return response.json() as Promise<AiParseResponse>
+    }
+
+    // 429 = rate limit — retry with longer backoff
+    if (response.status === 429 && attempt < retries) {
+      const delay = (attempt + 1) * 8000 // 8s, 16s
+      await new Promise((resolve) => setTimeout(resolve, delay))
+      continue
+    }
+
+    // Non-retryable error
+    let errorMessage = 'AI parse failed'
+    try {
+      const errorData = await response.json()
+      errorMessage = errorData.error ?? errorMessage
+    } catch {
+      // ignore
+    }
+    throw new Error(errorMessage)
+  }
+
+  // Should not reach here
+  throw new Error('AI parse failed after retries')
+}
+

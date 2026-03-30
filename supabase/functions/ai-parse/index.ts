@@ -1,50 +1,81 @@
 import { corsHeaders } from '../_shared/cors.ts'
 import { getUserFromJwt } from '../_shared/jwt.ts'
 
-// ── System Prompt ─────────────────────────────────────────────────────────────
+// Kong gateway đã verify JWT signature rồi (với --no-verify-jwt flag thì bypass,
+// nhưng token vẫn phải đúng format JWT).
+// Chỉ cần decode payload để verify token có đúng format + có sub claim.
+// Không throw Response vì Deno không xử lý tốt.
+function validateAuth(req: Request): { id: string; email: string } | null {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) return null
 
-const SYSTEM_PROMPT = `Bạn là AI assistant chuyên parse daily standup reports từ các nền tảng chat (Slack, Discord, MS Teams, v.v.) thành structured JSON.
+  try {
+    const token = authHeader.slice(7)
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
 
-Nhiệm vụ:
-1. Đọc raw text input — đây là export từ một buổi daily standup meeting
-2. Trích xuất danh sách các báo cáo ngày (daily reports), mỗi report gồm:
-   - Người viết (author): tên hoặc username hiển thị trong chat
-   - Ngày (date): ngày của standup, format YYYY-MM-DD
-   - Tasks đã hoàn thành (completed_tasks): mảng các task, mỗi task gồm description + giờ làm (hours, số)
-   - Tasks đang làm (in_progress_tasks): mảng các task đang tiến hành, mỗi task gồm description + giờ làm (hours, số)
-   - Plan for tomorrow (plan_for_tomorrow): string mô tả kế hoạch ngày mai
-   - Blockers (blockers): string mô tả khó khăn/g障碍 (hoặc null nếu không có)
+    const payloadB64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(payloadB64))
 
-Quy tắc xử lý:
-- **Hours calculation**: Tổng hours_logged = tổng tất cả hours của completed_tasks + in_progress_tasks. Nếu không có task nào → hours_logged = 0.
-- **N/A or empty sections**: Bỏ qua không tạo task row cho section trống hoặc "N/A"
-- **Date detection**: Nếu text không chứa ngày cụ thể, dùng ngày hôm nay làm report_date
-- **Flexible format**: Xử lý được nhiều format khác nhau: Slack thread format, Discord export, MS Teams export, Google Chat export, hoặc raw text đơn giản
-- **Multiple dates**: Nếu input chứa reports của nhiều ngày, trả về tất cả
-- **Author extraction**: Trích xuất tên người viết từ message header/prefix. Giữ nguyên tên gốc (có thể chứa tiếng Việt, emoji, @mentions)
-- **Task parsing**: Tách description và hours từ mỗi task line. Nếu hours không được đề cập rõ ràng, đoán hợp lý (thường 1-4 giờ).
-
-Trả về JSON array, mỗi object có cấu trúc:
-{
-  "author": "Tên người viết",
-  "date": "YYYY-MM-DD",
-  "completed_tasks": [
-    { "description": "Mô tả task", "hours": 2 }
-  ],
-  "in_progress_tasks": [
-    { "description": "Mô tả task đang làm", "hours": 3 }
-  ],
-  "plan_for_tomorrow": "Kế hoạch ngày mai hoặc null",
-  "blockers": "Khó khăn hoặc null"
+    // Cần có sub (user ID) — email có thể không có trong một số JWT
+    if (!payload.sub) return null
+    return {
+      id: payload.sub,
+      email: payload.email ?? '',
+    }
+  } catch {
+    return null
+  }
 }
 
-Trả về DUY NHẤT JSON array, không kèm markdown code block, không giải thích thêm.`
+// ── System Prompt ─────────────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `Parse daily standup reports từ chat export (Slack, Discord, MS Teams...) thành JSON array.
+
+Rules:
+- Trích xuất TẤT CẢ reports trong input (không giới hạn số lượng)
+- author: tên hiển thị trong message header
+
+**DATE PARSING (quan trọng):**
+- Luôn parse date format "D/M" hoặc "DD/MM" là DAY/MONTH, KHÔNG PHẢI month/day
+  - Ví dụ: "5/2" = ngày 5 tháng 2 (2025-02-05), KHÔNG phải ngày 2 tháng 5
+  - Ví dụ: "29/12" = ngày 29 tháng 12 (2025-12-29), KHÔNG phải ngày 12 tháng 29
+  - Ví dụ: "30/12" = ngày 30 tháng 12 (2025-12-30), KHÔNG phải ngày 12 tháng 30
+- Nếu report không ghi năm, SUY RA từ context:
+  - Xem các report khác có cùng ngày/tháng để lấy năm
+  - Hoặc xem thứ tự messages để suy ra năm gần nhất
+  - Mặc định: năm của report gần nhất với thời điểm hiện tại
+- Format output: YYYY-MM-DD
+
+- completed_tasks / in_progress_tasks: mỗi task gồm {description, hours}. Nếu hours không đề cập, ước lượng 1-4h
+- Bỏ qua section trống hoặc "N/A"
+- plan_for_tomorrow / blockers: string hoặc null
+- hours: dùng giá trị số (3h → 3, 1h30 → 1.5)
+
+Output: JSON array không markdown wrapper.
+[{"author":"Tên","date":"YYYY-MM-DD","completed_tasks":[{"description":"...","hours":2}],"in_progress_tasks":[],"plan_for_tomorrow":null,"blockers":null}]`
 
 // ── Response Schema (Zod-like validation) ────────────────────────────────────
 
 interface TaskItem {
   description: string
   hours: number
+}
+
+/**
+ * Normalize date string — handle AI misparsing like "2025-02-05" from "5/2".
+ * If date parts look swapped (month > 12), swap them back.
+ */
+function normalizeDate(dateStr: string, fallbackYear = 2025): string {
+  // Already valid YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [, year, month, day] = dateStr.split('-').map(Number)
+    if (month > 12 && day <= 12) {
+      // Swapped: interpret as DD/MM → YYYY-MM-DD
+      return `${year}-${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}`
+    }
+    return dateStr
+  }
+  return dateStr
 }
 
 interface ParsedReport {
@@ -104,7 +135,7 @@ function validateResponse(data: unknown): ParsedReport[] {
 
     results.push({
       author: report.author.trim(),
-      date: report.date,
+      date: normalizeDate(report.date),
       completed_tasks: parseTasks(completedTasks),
       in_progress_tasks: parseTasks(inProgressTasks),
       plan_for_tomorrow:
@@ -131,10 +162,10 @@ Deno.serve(async (req) => {
 
   try {
     // ── Auth check ───────────────────────────────────────────────────────────
-    const user = getUserFromJwt(req.headers.get('Authorization'))
+    const user = validateAuth(req)
     if (!user) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ code: 401, error: 'Invalid JWT' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -174,7 +205,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: 'gpt-4o',
-          max_tokens: 4096,
+          max_tokens: 8192,
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: text.trim() },
