@@ -10,6 +10,10 @@ import {
   Mail,
   Home,
   Upload,
+  Activity,
+  KeyRound,
+  UserCircle,
+  ShieldCheck,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 import { ROUTES } from '@/lib/routes'
@@ -48,6 +52,11 @@ export const sidebarData: SidebarData = {
           url: ROUTES.app.analytics,
           icon: BarChart3,
         },
+        {
+          title: 'Claude Usage',
+          url: ROUTES.app.usage,
+          icon: Activity,
+        },
       ],
     },
     {
@@ -72,6 +81,26 @@ export const sidebarData: SidebarData = {
           title: 'Vi phạm',
           url: ROUTES.app.incidents,
           icon: AlertTriangle,
+        },
+      ],
+    },
+    {
+      title: 'Tài khoản',
+      items: [
+        {
+          title: 'Hồ sơ cá nhân',
+          url: ROUTES.app.account.profile,
+          icon: UserCircle,
+        },
+        {
+          title: 'Bảo mật',
+          url: ROUTES.app.account.security,
+          icon: ShieldCheck,
+        },
+        {
+          title: 'API Tokens',
+          url: ROUTES.app.account.tokens,
+          icon: KeyRound,
         },
       ],
     },
