@@ -82,7 +82,7 @@ const chartConfig = {
 
 async function fetchTeamStatus(): Promise<UsageTeamStatusRow[]> {
   const { data, error } = await db.from('usage_team_status')
-    .select('session_id, user_id, tenant_id, model, project_hash, project_name, branch, started_at, last_seen_at, status')
+    .select('session_id, user_id, email, tenant_id, model, project_hash, project_name, branch, started_at, last_seen_at, status')
     .order('last_seen_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []) as UsageTeamStatusRow[]
@@ -312,15 +312,16 @@ function useTeamColumns(
     {
       accessorKey: 'user_id',
       header: 'Dev',
-      cell: ({ row }) => (
+      cell: ({ row }) => {
+        return(
         <button
           type='button'
           className='text-left font-mono text-xs underline-offset-2 hover:underline text-muted-foreground'
           onClick={() => onRowClick(row.original)}
         >
-          {row.original.display_name ?? row.original.user_id.slice(0, 8) + '…'}
+          {row.original.email ?? row.original.user_id.slice(0, 8) + '…'}
         </button>
-      ),
+      )},
     },
     {
       accessorKey: 'model',
@@ -467,6 +468,8 @@ function UsagePage() {
     enabled: !!activeTenantId,
     staleTime: 15_000,
   })
+
+  console.log('teamStatus:', teamStatus)
 
   const { data: allSnapshots = [], isLoading: isSnapshotsLoading } = useQuery({
     queryKey: [QUERY_KEYS.usageSnapshots, activeTenantId],

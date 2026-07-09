@@ -46,6 +46,8 @@ export type TeamStatusValue = 'active' | 'idle' | 'offline'
 export interface UsageTeamStatusRow {
   session_id: string
   user_id: string
+  name: string | null
+  email: string | null
   tenant_id: string
   model: string
   project_hash: string
