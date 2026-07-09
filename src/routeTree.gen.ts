@@ -15,6 +15,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppUsageRouteImport } from './routes/_app/usage'
 import { Route as AppTeamScheduleRouteImport } from './routes/_app/team-schedule'
 import { Route as AppScheduleRouteImport } from './routes/_app/schedule'
 import { Route as AppNotificationsRouteImport } from './routes/_app/notifications'
@@ -33,6 +34,7 @@ import { Route as AppTeamMembersRouteImport } from './routes/_app/team/members'
 import { Route as AppTeamInvitesRouteImport } from './routes/_app/team/invites'
 import { Route as AppIncidentsIncidentIdRouteImport } from './routes/_app/incidents/$incidentId'
 import { Route as AppAdminImportRouteImport } from './routes/_app/admin/import'
+import { Route as AppAccountTokensRouteImport } from './routes/_app/account/tokens'
 import { Route as AppAccountSecurityRouteImport } from './routes/_app/account/security'
 import { Route as AppAccountProfileRouteImport } from './routes/_app/account/profile'
 
@@ -64,6 +66,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppUsageRoute = AppUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => AppRouteRoute,
 } as any)
 const AppTeamScheduleRoute = AppTeamScheduleRouteImport.update({
   id: '/team-schedule',
@@ -155,6 +162,11 @@ const AppAdminImportRoute = AppAdminImportRouteImport.update({
   path: '/import',
   getParentRoute: () => AppAdminRouteRoute,
 } as any)
+const AppAccountTokensRoute = AppAccountTokensRouteImport.update({
+  id: '/tokens',
+  path: '/tokens',
+  getParentRoute: () => AppAccountRouteRoute,
+} as any)
 const AppAccountSecurityRoute = AppAccountSecurityRouteImport.update({
   id: '/security',
   path: '/security',
@@ -184,8 +196,10 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof AppNotificationsRoute
   '/schedule': typeof AppScheduleRoute
   '/team-schedule': typeof AppTeamScheduleRoute
+  '/usage': typeof AppUsageRoute
   '/account/profile': typeof AppAccountProfileRoute
   '/account/security': typeof AppAccountSecurityRoute
+  '/account/tokens': typeof AppAccountTokensRoute
   '/admin/import': typeof AppAdminImportRoute
   '/incidents/$incidentId': typeof AppIncidentsIncidentIdRoute
   '/team/invites': typeof AppTeamInvitesRoute
@@ -211,8 +225,10 @@ export interface FileRoutesByTo {
   '/notifications': typeof AppNotificationsRoute
   '/schedule': typeof AppScheduleRoute
   '/team-schedule': typeof AppTeamScheduleRoute
+  '/usage': typeof AppUsageRoute
   '/account/profile': typeof AppAccountProfileRoute
   '/account/security': typeof AppAccountSecurityRoute
+  '/account/tokens': typeof AppAccountTokensRoute
   '/admin/import': typeof AppAdminImportRoute
   '/incidents/$incidentId': typeof AppIncidentsIncidentIdRoute
   '/team/invites': typeof AppTeamInvitesRoute
@@ -240,8 +256,10 @@ export interface FileRoutesById {
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/schedule': typeof AppScheduleRoute
   '/_app/team-schedule': typeof AppTeamScheduleRoute
+  '/_app/usage': typeof AppUsageRoute
   '/_app/account/profile': typeof AppAccountProfileRoute
   '/_app/account/security': typeof AppAccountSecurityRoute
+  '/_app/account/tokens': typeof AppAccountTokensRoute
   '/_app/admin/import': typeof AppAdminImportRoute
   '/_app/incidents/$incidentId': typeof AppIncidentsIncidentIdRoute
   '/_app/team/invites': typeof AppTeamInvitesRoute
@@ -269,8 +287,10 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/schedule'
     | '/team-schedule'
+    | '/usage'
     | '/account/profile'
     | '/account/security'
+    | '/account/tokens'
     | '/admin/import'
     | '/incidents/$incidentId'
     | '/team/invites'
@@ -296,8 +316,10 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/schedule'
     | '/team-schedule'
+    | '/usage'
     | '/account/profile'
     | '/account/security'
+    | '/account/tokens'
     | '/admin/import'
     | '/incidents/$incidentId'
     | '/team/invites'
@@ -324,8 +346,10 @@ export interface FileRouteTypes {
     | '/_app/notifications'
     | '/_app/schedule'
     | '/_app/team-schedule'
+    | '/_app/usage'
     | '/_app/account/profile'
     | '/_app/account/security'
+    | '/_app/account/tokens'
     | '/_app/admin/import'
     | '/_app/incidents/$incidentId'
     | '/_app/team/invites'
@@ -386,6 +410,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/usage': {
+      id: '/_app/usage'
+      path: '/usage'
+      fullPath: '/usage'
+      preLoaderRoute: typeof AppUsageRouteImport
+      parentRoute: typeof AppRouteRoute
     }
     '/_app/team-schedule': {
       id: '/_app/team-schedule'
@@ -513,6 +544,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminImportRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
+    '/_app/account/tokens': {
+      id: '/_app/account/tokens'
+      path: '/tokens'
+      fullPath: '/account/tokens'
+      preLoaderRoute: typeof AppAccountTokensRouteImport
+      parentRoute: typeof AppAccountRouteRoute
+    }
     '/_app/account/security': {
       id: '/_app/account/security'
       path: '/security'
@@ -533,11 +571,13 @@ declare module '@tanstack/react-router' {
 interface AppAccountRouteRouteChildren {
   AppAccountProfileRoute: typeof AppAccountProfileRoute
   AppAccountSecurityRoute: typeof AppAccountSecurityRoute
+  AppAccountTokensRoute: typeof AppAccountTokensRoute
 }
 
 const AppAccountRouteRouteChildren: AppAccountRouteRouteChildren = {
   AppAccountProfileRoute: AppAccountProfileRoute,
   AppAccountSecurityRoute: AppAccountSecurityRoute,
+  AppAccountTokensRoute: AppAccountTokensRoute,
 }
 
 const AppAccountRouteRouteWithChildren = AppAccountRouteRoute._addFileChildren(
@@ -585,6 +625,7 @@ interface AppRouteRouteChildren {
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppScheduleRoute: typeof AppScheduleRoute
   AppTeamScheduleRoute: typeof AppTeamScheduleRoute
+  AppUsageRoute: typeof AppUsageRoute
   AppIncidentsIncidentIdRoute: typeof AppIncidentsIncidentIdRoute
   AppIncidentsIndexRoute: typeof AppIncidentsIndexRoute
 }
@@ -602,6 +643,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppNotificationsRoute: AppNotificationsRoute,
   AppScheduleRoute: AppScheduleRoute,
   AppTeamScheduleRoute: AppTeamScheduleRoute,
+  AppUsageRoute: AppUsageRoute,
   AppIncidentsIncidentIdRoute: AppIncidentsIncidentIdRoute,
   AppIncidentsIndexRoute: AppIncidentsIndexRoute,
 }

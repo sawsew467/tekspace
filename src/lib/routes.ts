@@ -16,7 +16,9 @@ export const ROUTES = {
     account: {
       profile: '/account/profile',
       security: '/account/security',
+      tokens: '/account/tokens',
     },
+    usage: '/usage',
     team: {
       members: '/team/members',
       invites: '/team/invites',

@@ -17,4 +17,8 @@ export const QUERY_KEYS = {
   selfStreak: 'self-streak',               // Story 8.12: consecutive report days streak
   incidentOutcomeNotes: 'incident-outcome-notes', // incident outcome notes
   incidentResolutions: 'incident-resolutions',    // Story 9.3: incident lifecycle resolutions
+  deviceTokens: 'device-tokens',                  // Claude usage: user's API tokens
+  usageTeamStatus: 'usage-team-status',           // Claude usage: team status view
+  usageSnapshots: 'usage-snapshots',              // Claude usage: snapshots over time
+  usageSessionHistory: 'usage-session-history',   // Claude usage: per-session snapshot history
 } as const
