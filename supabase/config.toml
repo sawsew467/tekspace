@@ -400,6 +400,10 @@ verify_jwt = false
 [functions.demote-member]
 verify_jwt = false
 
+# ingest-usage authenticates an opaque device token (cku_...), not a Supabase JWT.
+[functions.ingest-usage]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
