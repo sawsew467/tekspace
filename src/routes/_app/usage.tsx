@@ -276,7 +276,7 @@ function UserDetailSheet({
                     <TableHead className='text-xs'>Branch</TableHead>
                     <TableHead className='text-xs'>Model</TableHead>
                     <TableHead className='text-xs'>Hoạt động</TableHead>
-                    <TableHead className='text-xs'>Ctx%</TableHead>
+                    <TableHead className='text-xs'>Tokens</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -293,7 +293,7 @@ function UserDetailSheet({
                         {format(new Date(s.last_seen_at), 'dd/MM HH:mm')}
                       </TableCell>
                       <TableCell className='text-xs tabular-nums'>
-                        {s.latest ? `${s.latest.context_percent}%` : '—'}
+                        {s.latest ? s.latest.context_tokens.toLocaleString() : '—'}
                       </TableCell>
                     </TableRow>
                   ))}
