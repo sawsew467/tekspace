@@ -65,3 +65,36 @@ export interface TeamTableRow extends UsageTeamStatusRow {
   /** Display name — populated from auth metadata where available */
   display_name?: string
 }
+
+/** Một session của user, dùng trong detail sheet (gộp theo user). */
+export interface SessionSummary {
+  session_id: string
+  model: string | null
+  project_name: string | null
+  branch: string | null
+  started_at: string
+  last_seen_at: string
+  /** Trạng thái live (chỉ có ý nghĩa cho kỳ hiện tại). */
+  status?: TeamStatusValue
+  /** Snapshot mới nhất của session này. */
+  latest?: UsageSnapshotRow
+}
+
+/** Dòng bảng usage gộp theo user (user_id + tenant_id). */
+export interface UserUsageRow {
+  user_id: string
+  tenant_id: string
+  email: string | null
+  name: string | null
+  /** Model của session hoạt động gần nhất. */
+  model: string | null
+  /** Trạng thái tổng hợp: active nếu có ≥1 session active; null cho kỳ quá khứ. */
+  status: TeamStatusValue | null
+  sessionCount: number
+  /** Các session của user trong kỳ (cho detail sheet). */
+  sessions: SessionSummary[]
+  /** Thời điểm hoạt động gần nhất (max last_seen_at), ISO. */
+  lastActivity: string
+  /** Snapshot mới nhất trên toàn bộ session của user. */
+  latest?: UsageSnapshotRow
+}

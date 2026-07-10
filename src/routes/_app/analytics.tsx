@@ -14,7 +14,7 @@ import { useMemberTrend } from '@/features/analytics/hooks/use-member-trend'
 import { TeamAnalyticsOverview } from '@/features/analytics/components/TeamAnalyticsOverview'
 import { MemberTrendChart } from '@/features/analytics/components/MemberTrendChart'
 import { SelfAnalyticsHistory } from '@/features/analytics/components/SelfAnalyticsHistory'
-import { PeriodNavigator } from '@/features/analytics/components/PeriodNavigator'
+import { PeriodNavigator } from '@/components/period-navigator'
 import {
   type Granularity,
   type Period,

@@ -14,30 +14,38 @@ import {
   shiftPeriod,
   formatPeriodLabel,
   isCurrentOrFuturePeriod,
-} from '@/features/analytics/utils/analytics.utils'
+} from '@/lib/period'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const GRANULARITY_OPTIONS: { value: Granularity; label: string }[] = [
-  { value: 'day', label: 'Ngày' },
-  { value: 'week', label: 'Tuần' },
-  { value: 'month', label: 'Tháng' },
-  { value: 'year', label: 'Năm' },
-]
+const GRANULARITY_LABELS: Record<Granularity, string> = {
+  day: 'Ngày',
+  week: 'Tuần',
+  month: 'Tháng',
+  year: 'Năm',
+}
+
+const ALL_GRANULARITIES: Granularity[] = ['day', 'week', 'month', 'year']
 
 // ── PeriodNavigator ─────────────────────────────────────────────────────────────
 
 interface PeriodNavigatorProps {
   period: Period
   onChange: (next: Period) => void
+  /** Giới hạn mức gom hiển thị (mặc định cả 4). VD /usage chỉ ['day','week','month']. */
+  granularities?: Granularity[]
 }
 
 /**
- * PeriodNavigator — bộ chọn mức gom (Ngày/Tuần/Tháng/Năm) + điều hướng lùi/tiến kỳ.
+ * PeriodNavigator — bộ chọn mức gom + điều hướng lùi/tiến kỳ.
  * Nút "tiến" bị disable khi đang ở kỳ hiện tại/tương lai (không cho vượt hiện tại).
  * Đổi granularity → reset anchor về hôm nay để tránh anchor lệch giữa các mức.
  */
-export function PeriodNavigator({ period, onChange }: PeriodNavigatorProps) {
+export function PeriodNavigator({
+  period,
+  onChange,
+  granularities = ALL_GRANULARITIES,
+}: PeriodNavigatorProps) {
   const atLatest = isCurrentOrFuturePeriod(period)
 
   return (
@@ -52,9 +60,9 @@ export function PeriodNavigator({ period, onChange }: PeriodNavigatorProps) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {GRANULARITY_OPTIONS.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value} className="text-xs">
-              {opt.label}
+          {granularities.map((g) => (
+            <SelectItem key={g} value={g} className="text-xs">
+              {GRANULARITY_LABELS[g]}
             </SelectItem>
           ))}
         </SelectContent>
