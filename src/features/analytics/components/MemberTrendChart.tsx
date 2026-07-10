@@ -14,11 +14,11 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import {
-  calcAvgCommitmentRate,
   formatRate,
   getCommitmentRateColorClass,
+  getGranularityUnit,
+  type Granularity,
 } from '@/features/analytics/utils/analytics.utils'
-import type { WeeklyHoursRow } from '@/features/analytics/services/analytics.service'
 
 // ── Chart config ───────────────────────────────────────────────────────────────
 
@@ -33,17 +33,15 @@ const chartConfig = {
 
 interface MemberTrendChartProps {
   memberName: string
-  chartData: { weekLabel: string; actual: number; committed: number }[]
-  weeklyHours: WeeklyHoursRow[]
-  committedHoursPerWeek: number
+  chartData: { label: string; actual: number; committed: number }[]
+  granularity: Granularity
   isLoading: boolean
 }
 
 export function MemberTrendChart({
   memberName,
   chartData,
-  weeklyHours,
-  committedHoursPerWeek,
+  granularity,
   isLoading,
 }: MemberTrendChartProps) {
   if (isLoading) {
@@ -55,13 +53,22 @@ export function MemberTrendChart({
     )
   }
 
-  const avgRate = calcAvgCommitmentRate(weeklyHours, committedHoursPerWeek)
+  const unit = getGranularityUnit(granularity)
+  const unitCap = unit.charAt(0).toUpperCase() + unit.slice(1)
+
+  // Commitment rate = tổng thực tế / tổng cam kết trên toàn cửa sổ — độc lập granularity.
+  const totalActual = chartData.reduce((sum, d) => sum + d.actual, 0)
+  const totalCommitted = chartData.reduce((sum, d) => sum + d.committed, 0)
+  const avgRate = totalCommitted > 0 ? totalActual / totalCommitted : null
   const avgRateColorClass = getCommitmentRateColorClass(avgRate)
+
+  // Đường cam kết = trung bình committed/bucket (với week là hằng số, các mức khác là mức tham chiếu).
+  const avgCommitted = chartData.length > 0 ? totalCommitted / chartData.length : 0
 
   // YAxis upper bound: đảm bảo reference line luôn hiển thị đủ
   const yMax = Math.max(
     ...chartData.map(w => w.actual),
-    committedHoursPerWeek,
+    avgCommitted,
   )
 
   return (
@@ -81,9 +88,9 @@ export function MemberTrendChart({
       {chartData.length === 0 || chartData.every(w => w.actual === 0) ? (
         <div className="h-52 flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
           <span>Không có dữ liệu báo cáo trong khoảng thời gian này.</span>
-          {committedHoursPerWeek > 0 && (
+          {avgCommitted > 0 && (
             <span className="text-xs">
-              Mục tiêu: {committedHoursPerWeek}h/tuần
+              Mục tiêu: ~{Math.round(avgCommitted)}h/{unit}
             </span>
           )}
         </div>
@@ -96,7 +103,7 @@ export function MemberTrendChart({
           >
             <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
             <XAxis
-              dataKey="weekLabel"
+              dataKey="label"
               tickLine={false}
               axisLine={false}
               tick={{ fontSize: 11 }}
@@ -116,18 +123,18 @@ export function MemberTrendChart({
                     if (name === 'actual') return [`${value}h`, 'Thực tế']
                     return [`${value}h`, String(name)]
                   }}
-                  labelFormatter={(label) => `Tuần ${label}`}
+                  labelFormatter={(label) => `${unitCap} ${label}`}
                 />
               }
             />
-            {/* Committed target line — hiển thị rõ mục tiêu */}
+            {/* Committed target line — mức cam kết trung bình/bucket */}
             <ReferenceLine
-              y={committedHoursPerWeek}
+              y={avgCommitted}
               stroke="var(--muted-foreground)"
               strokeDasharray="5 3"
               strokeWidth={1.5}
               label={{
-                value: `${committedHoursPerWeek}h`,
+                value: `~${Math.round(avgCommitted)}h`,
                 position: 'right',
                 fontSize: 10,
                 fill: 'var(--muted-foreground)',
@@ -151,7 +158,7 @@ export function MemberTrendChart({
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-px w-4 border-t-2 border-dashed border-muted-foreground" />
-          Cam kết ({committedHoursPerWeek}h/tuần)
+          Cam kết (~{Math.round(avgCommitted)}h/{unit})
         </span>
       </div>
     </div>
