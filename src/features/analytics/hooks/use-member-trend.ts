@@ -1,16 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTenantStore } from '@/stores/tenant-store'
 import { QUERY_KEYS } from '@/lib/query-keys'
-import { AnalyticsService } from '@/features/analytics/services/analytics.service'
-import { groupReportsByWeek } from '@/features/analytics/utils/analytics.utils'
-import type {
-  WeeklyHoursRow,
-  CommittedHoursHistoryRow,
+import {
+  AnalyticsService,
+  type WeeklyHoursRow,
+  type CommittedHoursHistoryRow,
 } from '@/features/analytics/services/analytics.service'
+import { groupReportsByWeek } from '@/features/analytics/utils/analytics.utils'
 
 export type MemberTrendData = {
   weeklyHours: WeeklyHoursRow[]
   committedHistory: CommittedHoursHistoryRow[]
+  dailyReports: { report_date: string; hours_logged: number }[]
 }
 
 /**
@@ -45,6 +46,7 @@ export function useMemberTrend(
       return {
         weeklyHours: groupReportsByWeek(reports),
         committedHistory: history,
+        dailyReports: reports,
       }
     },
     enabled: !!activeTenantId && !!userId && !!startDate && !!endDate,

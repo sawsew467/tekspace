@@ -13,6 +13,8 @@ interface MemberRowProps {
   member: TenantMemberWithUser
   actualHours: number
   defaultCommittedHours: number
+  /** Hệ số quy đổi committed hàng tuần sang kỳ đang chọn (week=1, month=#tuần, day=1/5...). */
+  committedMultiplier: number
   isSelected: boolean
   onClick: (userId: string) => void
 }
@@ -23,10 +25,13 @@ function MemberRow({
   member,
   actualHours,
   defaultCommittedHours,
+  committedMultiplier,
   isSelected,
   onClick,
 }: MemberRowProps) {
-  const effectiveCommitted = member.committed_hours ?? defaultCommittedHours
+  const weeklyCommitted = member.committed_hours ?? defaultCommittedHours
+  // Committed của kỳ = committed hàng tuần × hệ số kỳ → mẫu số tỷ lệ đúng theo mức gom.
+  const effectiveCommitted = weeklyCommitted * committedMultiplier
   const rate = calcCommitmentRate(actualHours, effectiveCommitted)
   const rateColorClass = getCommitmentRateColorClass(rate)
   const displayName =
@@ -63,9 +68,9 @@ function MemberRow({
         </div>
       </td>
 
-      {/* Committed hours */}
+      {/* Committed hours (đã quy đổi theo kỳ) */}
       <td className="py-3 px-4 text-sm text-right tabular-nums">
-        {effectiveCommitted}h
+        {Math.round(effectiveCommitted)}h
       </td>
 
       {/* Actual hours this week */}
@@ -85,9 +90,11 @@ function MemberRow({
 
 interface TeamAnalyticsOverviewProps {
   members: TenantMemberWithUser[]
-  /** userId → totalHours in current week */
+  /** userId → totalHours trong kỳ đang chọn */
   hoursMap: Map<string, number>
   defaultCommittedHours: number
+  /** Hệ số quy đổi committed hàng tuần sang kỳ đang chọn. */
+  committedMultiplier: number
   isLoading: boolean
   selectedUserId: string | null
   onSelectMember: (userId: string) => void
@@ -97,6 +104,7 @@ export function TeamAnalyticsOverview({
   members,
   hoursMap,
   defaultCommittedHours,
+  committedMultiplier,
   isLoading,
   selectedUserId,
   onSelectMember,
@@ -157,6 +165,7 @@ export function TeamAnalyticsOverview({
               member={member}
               actualHours={hoursMap.get(member.user_id) ?? 0}
               defaultCommittedHours={defaultCommittedHours}
+              committedMultiplier={committedMultiplier}
               isSelected={selectedUserId === member.user_id}
               onClick={onSelectMember}
             />

@@ -21,4 +21,5 @@ export const QUERY_KEYS = {
   usageTeamStatus: 'usage-team-status',           // Claude usage: team status view
   usageSnapshots: 'usage-snapshots',              // Claude usage: snapshots over time
   usageSessionHistory: 'usage-session-history',   // Claude usage: per-session snapshot history
+  usageSessions: 'usage-sessions',                // Claude usage: sessions active in a period
 } as const

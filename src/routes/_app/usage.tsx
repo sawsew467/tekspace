@@ -8,7 +8,7 @@ import {
   type ColumnDef,
   type Table as TanstackTable,
 } from '@tanstack/react-table'
-import { Activity } from 'lucide-react'
+import { Activity, ChevronLeft } from 'lucide-react'
 import { format } from 'date-fns'
 import {
   AreaChart,
@@ -19,6 +19,7 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Sheet,
@@ -45,20 +46,31 @@ import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase-browser'
 import { QUERY_KEYS } from '@/lib/query-keys'
 import { useTenantStore } from '@/stores/tenant-store'
+import { PeriodNavigator } from '@/components/period-navigator'
+import {
+  type Period,
+  getPeriodRange,
+  isCurrentOrFuturePeriod,
+} from '@/lib/period'
+import {
+  fetchTeamStatus,
+  fetchSnapshotsForPeriod,
+  fetchSessionsForPeriod,
+  fetchSnapshotHistory,
+} from '@/features/usage/services/usage.service'
+import {
+  latestPerSession,
+  groupByUser,
+  buildUsageChartData,
+  periodToTimestampBounds,
+  type SessionInput,
+} from '@/features/usage/utils/usage-aggregate'
 import type {
-  UsageTeamStatusRow,
   UsageSnapshotRow,
-  TeamTableRow,
   TeamStatusValue,
+  UserUsageRow,
+  SessionSummary,
 } from '@/lib/usage-types'
-
-// ── Untyped client helper ─────────────────────────────────────────────────────
-// The generated Database type does not yet include the usage-tracking tables
-// (migration applied locally but not regenerated against cloud).
-// We cast through `unknown` at the query boundary only, keeping all call-site
-// types explicit via our local UsageTeamStatusRow / UsageSnapshotRow types.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as unknown as { from: (t: string) => any }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
@@ -78,50 +90,11 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-// ── Data helpers ───────────────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────────
 
-async function fetchTeamStatus(tenantId: string): Promise<UsageTeamStatusRow[]> {
-  // Scope to the ACTIVE tenant. RLS allows any tenant the user is a member of
-  // (membership-based so realtime works), so the active-tenant filter must be
-  // applied here — otherwise a multi-tenant user sees every tenant's usage merged.
-  const { data, error } = await db.from('usage_team_status')
-    .select('session_id, user_id, email, tenant_id, model, project_hash, project_name, branch, started_at, last_seen_at, status')
-    .eq('tenant_id', tenantId)
-    .order('last_seen_at', { ascending: false })
-  if (error) throw new Error(error.message)
-  return (data ?? []) as UsageTeamStatusRow[]
-}
-
-async function fetchLatestSnapshots(tenantId: string): Promise<UsageSnapshotRow[]> {
-  // Fetch all snapshots ordered by created_at desc so we can pick the latest per session client-side.
-  // context_tokens is a point-in-time value, so we take only the most recent per session.
-  const { data, error } = await db.from('usage_snapshots')
-    .select('id, session_id, user_id, tenant_id, context_percent, context_tokens, lines_added, lines_removed, five_hour_pct, seven_day_pct, created_at')
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false })
-  if (error) throw new Error(error.message)
-  return (data ?? []) as UsageSnapshotRow[]
-}
-
-async function fetchSnapshotHistory(sessionId: string): Promise<UsageSnapshotRow[]> {
-  const { data, error } = await db.from('usage_snapshots')
-    .select('id, session_id, user_id, tenant_id, context_percent, context_tokens, lines_added, lines_removed, five_hour_pct, seven_day_pct, created_at')
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: false })
-    .limit(50)
-  if (error) throw new Error(error.message)
-  return (data ?? []) as UsageSnapshotRow[]
-}
-
-/** Returns the latest snapshot per session_id (snapshots must be ordered by created_at DESC) */
-function latestPerSession(snapshots: UsageSnapshotRow[]): Map<string, UsageSnapshotRow> {
-  const map = new Map<string, UsageSnapshotRow>()
-  for (const snap of snapshots) {
-    if (!map.has(snap.session_id)) {
-      map.set(snap.session_id, snap)
-    }
-  }
-  return map
+/** Nhãn hiển thị của user: name → email → user_id rút gọn. */
+function userLabel(u: { name: string | null; email: string | null; user_id: string }): string {
+  return u.name || u.email || `${u.user_id.slice(0, 8)}…`
 }
 
 // ── Status badge ───────────────────────────────────────────────────────────────
@@ -167,88 +140,160 @@ function CtxBar({ pct }: { pct: number }) {
   )
 }
 
-// ── Session history sheet ──────────────────────────────────────────────────────
+// ── Snapshot history table (per session) ────────────────────────────────────────
 
-function SessionHistorySheet({
-  row,
+function SnapshotHistoryTable({ history }: { history: UsageSnapshotRow[] }) {
+  if (history.length === 0) {
+    return (
+      <p className='text-sm text-muted-foreground py-8 text-center'>
+        Không có snapshot nào.
+      </p>
+    )
+  }
+  return (
+    <div className='overflow-x-auto rounded-md border'>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className='text-xs'>Thời gian</TableHead>
+            <TableHead className='text-xs'>Ctx%</TableHead>
+            <TableHead className='text-xs'>Tokens</TableHead>
+            <TableHead className='text-xs'>+Lines</TableHead>
+            <TableHead className='text-xs'>−Lines</TableHead>
+            <TableHead className='text-xs'>5h%</TableHead>
+            <TableHead className='text-xs'>7d%</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {history.map((snap) => (
+            <TableRow key={snap.id}>
+              <TableCell className='text-xs text-muted-foreground whitespace-nowrap'>
+                {format(new Date(snap.created_at), 'dd/MM HH:mm')}
+              </TableCell>
+              <TableCell className='text-xs'>
+                <span className={snap.context_percent > 80 ? 'text-destructive font-semibold' : ''}>
+                  {snap.context_percent}%
+                </span>
+              </TableCell>
+              <TableCell className='text-xs tabular-nums'>
+                {snap.context_tokens.toLocaleString()}
+              </TableCell>
+              <TableCell className='text-xs tabular-nums text-green-600'>
+                +{snap.lines_added.toLocaleString()}
+              </TableCell>
+              <TableCell className='text-xs tabular-nums text-destructive'>
+                −{snap.lines_removed.toLocaleString()}
+              </TableCell>
+              <TableCell className='text-xs'>
+                {snap.five_hour_pct != null ? `${snap.five_hour_pct}%` : '—'}
+              </TableCell>
+              <TableCell className='text-xs'>
+                {snap.seven_day_pct != null ? `${snap.seven_day_pct}%` : '—'}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
+// ── User detail sheet (sessions → snapshot history) ─────────────────────────────
+
+function UserDetailSheet({
+  user,
   open,
   onOpenChange,
 }: {
-  row: TeamTableRow | null
+  user: UserUsageRow | null
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
+  const [selectedSession, setSelectedSession] = useState<SessionSummary | null>(null)
+
   const { data: history = [], isLoading } = useQuery({
-    queryKey: [QUERY_KEYS.usageSessionHistory, row?.session_id],
-    queryFn: () => fetchSnapshotHistory(row!.session_id),
-    enabled: open && !!row?.session_id,
+    queryKey: [QUERY_KEYS.usageSessionHistory, selectedSession?.session_id],
+    queryFn: () => fetchSnapshotHistory(selectedSession!.session_id),
+    enabled: open && !!selectedSession?.session_id,
     staleTime: 10_000,
   })
 
+  const displayName = user ? userLabel(user) : 'User'
+
+  // Đóng sheet → reset về danh sách session (đổi user reset qua key ở parent).
+  const handleOpenChange = (v: boolean) => {
+    if (!v) setSelectedSession(null)
+    onOpenChange(v)
+  }
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side='right' className='w-full sm:max-w-lg overflow-y-auto'>
         <SheetHeader>
           <SheetTitle className='flex items-center gap-2'>
             <Activity className='size-4' />
-            {row?.project_name ?? row?.session_id ?? 'Session'}
+            {displayName}
           </SheetTitle>
           <SheetDescription>
-            {row?.model && <span className='font-mono text-xs'>{row.model}</span>}
-            {row?.branch && <span className='ml-2 text-xs'>branch: {row.branch}</span>}
+            {user ? `${user.sessionCount} session · hoạt động gần nhất ${format(new Date(user.lastActivity), 'dd/MM HH:mm')}` : null}
           </SheetDescription>
         </SheetHeader>
 
-        <div className='mt-4 px-4 pb-4'>
-          {isLoading ? (
-            <div className='space-y-2'>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className='h-10 w-full' />
-              ))}
-            </div>
-          ) : history.length === 0 ? (
-            <p className='text-sm text-muted-foreground py-8 text-center'>
-              Không có snapshot nào.
-            </p>
+        <div className='mt-4 px-4 pb-4 space-y-3'>
+          {selectedSession ? (
+            <>
+              <div className='flex items-center gap-2'>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  className='h-7 px-2 text-xs'
+                  onClick={() => setSelectedSession(null)}
+                >
+                  <ChevronLeft className='size-3.5' /> Sessions
+                </Button>
+                <span className='text-xs text-muted-foreground truncate'>
+                  {selectedSession.project_name ?? selectedSession.session_id}
+                  {selectedSession.branch && <span className='ml-2'>branch: {selectedSession.branch}</span>}
+                </span>
+              </div>
+              {isLoading ? (
+                <div className='space-y-2'>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className='h-10 w-full' />
+                  ))}
+                </div>
+              ) : (
+                <SnapshotHistoryTable history={history} />
+              )}
+            </>
           ) : (
             <div className='overflow-x-auto rounded-md border'>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className='text-xs'>Thời gian</TableHead>
-                    <TableHead className='text-xs'>Ctx%</TableHead>
+                    <TableHead className='text-xs'>Project</TableHead>
+                    <TableHead className='text-xs'>Branch</TableHead>
+                    <TableHead className='text-xs'>Model</TableHead>
+                    <TableHead className='text-xs'>Hoạt động</TableHead>
                     <TableHead className='text-xs'>Tokens</TableHead>
-                    <TableHead className='text-xs'>+Lines</TableHead>
-                    <TableHead className='text-xs'>−Lines</TableHead>
-                    <TableHead className='text-xs'>5h%</TableHead>
-                    <TableHead className='text-xs'>7d%</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {history.map((snap) => (
-                    <TableRow key={snap.id}>
+                  {user?.sessions.map((s) => (
+                    <TableRow
+                      key={s.session_id}
+                      className='cursor-pointer hover:bg-muted/50'
+                      onClick={() => setSelectedSession(s)}
+                    >
+                      <TableCell className='text-sm'>{s.project_name ?? '—'}</TableCell>
+                      <TableCell className='font-mono text-xs text-muted-foreground'>{s.branch ?? '—'}</TableCell>
+                      <TableCell className='font-mono text-xs'>{s.model ?? '—'}</TableCell>
                       <TableCell className='text-xs text-muted-foreground whitespace-nowrap'>
-                        {format(new Date(snap.created_at), 'dd/MM HH:mm')}
-                      </TableCell>
-                      <TableCell className='text-xs'>
-                        <span className={snap.context_percent > 80 ? 'text-destructive font-semibold' : ''}>
-                          {snap.context_percent}%
-                        </span>
+                        {format(new Date(s.last_seen_at), 'dd/MM HH:mm')}
                       </TableCell>
                       <TableCell className='text-xs tabular-nums'>
-                        {snap.context_tokens.toLocaleString()}
-                      </TableCell>
-                      <TableCell className='text-xs tabular-nums text-green-600'>
-                        +{snap.lines_added.toLocaleString()}
-                      </TableCell>
-                      <TableCell className='text-xs tabular-nums text-destructive'>
-                        −{snap.lines_removed.toLocaleString()}
-                      </TableCell>
-                      <TableCell className='text-xs'>
-                        {snap.five_hour_pct != null ? `${snap.five_hour_pct}%` : '—'}
-                      </TableCell>
-                      <TableCell className='text-xs'>
-                        {snap.seven_day_pct != null ? `${snap.seven_day_pct}%` : '—'}
+                        {s.latest ? s.latest.context_tokens.toLocaleString() : '—'}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -308,54 +353,49 @@ function useUsageRealtime(tenantId: string | null) {
   }, [tenantId, queryClient])
 }
 
-// ── Team table columns ─────────────────────────────────────────────────────────
+// ── User table columns ─────────────────────────────────────────────────────────
 
-function useTeamColumns(
-  onRowClick: (row: TeamTableRow) => void
-): ColumnDef<TeamTableRow>[] {
+function useUserColumns(
+  onRowClick: (row: UserUsageRow) => void,
+  showLiveStatus: boolean,
+  teamContextTokens: number,
+): ColumnDef<UserUsageRow>[] {
   return [
     {
       accessorKey: 'user_id',
       header: 'Dev',
-      cell: ({ row }) => {
-        return(
+      cell: ({ row }) => (
         <button
           type='button'
-          className='text-left font-mono text-xs underline-offset-2 hover:underline text-muted-foreground'
+          className='text-left text-xs underline-offset-2 hover:underline'
           onClick={() => onRowClick(row.original)}
         >
-          {row.original.email ?? row.original.user_id.slice(0, 8) + '…'}
+          {userLabel(row.original)}
         </button>
-      )},
+      ),
     },
     {
       accessorKey: 'model',
       header: 'Model',
       cell: ({ row }) => (
-        <span className='font-mono text-xs'>{row.original.model}</span>
+        <span className='font-mono text-xs'>{row.original.model ?? '—'}</span>
       ),
     },
     {
-      accessorKey: 'project_name',
-      header: 'Project',
+      id: 'sessions',
+      header: 'Sessions',
       cell: ({ row }) => (
-        <span className='text-sm'>{row.original.project_name ?? '—'}</span>
+        <span className='text-xs tabular-nums'>{row.original.sessionCount}</span>
       ),
     },
     {
-      accessorKey: 'branch',
-      header: 'Branch',
-      cell: ({ row }) => (
-        <span className='font-mono text-xs text-muted-foreground'>
-          {row.original.branch ?? '—'}
-        </span>
-      ),
-    },
-    {
-      id: 'ctx_pct',
-      header: 'Ctx%',
+      id: 'token_share',
+      header: 'Token %',
       cell: ({ row }) => {
-        const pct = row.original.latest?.context_percent ?? 0
+        // % token của user / tổng token cả team (theo latest-per-session trong kỳ).
+        const pct = teamContextTokens > 0
+          ? Math.round((row.original.contextTokens / teamContextTokens) * 100)
+          : 0
         return <CtxBar pct={pct} />
       },
     },
@@ -399,44 +439,20 @@ function useTeamColumns(
       },
     },
     {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      id: 'status',
+      header: showLiveStatus ? 'Status' : 'Hoạt động gần nhất',
+      cell: ({ row }) => {
+        if (showLiveStatus && row.original.status) {
+          return <StatusBadge status={row.original.status} />
+        }
+        return (
+          <span className='text-xs text-muted-foreground whitespace-nowrap'>
+            {format(new Date(row.original.lastActivity), 'dd/MM HH:mm')}
+          </span>
+        )
+      },
     },
   ]
-}
-
-// ── Chart data builder ─────────────────────────────────────────────────────────
-
-interface ChartPoint {
-  time: string
-  context_tokens: number
-}
-
-/** Build area chart data: sum of the latest context_tokens per session at each timestamp bucket.
- *  We use all snapshots ordered by created_at and bucket by minute for readability. */
-function buildChartData(snapshots: UsageSnapshotRow[]): ChartPoint[] {
-  if (snapshots.length === 0) return []
-
-  // Sort ascending for chart
-  const sorted = [...snapshots].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  )
-
-  // Group by minute bucket, summing context_tokens
-  const buckets = new Map<string, number>()
-  for (const snap of sorted) {
-    const d = new Date(snap.created_at)
-    // Floor to minute
-    d.setSeconds(0, 0)
-    const key = d.toISOString()
-    buckets.set(key, (buckets.get(key) ?? 0) + snap.context_tokens)
-  }
-
-  return Array.from(buckets.entries()).map(([iso, tokens]) => ({
-    time: format(new Date(iso), 'HH:mm'),
-    context_tokens: tokens,
-  }))
 }
 
 // ── Stat cards ─────────────────────────────────────────────────────────────────
@@ -459,14 +475,21 @@ function StatCard({ title, value, sub }: { title: string; value: string | number
 
 function UsagePage() {
   const { activeTenantId } = useTenantStore()
-  const [selectedRow, setSelectedRow] = useState<TeamTableRow | null>(null)
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const [period, setPeriod] = useState<Period>({ granularity: 'day', anchor: today })
+  const [selectedUser, setSelectedUser] = useState<UserUsageRow | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  // Subscribe to realtime updates
-  useUsageRealtime(activeTenantId)
+  const isCurrent = isCurrentOrFuturePeriod(period)
+  const { start, end } = getPeriodRange(period)
+  const { startISO, endExclusiveISO } = periodToTimestampBounds(start, end)
+
+  // Realtime chỉ cho kỳ hiện tại (xem kỳ cũ không bị nhảy dữ liệu).
+  useUsageRealtime(isCurrent ? activeTenantId : null)
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
+  // Team status (live) — dùng cho status hiện tại + map email/name theo user.
   const { data: teamStatus = [], isLoading: isStatusLoading } = useQuery({
     queryKey: [QUERY_KEYS.usageTeamStatus, activeTenantId],
     queryFn: () => fetchTeamStatus(activeTenantId!),
@@ -474,55 +497,84 @@ function UsagePage() {
     staleTime: 15_000,
   })
 
-  const { data: allSnapshots = [], isLoading: isSnapshotsLoading } = useQuery({
-    queryKey: [QUERY_KEYS.usageSnapshots, activeTenantId],
-    queryFn: () => fetchLatestSnapshots(activeTenantId!),
+  // Snapshots trong kỳ.
+  const { data: periodSnapshots = [], isLoading: isSnapshotsLoading } = useQuery({
+    queryKey: [QUERY_KEYS.usageSnapshots, activeTenantId, startISO, endExclusiveISO],
+    queryFn: () => fetchSnapshotsForPeriod(activeTenantId!, startISO, endExclusiveISO),
     enabled: !!activeTenantId,
+    staleTime: 15_000,
+  })
+
+  // Sessions trong kỳ — chỉ cần cho kỳ quá khứ (kỳ hiện tại đã có từ teamStatus).
+  const { data: periodSessions = [] } = useQuery({
+    queryKey: [QUERY_KEYS.usageSessions, activeTenantId, startISO, endExclusiveISO],
+    queryFn: () => fetchSessionsForPeriod(activeTenantId!, startISO, endExclusiveISO),
+    enabled: !!activeTenantId && !isCurrent,
     staleTime: 15_000,
   })
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
-  const latestBySession = useMemo(() => latestPerSession(allSnapshots), [allSnapshots])
+  const latestBySession = useMemo(() => latestPerSession(periodSnapshots), [periodSnapshots])
 
-  // Total context_tokens: sum of latest snapshot per session (not a naive sum of all snapshots)
+  // Map email/name theo user (từ team status live) để bổ sung cho session lịch sử.
+  const identityByUser = useMemo(() => {
+    const m = new Map<string, { email: string | null; name: string | null }>()
+    for (const r of teamStatus) m.set(r.user_id, { email: r.email, name: r.name })
+    return m
+  }, [teamStatus])
+
+  // Nguồn session: kỳ hiện tại = team status (có status); kỳ quá khứ = claude_sessions trong kỳ.
+  const sessions = useMemo<SessionInput[]>(() => {
+    if (isCurrent) return teamStatus
+    return periodSessions.map((s) => ({
+      session_id: s.session_id,
+      user_id: s.user_id,
+      tenant_id: s.tenant_id,
+      email: identityByUser.get(s.user_id)?.email ?? null,
+      name: identityByUser.get(s.user_id)?.name ?? null,
+      model: s.model,
+      project_name: s.project_name,
+      branch: s.branch,
+      started_at: s.started_at,
+      last_seen_at: s.last_seen_at,
+      status: undefined,
+    }))
+  }, [isCurrent, teamStatus, periodSessions, identityByUser])
+
+  const userRows = useMemo(
+    () => groupByUser(sessions, latestBySession),
+    [sessions, latestBySession],
+  )
+
+  // Total context tokens = tổng latest-per-session trong kỳ.
   const totalContextTokens = useMemo(() => {
     let sum = 0
-    for (const snap of latestBySession.values()) {
-      sum += snap.context_tokens
-    }
+    for (const snap of latestBySession.values()) sum += snap.context_tokens ?? 0
     return sum
   }, [latestBySession])
 
-  const activeDevCount = useMemo(
-    () => teamStatus.filter((r) => r.status === 'active').length,
-    [teamStatus]
-  )
+  const activeCount = useMemo(() => {
+    if (isCurrent) return teamStatus.filter((r) => r.status === 'active').length
+    return userRows.length
+  }, [isCurrent, teamStatus, userRows])
 
-  // Enrich team status rows with latest snapshot
-  const teamRows = useMemo<TeamTableRow[]>(
-    () =>
-      teamStatus.map((row) => ({
-        ...row,
-        latest: latestBySession.get(row.session_id),
-      })),
-    [teamStatus, latestBySession]
+  const chartData = useMemo(
+    () => buildUsageChartData(periodSnapshots, period.granularity),
+    [periodSnapshots, period.granularity],
   )
-
-  // Chart data from all snapshots
-  const chartData = useMemo(() => buildChartData(allSnapshots), [allSnapshots])
 
   // ── Table ─────────────────────────────────────────────────────────────────
 
-  const handleRowClick = (row: TeamTableRow) => {
-    setSelectedRow(row)
+  const handleRowClick = (row: UserUsageRow) => {
+    setSelectedUser(row)
     setSheetOpen(true)
   }
 
-  const columns = useTeamColumns(handleRowClick)
+  const columns = useUserColumns(handleRowClick, isCurrent, totalContextTokens)
 
   const table = useReactTable({
-    data: teamRows,
+    data: userRows,
     columns,
     getCoreRowModel: getCoreRowModel(),
   })
@@ -534,10 +586,13 @@ function UsagePage() {
   return (
     <div className='w-full px-4 md:px-6 py-6 space-y-6'>
       {/* Page header */}
-      <div className='flex items-center gap-2'>
-        <Activity className='size-5 text-muted-foreground shrink-0' />
-        <h1 className='text-lg font-semibold'>Claude Usage</h1>
-        <span className='text-xs text-muted-foreground ml-1'>Live</span>
+      <div className='flex flex-wrap items-center justify-between gap-2'>
+        <div className='flex items-center gap-2'>
+          <Activity className='size-5 text-muted-foreground shrink-0' />
+          <h1 className='text-lg font-semibold'>Claude Usage</h1>
+          {isCurrent && <span className='text-xs text-muted-foreground ml-1'>Live</span>}
+        </div>
+        <PeriodNavigator period={period} onChange={setPeriod} granularities={['day', 'week', 'month']} />
       </div>
 
       {/* Stat cards */}
@@ -552,12 +607,12 @@ function UsagePage() {
             <StatCard
               title='Total context tokens'
               value={totalContextTokens.toLocaleString()}
-              sub='Sum of latest context_tokens per active session'
+              sub='Tổng latest context_tokens mỗi session trong kỳ'
             />
             <StatCard
-              title='Active devs'
-              value={activeDevCount}
-              sub='Sessions with status = active right now'
+              title={isCurrent ? 'Active devs' : 'Devs hoạt động'}
+              value={activeCount}
+              sub={isCurrent ? 'Session đang active' : 'Số dev có hoạt động trong kỳ'}
             />
           </>
         )}
@@ -566,14 +621,14 @@ function UsagePage() {
       {/* Area chart: context tokens over time */}
       <Card>
         <CardHeader>
-          <CardTitle className='text-sm font-medium'>Context tokens over time</CardTitle>
+          <CardTitle className='text-sm font-medium'>Context tokens theo thời gian</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <Skeleton className='h-48 w-full' />
           ) : chartData.length === 0 ? (
             <div className='flex h-48 items-center justify-center text-sm text-muted-foreground'>
-              Chưa có dữ liệu snapshot.
+              Chưa có dữ liệu snapshot trong kỳ.
             </div>
           ) : (
             <ChartContainer config={chartConfig} className='h-48 w-full'>
@@ -583,7 +638,7 @@ function UsagePage() {
               >
                 <CartesianGrid vertical={false} strokeDasharray='3 3' className='stroke-border' />
                 <XAxis
-                  dataKey='time'
+                  dataKey='label'
                   tickLine={false}
                   axisLine={false}
                   tick={{ fontSize: 11 }}
@@ -620,10 +675,10 @@ function UsagePage() {
         </CardContent>
       </Card>
 
-      {/* Team table */}
+      {/* User table */}
       <section aria-label='Team usage table'>
         <h2 className='text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3'>
-          Team — sessions
+          Team — theo dev
         </h2>
         {isLoading ? (
           <div className='space-y-2 rounded-lg border border-border p-3'>
@@ -636,14 +691,15 @@ function UsagePage() {
             table={table}
             columns={columns}
             onRowClick={handleRowClick}
-            emptyMessage='Không có session nào. Chạy Claude CLI với TEAM_USAGE_TOKEN để bắt đầu.'
+            emptyMessage='Không có hoạt động nào trong kỳ. Chạy Claude CLI với TEAM_USAGE_TOKEN để bắt đầu.'
           />
         )}
       </section>
 
-      {/* Session history sheet */}
-      <SessionHistorySheet
-        row={selectedRow}
+      {/* User detail sheet */}
+      <UserDetailSheet
+        key={selectedUser?.user_id ?? 'none'}
+        user={selectedUser}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
       />
@@ -652,7 +708,7 @@ function UsagePage() {
 }
 
 // ── ClickableDataTable ─────────────────────────────────────────────────────────
-// Inline table with per-row click handler for the session-history sheet trigger.
+// Inline table with per-row click handler for the user-detail sheet trigger.
 
 function ClickableDataTable({
   table,
@@ -660,9 +716,9 @@ function ClickableDataTable({
   onRowClick,
   emptyMessage,
 }: {
-  table: TanstackTable<TeamTableRow>
-  columns: ColumnDef<TeamTableRow>[]
-  onRowClick: (row: TeamTableRow) => void
+  table: TanstackTable<UserUsageRow>
+  columns: ColumnDef<UserUsageRow>[]
+  onRowClick: (row: UserUsageRow) => void
   emptyMessage?: string
 }) {
   return (

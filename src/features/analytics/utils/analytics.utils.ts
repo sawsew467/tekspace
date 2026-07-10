@@ -1,5 +1,15 @@
-import { format, startOfISOWeek, endOfISOWeek, subWeeks, addDays, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns'
+import { format, startOfISOWeek, endOfISOWeek, subWeeks, addDays, startOfMonth, endOfMonth, subMonths, addMonths, startOfYear, endOfYear, addYears } from 'date-fns'
 import type { WeeklyHoursRow, CommittedHoursHistoryRow } from '@/features/analytics/services/analytics.service'
+import {
+  type Granularity,
+  type Period,
+  getGranularityUnit,
+  getPeriodRange,
+  shiftPeriod,
+  isCurrentOrFuturePeriod,
+  formatPeriodLabel,
+  getWindowRange,
+} from '@/lib/period'
 
 // ── Date range helpers ─────────────────────────────────────────────────────────
 
@@ -204,16 +214,7 @@ export function buildMonthlyChartData(
     const monthKey = format(currentMonth, 'yyyy-MM')
     const monthLabel = format(currentMonth, 'MM/yyyy')
     const monthEnd = endOfMonth(currentMonth)
-
-    // Count ISO weeks (Mondays) starting in this calendar month
-    let weekCount = 0
-    let d = startOfISOWeek(currentMonth)
-    // Đảm bảo d là Monday >= đầu tháng
-    if (d < currentMonth) d = addDays(d, 7)
-    while (d <= monthEnd) {
-      weekCount++
-      d = addDays(d, 7)
-    }
+    const weekCount = countISOWeekStarts(currentMonth, monthEnd)
 
     result.push({
       monthLabel,
@@ -222,6 +223,139 @@ export function buildMonthlyChartData(
     })
 
     currentMonth = addMonths(currentMonth, 1)
+  }
+
+  return result
+}
+
+// ── Period model (re-export từ shared @/lib/period) ─────────────────────────────
+// Model kỳ generic sống ở @/lib/period (dùng chung analytics + usage). Re-export
+// để các consumer analytics giữ import path này không đổi.
+
+export type { Granularity, Period }
+export {
+  getGranularityUnit,
+  getPeriodRange,
+  shiftPeriod,
+  isCurrentOrFuturePeriod,
+  formatPeriodLabel,
+  getWindowRange,
+}
+
+// ── Committed-hours conversion (analytics-specific) ─────────────────────────────
+
+/** Số ngày làm việc/tuần — dùng quy đổi committed hàng tuần sang committed/ngày. */
+export const WORKDAYS_PER_WEEK = 5
+
+/** parseAnchor — 'yyyy-MM-dd' → Date tại local midnight (tránh lệch UTC). */
+function parseAnchor(anchor: string): Date {
+  return new Date(anchor + 'T00:00:00')
+}
+
+/**
+ * countISOWeekStarts — số tuần ISO (thứ Hai) bắt đầu trong khoảng [rangeStart, rangeEnd].
+ * Dùng để quy đổi committed hàng tuần sang committed cho tháng/năm.
+ */
+function countISOWeekStarts(rangeStart: Date, rangeEnd: Date): number {
+  let count = 0
+  let d = startOfISOWeek(rangeStart)
+  if (d < rangeStart) d = addDays(d, 7) // Monday đầu tiên >= rangeStart
+  while (d <= rangeEnd) {
+    count++
+    d = addDays(d, 7)
+  }
+  return count
+}
+
+/**
+ * getPeriodCommittedMultiplier — hệ số quy đổi committed hàng tuần sang tổng committed của kỳ.
+ * week → 1; day → 1/số ngày làm việc (0 nếu T7/CN); month/year → số ISO week bắt đầu trong kỳ.
+ * Nhân với committed hàng tuần của member để có mẫu số tỷ lệ đúng theo mức gom.
+ */
+export function getPeriodCommittedMultiplier(period: Period): number {
+  switch (period.granularity) {
+    case 'week':
+      return 1
+    case 'day': {
+      const dow = parseAnchor(period.anchor).getDay() // 0=CN, 6=T7
+      return dow === 0 || dow === 6 ? 0 : 1 / WORKDAYS_PER_WEEK
+    }
+    case 'month':
+    case 'year': {
+      const { start, end } = getPeriodRange(period)
+      return countISOWeekStarts(parseAnchor(start), parseAnchor(end))
+    }
+  }
+}
+
+/**
+ * buildDailyChartData — tổng hợp raw daily reports theo từng ngày trong range.
+ * Tạo đủ data point cho mọi ngày (kể cả ngày không có report = 0h).
+ * committed/ngày chỉ áp cho ngày làm việc (T2–T6); T7/CN = 0 để đường cam kết hợp lý.
+ * Label 'dd/MM'.
+ */
+export function buildDailyChartData(
+  reports: { report_date: string; hours_logged: number }[],
+  startDate: string,
+  endDate: string,
+  committedPerWorkday: number,
+): { label: string; actual: number; committed: number }[] {
+  const actualByDay = new Map<string, number>()
+  for (const r of reports) {
+    if (!r.report_date) continue
+    actualByDay.set(r.report_date, (actualByDay.get(r.report_date) ?? 0) + r.hours_logged)
+  }
+
+  const result: { label: string; actual: number; committed: number }[] = []
+  let current = parseAnchor(startDate)
+  const end = parseAnchor(endDate)
+  while (current <= end) {
+    const key = format(current, 'yyyy-MM-dd')
+    const dow = current.getDay() // 0=CN, 6=T7
+    const isWorkday = dow !== 0 && dow !== 6
+    result.push({
+      label: format(current, 'dd/MM'),
+      actual: actualByDay.get(key) ?? 0,
+      committed: isWorkday ? committedPerWorkday : 0,
+    })
+    current = addDays(current, 1)
+  }
+  return result
+}
+
+/**
+ * buildYearlyChartData — tổng hợp weeklyHours theo calendar year.
+ * Committed/năm = số ISO week bắt đầu trong năm × committed hàng tuần (≈52).
+ * Tạo đủ data point cho mọi năm trong range. Label 'yyyy'.
+ */
+export function buildYearlyChartData(
+  weeklyHours: { weekOf: string; actualHours: number }[],
+  startDate: string,
+  endDate: string,
+  fallbackCommittedHours: number,
+): { label: string; actual: number; committed: number }[] {
+  const actualByYear = new Map<string, number>()
+  for (const w of weeklyHours) {
+    const yearKey = w.weekOf.substring(0, 4)
+    actualByYear.set(yearKey, (actualByYear.get(yearKey) ?? 0) + w.actualHours)
+  }
+
+  const result: { label: string; actual: number; committed: number }[] = []
+  let currentYear = startOfYear(parseAnchor(startDate))
+  const endYearStart = startOfYear(parseAnchor(endDate))
+
+  while (currentYear <= endYearStart) {
+    const yearKey = format(currentYear, 'yyyy')
+    const yearEnd = endOfYear(currentYear)
+    const weekCount = countISOWeekStarts(currentYear, yearEnd)
+
+    result.push({
+      label: yearKey,
+      actual: actualByYear.get(yearKey) ?? 0,
+      committed: weekCount * fallbackCommittedHours,
+    })
+
+    currentYear = addYears(currentYear, 1)
   }
 
   return result
