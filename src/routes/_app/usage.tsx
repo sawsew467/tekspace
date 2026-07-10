@@ -80,19 +80,24 @@ const chartConfig = {
 
 // ── Data helpers ───────────────────────────────────────────────────────────────
 
-async function fetchTeamStatus(): Promise<UsageTeamStatusRow[]> {
+async function fetchTeamStatus(tenantId: string): Promise<UsageTeamStatusRow[]> {
+  // Scope to the ACTIVE tenant. RLS allows any tenant the user is a member of
+  // (membership-based so realtime works), so the active-tenant filter must be
+  // applied here — otherwise a multi-tenant user sees every tenant's usage merged.
   const { data, error } = await db.from('usage_team_status')
     .select('session_id, user_id, email, tenant_id, model, project_hash, project_name, branch, started_at, last_seen_at, status')
+    .eq('tenant_id', tenantId)
     .order('last_seen_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []) as UsageTeamStatusRow[]
 }
 
-async function fetchLatestSnapshots(): Promise<UsageSnapshotRow[]> {
+async function fetchLatestSnapshots(tenantId: string): Promise<UsageSnapshotRow[]> {
   // Fetch all snapshots ordered by created_at desc so we can pick the latest per session client-side.
   // context_tokens is a point-in-time value, so we take only the most recent per session.
   const { data, error } = await db.from('usage_snapshots')
     .select('id, session_id, user_id, tenant_id, context_percent, context_tokens, lines_added, lines_removed, five_hour_pct, seven_day_pct, created_at')
+    .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []) as UsageSnapshotRow[]
@@ -464,16 +469,14 @@ function UsagePage() {
 
   const { data: teamStatus = [], isLoading: isStatusLoading } = useQuery({
     queryKey: [QUERY_KEYS.usageTeamStatus, activeTenantId],
-    queryFn: fetchTeamStatus,
+    queryFn: () => fetchTeamStatus(activeTenantId!),
     enabled: !!activeTenantId,
     staleTime: 15_000,
   })
 
-  console.log('teamStatus:', teamStatus)
-
   const { data: allSnapshots = [], isLoading: isSnapshotsLoading } = useQuery({
     queryKey: [QUERY_KEYS.usageSnapshots, activeTenantId],
-    queryFn: fetchLatestSnapshots,
+    queryFn: () => fetchLatestSnapshots(activeTenantId!),
     enabled: !!activeTenantId,
     staleTime: 15_000,
   })
