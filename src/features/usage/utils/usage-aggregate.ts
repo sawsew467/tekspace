@@ -82,6 +82,7 @@ export function groupByUser(
         model: s.model,
         status: null,
         sessionCount: 0,
+        contextTokens: 0,
         sessions: [],
         lastActivity: s.last_seen_at,
         latest: undefined,
@@ -91,6 +92,7 @@ export function groupByUser(
 
     row.sessions.push(summary)
     row.sessionCount += 1
+    row.contextTokens += latest?.context_tokens ?? 0
     row.email = row.email ?? s.email
     row.name = row.name ?? s.name
     row.status = mergeStatus(row.status, s.status)

@@ -358,6 +358,7 @@ function useUsageRealtime(tenantId: string | null) {
 function useUserColumns(
   onRowClick: (row: UserUsageRow) => void,
   showLiveStatus: boolean,
+  teamContextTokens: number,
 ): ColumnDef<UserUsageRow>[] {
   return [
     {
@@ -388,9 +389,15 @@ function useUserColumns(
       ),
     },
     {
-      id: 'ctx_pct',
-      header: 'Ctx%',
-      cell: ({ row }) => <CtxBar pct={row.original.latest?.context_percent ?? 0} />,
+      id: 'token_share',
+      header: 'Token %',
+      cell: ({ row }) => {
+        // % token của user / tổng token cả team (theo latest-per-session trong kỳ).
+        const pct = teamContextTokens > 0
+          ? Math.round((row.original.contextTokens / teamContextTokens) * 100)
+          : 0
+        return <CtxBar pct={pct} />
+      },
     },
     {
       id: 'quota_5h',
@@ -564,7 +571,7 @@ function UsagePage() {
     setSheetOpen(true)
   }
 
-  const columns = useUserColumns(handleRowClick, isCurrent)
+  const columns = useUserColumns(handleRowClick, isCurrent, totalContextTokens)
 
   const table = useReactTable({
     data: userRows,

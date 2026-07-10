@@ -91,6 +91,8 @@ export interface UserUsageRow {
   /** Trạng thái tổng hợp: active nếu có ≥1 session active; null cho kỳ quá khứ. */
   status: TeamStatusValue | null
   sessionCount: number
+  /** Tổng context_tokens = Σ latest-per-session của user (dùng tính % share so với team). */
+  contextTokens: number
   /** Các session của user trong kỳ (cho detail sheet). */
   sessions: SessionSummary[]
   /** Thời điểm hoạt động gần nhất (max last_seen_at), ISO. */

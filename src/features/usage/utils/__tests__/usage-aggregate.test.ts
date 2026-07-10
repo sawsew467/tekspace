@@ -78,6 +78,7 @@ describe('groupByUser', () => {
     expect(rows[0].lastActivity).toBe('2026-07-10T10:00:00Z')
     expect(rows[0].model).toBe('opus') // model của session hoạt động gần nhất
     expect(rows[0].latest?.context_tokens).toBe(200) // snapshot mới nhất toàn user
+    expect(rows[0].contextTokens).toBe(300) // Σ latest-per-session (100 + 200)
   })
 
   it('aggregates status active > idle > offline', () => {
